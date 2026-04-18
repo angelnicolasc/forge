@@ -1,0 +1,118 @@
+[project]
+name = "forge-workspace"
+version = "0.0.0"
+description = "Forge — Universal Agent Harness. The living, self-evolving orchestration layer for production multi-agent systems."
+requires-python = ">=3.11"
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+forge-core = { workspace = true }
+forge-adapters = { workspace = true }
+forge-memory = { workspace = true }
+forge-observe = { workspace = true }
+forge-cli = { workspace = true }
+forge-os = { workspace = true }
+
+[tool.uv]
+package = false
+dev-dependencies = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=5.0",
+    "mypy>=1.11",
+    "ruff>=0.7",
+    "pre-commit>=4.0",
+    "hypothesis>=6.100",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "TCH",  # flake8-type-checking
+    "RUF",  # ruff-specific
+]
+# RUF001/002/003 flag em-dashes and Spanish punctuation in docstrings and
+# string literals. The project is written bilingually (code: English,
+# long-form rationale: Spanish with typographically-correct punctuation);
+# the authors of those docstrings consider `—`, `·` intentional.
+# B008 fires on Typer command signatures where `typer.Argument(...)` /
+# `typer.Option(...)` in defaults is the documented usage pattern.
+ignore = ["RUF001", "RUF002", "RUF003", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests intentionally use Capitalized handles for factory returns
+# (e.g. `Messages = _install_fake_anthropic()`), use bare
+# `pytest.raises(Exception)` when the specific subclass would couple the
+# test to an internal call site, and keep long lines in scripted prompts.
+"**/tests/**" = ["N806", "B017", "E501", "SIM105", "SIM102", "F841"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["forge_core", "forge_memory", "forge_adapters", "forge_observe", "forge_cli"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+# Optional SDKs and untyped libs we integrate with — we guard the imports
+# at runtime, so mypy doesn't need stubs.
+[[tool.mypy.overrides]]
+module = [
+    "anthropic.*",
+    "openai.*",
+    "langchain_core.*",
+    "crewai.*",
+    "google.generativeai.*",
+    "networkx",
+    "chromadb.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["packages/*/tests", "tests"]
+addopts = "-ra -q --strict-markers --import-mode=importlib"
+markers = [
+    "slow: marks tests as slow",
+    "integration: marks integration tests",
+]
+
+[tool.coverage.run]
+source = ["packages"]
+omit = [
+    "*/tests/*",
+    "*/_version.py",
+    "*/__main__.py",
+]
+branch = false
+
+[tool.coverage.report]
+# 75% is the launch gate per plan ζ.8; raise only after a green week.
+fail_under = 75
+skip_covered = false
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "\\.\\.\\.",  # Protocol bodies
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

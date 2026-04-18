@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  publish:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    environment: pypi
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v3
+
+      - name: Build all packages
+        run: |
+          mkdir -p dist
+          for pkg in packages/*/; do
+            uv build --package $(basename $pkg) --out-dir dist/
+          done
+
+      # Supply-chain hardening (ζ.10): SBOM + SLSA provenance on every
+      # tag. The SBOM catalogs every transitive dep in SPDX form;
+      # provenance proves the wheel came from this workflow run and
+      # this commit SHA — both become PyPI-verifiable once uploaded.
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: ./dist
+          format: spdx-json
+          output-file: forge-os.spdx.json
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: dist/*
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist/*
+            forge-os.spdx.json

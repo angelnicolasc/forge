@@ -1,0 +1,41 @@
+[project]
+name = "forge-core"
+version = "0.1.0"
+description = "Core orchestration engine for Forge — universal agent harness with self-evolution capabilities."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+authors = [{ name = "Forge Contributors" }]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
+keywords = ["agents", "llm", "orchestration", "harness", "multi-agent", "self-evolving"]
+dependencies = [
+    "pydantic>=2.7,<3.0",
+    "pydantic-settings>=2.4,<3.0",
+    "structlog>=24.0,<26.0",
+    "opentelemetry-api>=1.25",
+    "opentelemetry-sdk>=1.25,<2.0",
+]
+
+[project.optional-dependencies]
+evolution = [
+    "anthropic>=0.40",
+    "openai>=1.50",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/forge_core"]

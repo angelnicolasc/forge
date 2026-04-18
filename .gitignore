@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# uv
+.uv/
+uv.lock  # uncomment to ignore lockfile (not recommended)
+
+# Testing
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.hypothesis/
+
+# Mypy
+.mypy_cache/
+.dmypy.json
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Docs
+site/
+
+# Forge runtime
+~/.forge/  # symlink guard — actual data in user home
+
+# Node (dashboard)
+apps/forge-dashboard/node_modules/
+apps/forge-dashboard/.next/
+apps/forge-dashboard/.turbo/
+
+# Distribution
+*.whl
+*.tar.gz
