@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path  # noqa: TC003  (used as a pytest fixture param type at runtime)
+from typing import TYPE_CHECKING
 
 from typer.testing import CliRunner
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from forge_cli.main import app
 

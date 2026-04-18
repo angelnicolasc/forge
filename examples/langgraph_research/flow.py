@@ -28,7 +28,6 @@ Usage:
 
 from __future__ import annotations
 
-import os
 from typing import Any, TypedDict
 
 # LangGraph imports
@@ -147,8 +146,8 @@ app = build_graph()
 if __name__ == "__main__":
     print("Running research agent directly (without Forge instrumentation)\n")
     print("For the full Forge experience, run:")
-    print("  forge wrap flow.py --input '{\"query\": \"What are agent harnesses?\"}'")
-    print("  forge wrap flow.py --input '{\"query\": \"...\"}'--evolution --dashboard\n")
+    print('  forge wrap flow.py --input \'{"query": "What are agent harnesses?"}\'')
+    print('  forge wrap flow.py --input \'{"query": "..."}\'--evolution --dashboard\n')
 
     result = app.invoke({"query": "What are agent harnesses in AI?"})
     print("\n" + "=" * 60)

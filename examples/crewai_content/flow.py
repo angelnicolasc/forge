@@ -121,5 +121,5 @@ if __name__ == "__main__":
     print("=" * 60)
     print(
         "\nFor the full Forge experience, run:\n"
-        "  forge wrap flow.py --input '{\"topic\":\"AI harnesses\"}'"
+        '  forge wrap flow.py --input \'{"topic":"AI harnesses"}\''
     )

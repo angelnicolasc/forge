@@ -23,6 +23,7 @@ from __future__ import annotations
 import sys
 import types
 from dataclasses import dataclass
+from typing import ClassVar
 
 
 @dataclass
@@ -52,7 +53,7 @@ class Messages:
     """Sync messages resource — what ``instrument_llm_clients`` patches."""
 
     # Scripted responses: a class-level FIFO. Tests append; calls consume.
-    _script: list[_MessageResponse] = []
+    _script: ClassVar[list[_MessageResponse]] = []
 
     @classmethod
     def queue(cls, text: str, *, input_tokens: int = 100, output_tokens: int = 150) -> None:

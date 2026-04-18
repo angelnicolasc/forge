@@ -159,7 +159,7 @@ def _install_fake_openai() -> type:
 
     class _OpenAIResponse:
         usage = _OpenAIUsage()
-        choices: list[Any] = []  # noqa: RUF012
+        choices: list[Any] = []
 
     class Completions:
         def create(self, **kwargs: Any) -> _OpenAIResponse:

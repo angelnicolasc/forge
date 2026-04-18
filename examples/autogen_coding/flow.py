@@ -109,5 +109,5 @@ if __name__ == "__main__":
     print("\n=== REVIEW ===\n" + out["review"])
     print(
         "\nFor the full Forge experience, run:\n"
-        "  forge wrap flow.py --input '{\"task\":\"sum a list\"}'"
+        '  forge wrap flow.py --input \'{"task":"sum a list"}\''
     )

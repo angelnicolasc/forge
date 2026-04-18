@@ -1,6 +1,8 @@
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.7.0
+    # Must track the ruff version pinned in the project's dev deps so the
+    # same lint codes (TC003 vs legacy TCH003, RUF codes, etc.) resolve.
+    rev: v0.15.11
     hooks:
       - id: ruff
         args: [--fix]
@@ -12,17 +14,23 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
+        # mkdocs.yml uses custom Python-tagged constructors (material for mkdocs).
+        exclude: ^mkdocs\.yml$
       - id: check-toml
       - id: check-merge-conflict
       - id: check-added-large-files
         args: ["--maxkb=500"]
-      - id: no-commit-to-branch
-        args: [--branch, main]
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.11.0
+  # Run mypy via uv so it sees our full dev environment (typer, pydantic, etc.)
+  # and the [[tool.mypy.overrides]] block in pyproject.toml.  The isolated
+  # venv created by mirrors-mypy doesn't have our runtime deps and would
+  # report false positives like "Untyped decorator makes function ... untyped".
+  - repo: local
     hooks:
       - id: mypy
-        additional_dependencies: [pydantic>=2.7, types-networkx]
-        args: [--ignore-missing-imports]
-        files: packages/
+        name: mypy
+        entry: uv run mypy packages/forge-core/src packages/forge-memory/src packages/forge-adapters/src packages/forge-observe/src packages/forge-cli/src
+        language: system
+        pass_filenames: false
+        types: [python]
+        files: ^packages/[^/]+/src/

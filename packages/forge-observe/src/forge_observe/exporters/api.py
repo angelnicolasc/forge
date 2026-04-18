@@ -21,7 +21,7 @@ import json
 import threading
 from collections import deque
 from collections.abc import (
-    AsyncIterator,  # noqa: TC003  (used as return type at runtime by async generator)
+    AsyncIterator,
 )
 from datetime import UTC, datetime
 from typing import Any
