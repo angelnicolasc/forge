@@ -12,10 +12,25 @@ Usage:
 
 from __future__ import annotations
 
+import contextlib
+import sys
+
 import typer
 from rich.console import Console
 
 from forge_cli._version import __version__
+
+# Windows consoles default to cp1252, which cannot encode the unicode glyphs
+# (✓, ⚡, ·, em-dashes) Forge emits throughout its Rich output. Reconfigure
+# stdout/stderr to UTF-8 at CLI entry so `forge doctor`, `forge wrap`, etc.
+# render without crashing in PowerShell/cmd.exe. No-op on POSIX terminals
+# that already default to UTF-8.
+if sys.platform == "win32":
+    for _stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(_stream, "reconfigure", None)
+        if reconfigure is not None:
+            with contextlib.suppress(OSError, ValueError):
+                reconfigure(encoding="utf-8", errors="replace")
 
 app = typer.Typer(
     name="forge",
