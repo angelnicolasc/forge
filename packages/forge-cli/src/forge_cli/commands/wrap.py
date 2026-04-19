@@ -84,9 +84,10 @@ def wrap(
     ),
     dashboard: bool = typer.Option(
         False,
+        "--observe",
         "--dashboard",
         "-d",
-        help="Start the observe API and open the web dashboard.",
+        help="Start the observe REST + SSE API in the background for this run.",
     ),
 ) -> None:
     """[bold #FF6B35]Wrap[/] any multi-agent flow with full Forge instrumentation.
@@ -97,7 +98,7 @@ def wrap(
     [bold]Examples:[/bold]
       [green]forge wrap my_flow.py[/green]
       [green]forge wrap my_crew.py --input '{"topic": "AGI safety"}' --evolution[/green]
-      [green]forge wrap my_flow.py --budget 0.50 --dashboard[/green]
+      [green]forge wrap my_flow.py --budget 0.50 --observe[/green]
     """
     print_forge_banner()
 
@@ -155,10 +156,7 @@ async def _run_wrap(
 
         backend = DashboardBackend(host=config.observe.api_host, port=config.observe.api_port)
         backend.start_background()
-        console.print(
-            f"  [{FORGE_TEAL}]Dashboard API:[/] {backend.url}/docs",
-            f"\n  [{FORGE_TEAL}]Dashboard UI:[/] http://localhost:3000",
-        )
+        console.print(f"  [{FORGE_TEAL}]Observe API:[/] {backend.url}/docs")
 
     # Show loading spinner
     with Live(

@@ -3,12 +3,11 @@
 <h1>⚡ Forge</h1>
 <p><strong>Universal Agent Harness — Drop your agents. Watch them evolve, remember and win.</strong></p>
 
-[![CI](https://github.com/forge-ai/forge/actions/workflows/ci.yml/badge.svg)](https://github.com/forge-ai/forge/actions/workflows/ci.yml)
-[![PyPI version](https://badge.fury.io/py/forge-os.svg)](https://badge.fury.io/py/forge-os)
+[![CI](https://github.com/angelnicolasc/forge/actions/workflows/ci.yml/badge.svg)](https://github.com/angelnicolasc/forge/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-orange.svg)](LICENSE)
-[![Discord](https://img.shields.io/badge/Discord-Join-7289DA.svg)](https://discord.gg/forge-ai)
-[![Docs](https://img.shields.io/badge/docs-forge--ai.dev-teal.svg)](https://forge-ai.dev)
+[![Tests](https://img.shields.io/badge/tests-260%20passing-brightgreen.svg)](#)
+[![Coverage](https://img.shields.io/badge/coverage-%E2%89%A575%25-brightgreen.svg)](#)
 
 <br/>
 
@@ -21,16 +20,16 @@
 
 ## What is Forge?
 
-Forge is the first **open-source, enterprise-grade harness** that transforms any multi-agent flow into a **self-evolving, memory-powered, production-observable system** — in one command.
+Forge is an **open-source, enterprise-grade harness** that wraps any multi-agent flow and gives it real-time cost tracking, cross-run memory, OpenTelemetry tracing, and an opt-in self-evolution loop — in one command.
 
-> Every feature claim below maps to a test — see [docs/feature-map.md](docs/feature-map.md). Items not yet shipped live in the [Roadmap](#roadmap) section at the bottom.
+> Every feature bullet below maps to a test. See [docs/feature-map.md](docs/feature-map.md). Items not yet shipped live in the [Roadmap](#roadmap) at the bottom.
 
 ```bash
 pip install forge-os
 forge wrap my_langgraph_flow.py --input '{"query": "What is RAG?"}'
 ```
 
-**47 seconds later:**
+**A few seconds later:**
 
 ```
 ⚡ FORGE — Universal Agent Harness
@@ -49,11 +48,11 @@ Running task_id=a3f8b2c1...
 ╭─ Cost Breakdown ────────────────────────────────╮
 │ agent: researcher   $0.00420                    │
 │ agent: writer       $0.00180                    │
-│ TOTAL               $0.00600                   │
+│ TOTAL               $0.00600                    │
 ╰─────────────────────────────────────────────────╯
 
 ╭─ Agent Topology ────────────────────────────────╮
-│ ⚙ Agent Topology                               │
+│ ⚙ Agent Topology                                │
 │ ├── [research] Researcher  (claude-sonnet)      │
 │ └── [writing]  Writer      (claude-haiku)       │
 ╰─────────────────────────────────────────────────╯
@@ -69,7 +68,7 @@ Running task_id=a3f8b2c1...
 | Real-time cost tracking | ✗ Manual | ✓ Per-agent |
 | Self-optimization loop | ✗ You | ✓ Opt-in, snapshot-safe |
 | Cross-run memory | ✗ None | ✓ Hybrid KB |
-| Enterprise audit trail | ✗ Logs | ✓ Provenance |
+| Audit trail | ✗ Logs | ✓ Provenance |
 | Production-ready | ✗ Weeks | ✓ Day 1 |
 
 ---
@@ -86,32 +85,39 @@ Every run generates telemetry. The evolution loop analyzes it and proposes (or a
 - **Agent culling** — remove dead agents from the topology, with atomic rollback from a `TopologySnapshot` on regression
 - **Parameter tuning** — adjust timeouts, max steps
 
-Auto-trigger is **off by default**; enable with `FORGE_ENABLE_EVOLUTION_AUTO=1`. Three consecutive failed mutations open a breaker and suspend the loop until an operator calls `orchestrator.resume_evolution()`.
+Auto-trigger is **off by default**; enable with `FORGE_ENABLE_EVOLUTION_AUTO=1`. Three consecutive failed mutations open a breaker and suspend the loop until an operator calls `forge evolve resume <source>` or `orchestrator.resume_evolution()`.
 
 ```bash
-forge evolve my_flow.py --mode auto
+forge evolve run my_flow.py --mode auto
 # ⚗  Evolution proposed: Swap researcher from claude-opus → claude-sonnet
 # ↳ Applied automatically. Fitness: 0.72 → 0.91 (+0.19)
+
+forge evolve status   # read the journal
+forge evolve resume my_flow.py   # re-arm the breaker
 ```
 
 ### 🧠 Living Collaborative Memory
-**The feature nobody else has production-ready.** A hybrid knowledge base that:
+A hybrid knowledge base that persists knowledge across runs:
 - **Vector layer** (ChromaDB): semantic search across all agent outputs
-- **Graph layer** (NetworkX/Neo4j): entity-relationship traversal with temporal validity
+- **Graph layer** (NetworkX, SQLite-backed with WAL): entity-relationship traversal with temporal validity
 - **Symbolic layer**: forward-chaining rule engine for deterministic business rules that override statistical retrieval
 - **Full provenance**: every entry has creator, version, and evidence chain
+- **Vector-clock conflict resolution** for concurrent writes
 
 ```bash
 forge memory query "optimization techniques the researcher found last week"
 forge memory ingest my_document.txt --tag topic=RAG
 ```
 
-### 📊 Production Observability + FinOps
+### 📊 Observability + FinOps
 - OpenTelemetry tracing with per-agent spans
-- Real-time cost breakdown by agent and model
-- Budget enforcement (`--budget 1.50`)
-- OTLP wiring via `opentelemetry-sdk` — point it at any OTLP-compatible collector (Grafana Tempo, Datadog, Jaeger) _(see [Roadmap](#roadmap) for a first-party integration test)_
-- REST + SSE API for the dashboard (`forge observe`). The Next.js dashboard itself is on the [Roadmap](#roadmap) — v0.1.0 ships the backend only.
+- Real-time cost breakdown by agent and model (pricing table shipped; unknown models warn loudly, they don't silently cost $0)
+- Budget enforcement (`--budget 1.50`) — runs are cancelled when the ceiling is hit
+- OTLP wiring via `opentelemetry-sdk` — point it at any OTLP-compatible collector (Grafana Tempo, Datadog, Jaeger)
+- REST + SSE API for metrics and run traces (`forge observe`) — see [Roadmap](#roadmap) for the web UI
+
+### 🩺 `forge doctor`
+Diagnose a local install in one command: Python version, installed adapter extras, default memory backends, and optional network egress (`--network`).
 
 ---
 
@@ -145,6 +151,8 @@ forge memory ingest my_document.txt --tag topic=RAG
                └──────────────────────────┘
 ```
 
+Full write-up in [docs/architecture.md](docs/architecture.md).
+
 ---
 
 ## Installation
@@ -160,7 +168,7 @@ pip install 'forge-os[autogen]'
 pip install 'forge-os[all]'      # everything
 ```
 
-**Requirements**: Python 3.11+, no Docker required for dev.
+**Requirements**: Python 3.11+. No Docker required for dev.
 
 ---
 
@@ -196,8 +204,7 @@ forge wrap my_flow.py --input '{"query": "What is RAG?"}'
 ```bash
 forge wrap my_flow.py \
   --input '{"query": "Latest agent harness papers"}' \
-  --evolution \
-  --dashboard
+  --evolution
 ```
 
 ### 3. Use the Python SDK
@@ -225,60 +232,49 @@ asyncio.run(main())
 
 ## Packages
 
-| Package | Description | PyPI |
-|---------|-------------|------|
-| `forge-core` | Types, protocols, MetaOrchestrator, evolution loop | [![PyPI](https://badge.fury.io/py/forge-core.svg)](https://badge.fury.io/py/forge-core) |
-| `forge-memory` | Living Collaborative Memory (vector+graph+symbolic) | [![PyPI](https://badge.fury.io/py/forge-memory.svg)](https://badge.fury.io/py/forge-memory) |
-| `forge-adapters` | LangGraph, CrewAI, AutoGen adapters | [![PyPI](https://badge.fury.io/py/forge-adapters.svg)](https://badge.fury.io/py/forge-adapters) |
-| `forge-observe` | OpenTelemetry + FinOps + Dashboard API | [![PyPI](https://badge.fury.io/py/forge-observe.svg)](https://badge.fury.io/py/forge-observe) |
-| `forge-cli` | The `forge` command | [![PyPI](https://badge.fury.io/py/forge-cli.svg)](https://badge.fury.io/py/forge-cli) |
-| `forge-os` | Meta-package: installs everything | [![PyPI](https://badge.fury.io/py/forge-os.svg)](https://badge.fury.io/py/forge-os) |
+Forge ships as six composable packages. Installing `forge-os` pulls all of them.
+
+| Package | Description |
+|---------|-------------|
+| `forge-core` | Types, protocols, `MetaOrchestrator`, evolution loop + FSM |
+| `forge-memory` | Living Collaborative Memory (vector + graph + symbolic) |
+| `forge-adapters` | LangGraph, CrewAI, AutoGen, generic-callable adapters |
+| `forge-observe` | OpenTelemetry tracing, FinOps cost model, REST + SSE API |
+| `forge-cli` | The `forge` command (`wrap`, `run`, `evolve`, `memory`, `doctor`, `observe`) |
+| `forge-os` | Meta-package: installs everything |
 
 ---
 
 ## Roadmap
 
-- [x] Phase 1: Universal adapter + cost tracking + CLI (47-second demo)
-- [x] Phase 2: Multi-framework + Living Memory
-- [x] Phase 3: Self-evolution loop + dashboard
-- [ ] Phase 4: Production backends (Neo4j, Qdrant), Helm chart, RBAC
-- [ ] Agent-to-agent payments (A2A protocol)
-- [ ] Cross-org memory federation
-- [ ] Forge Cloud (managed enterprise)
+v0.1.0 is **backend + CLI only**. The items below are out of scope for this tag
+and tracked as follow-up releases. Anything that graduates to a shipped feature
+must land with a test row in [docs/feature-map.md](docs/feature-map.md).
 
----
-
-## Roadmap
-
-v0.1.0 is **backend + CLI only**. The items below are intentionally
-out of scope for this tag and are tracked as first-week / first-month
-hotfixes. Anything in this list that graduates to a shipped feature
-must land with a test row in
-[docs/feature-map.md](docs/feature-map.md).
-
-- **Next.js dashboard** (`apps/forge-dashboard/`) — REST + SSE backend is live in v0.1.0; the UI ships in v0.2.0.
-- **First-party OTLP integration test** — OTLP export is wired via `opentelemetry-sdk`; we add a collector-level smoke test in v0.1.x.
-- **Neo4j + Qdrant backends** — scaffolding is in `forge-memory/`; production-hardened adapters ship in v0.2.x.
+- **Web dashboard UI** — the REST + SSE backend ships in v0.1.0; a web UI is planned for v0.2.0.
+- **First-party OTLP collector integration test** — OTLP export is wired via `opentelemetry-sdk`; a collector-level smoke test lands in v0.1.x.
+- **Production memory backends** (Neo4j, Qdrant) — scaffolding is in `forge-memory/`; production-hardened adapters ship in v0.2.x.
 - **RBAC / multi-tenancy** — v0.2.x.
-- **`forge doctor`** — environment diagnostics (Python version, installed extras, network egress). Ships in v0.1.1.
+- **Agent-to-agent payments (A2A)** — exploratory.
 
 ---
 
-## Community
+## Contributing
 
-- **Discord**: [discord.gg/forge-ai](https://discord.gg/forge-ai) — #show-your-evolution
-- **X**: [@forgeharness](https://x.com/forgeharness)
-- **Docs**: [forge-ai.dev](https://forge-ai.dev)
-- **Contributing**: [CONTRIBUTING.md](CONTRIBUTING.md)
+Issues, bug reports, and pull requests are welcome — see
+[CONTRIBUTING.md](CONTRIBUTING.md) and open an issue at
+[github.com/angelnicolasc/forge/issues](https://github.com/angelnicolasc/forge/issues).
+
+Security reports: please read [SECURITY.md](SECURITY.md).
 
 ---
 
 ## License
 
-Apache 2.0 — enterprise-friendly, commercial use allowed.
+Apache 2.0 — enterprise-friendly, commercial use allowed. See [LICENSE](LICENSE).
 
 ---
 
 <div align="center">
-<sub>Built with ⚡ by the Forge contributors. Drop your agents. Watch them evolve.</sub>
+<sub>Built by <a href="https://github.com/angelnicolasc">Angel DiCerutti</a>. Drop your agents. Watch them evolve.</sub>
 </div>

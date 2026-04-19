@@ -1,7 +1,9 @@
-"""REST API exporter for Forge — powers the dashboard.
+"""REST + SSE API exporter for Forge.
 
-Exposes a FastAPI application at /api/v1/ that the forge-dashboard
-Next.js app consumes. All responses are typed with Pydantic.
+Exposes a FastAPI application at /api/v1/ that serves runs, evolution
+journal entries, and a live event stream. Consumed today by custom
+integrations (Grafana panels, internal dashboards); a first-party web
+UI is planned for v0.2.0. All responses are typed with Pydantic.
 
 Endpoints:
   GET  /api/v1/runs                  — list recent runs
@@ -18,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import os
 import threading
 from collections import deque
 from collections.abc import (
@@ -35,6 +38,20 @@ from pydantic import BaseModel
 from forge_core.types import Mutation, RunResult
 
 logger = structlog.get_logger()
+
+
+def _load_allowed_origins() -> list[str]:
+    """Read CORS allowlist from FORGE_API_ALLOWED_ORIGINS (comma-separated).
+
+    Default is empty (same-origin only). Callers who need to expose the API
+    to a browser on another host set it explicitly, e.g.:
+        FORGE_API_ALLOWED_ORIGINS="http://localhost:5173,https://my.app"
+    """
+    raw = os.environ.get("FORGE_API_ALLOWED_ORIGINS", "").strip()
+    if not raw:
+        return []
+    return [o.strip() for o in raw.split(",") if o.strip()]
+
 
 # ε.1 — live-event pub/sub. Each new SSE client registers a Queue on
 # ``_live_subscribers``; ``publish_event`` fans out to every queue
@@ -166,7 +183,9 @@ def create_app(version: str = "0.1.0") -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+        # Default to same-origin only; override via FORGE_API_ALLOWED_ORIGINS
+        # (comma-separated) to permit browser clients on other hosts.
+        allow_origins=_load_allowed_origins(),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

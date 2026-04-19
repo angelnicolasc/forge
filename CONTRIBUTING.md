@@ -5,7 +5,7 @@ Welcome! Forge is an open-core project and we love contributions.
 ## Development Setup
 
 ```bash
-git clone https://github.com/forge-ai/forge.git
+git clone https://github.com/angelnicolasc/forge.git
 cd forge
 pip install uv
 uv sync --all-extras
@@ -38,12 +38,12 @@ packages/
   forge-core/     # Core types, protocols, meta-orchestrator, evolution loop
   forge-memory/   # Living Collaborative Memory (vector + graph + symbolic)
   forge-adapters/ # Framework adapters (LangGraph, CrewAI, AutoGen)
-  forge-observe/  # Telemetry, FinOps, dashboard backend
+  forge-observe/  # Telemetry, FinOps, REST + SSE API
   forge-cli/      # The `forge` command
-apps/
-  forge-dashboard/ # Next.js dashboard (TypeScript)
+  forge-os/       # Meta-package that installs the five above together
 examples/         # Working end-to-end examples
 docs/             # MkDocs documentation
+tests/            # Cross-package E2E tests
 ```
 
 ## Adding a New Adapter
@@ -58,7 +58,7 @@ docs/             # MkDocs documentation
    my_framework = "forge_adapters.my_framework_adapter:MyFrameworkAdapter"
    ```
 6. Add tests in `packages/forge-adapters/tests/`
-7. Add docs in `docs/adapters/my_framework.md`
+7. Update [`docs/feature-map.md`](docs/feature-map.md) with the new adapter row
 
 ## Conventional Commits
 

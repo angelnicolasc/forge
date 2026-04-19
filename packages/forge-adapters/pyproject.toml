@@ -5,7 +5,7 @@ description = "Framework adapters for Forge — drop-in wrappers for LangGraph, 
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.11"
-authors = [{ name = "Forge Contributors" }]
+authors = [{ name = "Angel DiCerutti", email = "angelnicolascorzo@gmail.com" }]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",

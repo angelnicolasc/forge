@@ -45,11 +45,6 @@ site/
 # Forge runtime
 ~/.forge/  # symlink guard — actual data in user home
 
-# Node (dashboard)
-apps/forge-dashboard/node_modules/
-apps/forge-dashboard/.next/
-apps/forge-dashboard/.turbo/
-
 # Distribution
 *.whl
 *.tar.gz

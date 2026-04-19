@@ -1,8 +1,7 @@
 site_name: Forge
 site_description: "Universal Agent Harness — Drop your agents. Watch them evolve, remember and win."
-site_url: https://forge-ai.dev
-repo_url: https://github.com/forge-ai/forge
-repo_name: forge-ai/forge
+repo_url: https://github.com/angelnicolasc/forge
+repo_name: angelnicolasc/forge
 edit_uri: edit/main/docs/
 
 theme:
@@ -32,19 +31,9 @@ theme:
     - search.highlight
     - content.code.copy
     - content.code.annotate
-  logo: assets/forge-icon.svg
-  favicon: assets/forge-icon.svg
 
 plugins:
   - search
-  - mkdocstrings:
-      handlers:
-        python:
-          options:
-            show_source: true
-            show_root_heading: true
-            show_symbol_type_heading: true
-            merge_init_into_class: true
 
 markdown_extensions:
   - admonition
@@ -67,19 +56,9 @@ nav:
       - Quickstart: quickstart.md
   - Concepts:
       - Architecture: architecture.md
-      - Self-Evolution: self-evolution.md
-      - Living Memory: memory.md
-  - Adapters:
-      - LangGraph: adapters/langgraph.md
-      - CrewAI: adapters/crewai.md
-      - AutoGen: adapters/autogen.md
-  - API Reference: api-reference/index.md
+      - Feature Map: feature-map.md
 
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/forge-ai/forge
-    - icon: fontawesome/brands/discord
-      link: https://discord.gg/forge-ai
-    - icon: fontawesome/brands/x-twitter
-      link: https://x.com/forgeharness
+      link: https://github.com/angelnicolasc/forge

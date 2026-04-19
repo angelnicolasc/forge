@@ -12,7 +12,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [0.1.0] — 2026-04-18
 
-First public release. Backend + CLI only (the Next.js dashboard ships post-launch).
+First public release. Backend + CLI only; a web UI on top of the observe REST + SSE API is planned for v0.2.0.
 
 ### Added
 
@@ -48,7 +48,7 @@ First public release. Backend + CLI only (the Next.js dashboard ships post-launc
 - `CostModel` with April-2026 pricing table (Claude 4, GPT-4o, Gemini 1.5)
 - `MetricsCollector` with `LabelSanitizer` (allowlist + hashed buckets) for
   cardinality-safe OTel export
-- FastAPI dashboard backend: `/runs`, `/evolution`, `/memory`, SSE `/runs/{id}/stream`
+- FastAPI observe backend: `/runs`, `/evolution`, `/memory`, SSE `/runs/{id}/stream`
 - OTLP exporter for Grafana / Datadog
 - Rich console exporter (the terminal demo)
 

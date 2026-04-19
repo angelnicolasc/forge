@@ -5,7 +5,7 @@ description = "Forge — universal agent harness (meta-package). Installs forge-
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.11"
-authors = [{ name = "Forge Contributors" }]
+authors = [{ name = "Angel DiCerutti", email = "angelnicolascorzo@gmail.com" }]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -34,9 +34,10 @@ autogen = ["forge-adapters[autogen]==0.1.0"]
 all = ["forge-adapters[all]==0.1.0"]
 
 [project.urls]
-Homepage = "https://github.com/forge-ai/forge"
-Repository = "https://github.com/forge-ai/forge"
-Changelog = "https://github.com/forge-ai/forge/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/angelnicolasc/forge"
+Repository = "https://github.com/angelnicolasc/forge"
+Issues = "https://github.com/angelnicolasc/forge/issues"
+Changelog = "https://github.com/angelnicolasc/forge/blob/main/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]

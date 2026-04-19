@@ -51,7 +51,7 @@ class DashboardBackend:
         self._thread = threading.Thread(
             target=self._server.run,
             daemon=True,
-            name="forge-dashboard-backend",
+            name="forge-observe-api",
         )
         self._thread.start()
         logger.info(

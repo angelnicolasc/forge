@@ -10,7 +10,11 @@
 
 **Please do NOT open a public GitHub issue for security vulnerabilities.**
 
-Email: security@forge-ai.dev
+Report privately via GitHub Security Advisories:
+<https://github.com/angelnicolasc/forge/security/advisories/new>
+
+Or email the maintainer: **angelnicolascorzo@gmail.com** (PGP key available on
+request).
 
 Include:
 - Description of the vulnerability

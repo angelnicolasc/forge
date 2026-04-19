@@ -37,7 +37,7 @@ Last updated: 2026-04-18 (v0.1.0 launch).
 | REST API (`/runs`, `/evolution`, `/memory`) | `packages/forge-observe/tests/test_api.py` | ✅ tested |
 | SSE live stream endpoint | `packages/forge-observe/tests/test_api.py::test_stream_generator_registers_and_cleans_up` | ✅ tested |
 | `forge wrap` CLI end-to-end demo | `tests/e2e/test_wrap_demo.py` | ✅ tested |
-| Next.js dashboard (`apps/forge-dashboard/`) | — | 📋 roadmap (post-v0.1.0) |
+| Web dashboard UI on top of the observe API | — | 📋 roadmap (v0.2.0) |
 | OTLP exporter to Grafana/Datadog | wiring via opentelemetry-sdk; no integration test | 📋 roadmap (0.1.x) |
 | Neo4j / Qdrant production backends | adapters stubbed | 📋 roadmap (0.2.x) |
 | RBAC / multi-tenant | — | 📋 roadmap (0.2.x) |

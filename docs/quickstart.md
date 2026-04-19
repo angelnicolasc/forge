@@ -75,14 +75,15 @@ pip install 'forge-os[all]'         # Everything
     forge wrap my_team.py --input '{"task": "Summarize RAG papers"}'
     ```
 
-## 3. See the dashboard
+## 3. Start the observe API
 
 ```bash
-forge wrap my_flow.py --dashboard
+forge observe
 ```
 
-This starts the observe API at `http://localhost:8787` and (coming in Phase 3)
-the full Next.js dashboard at `http://localhost:3000`.
+This starts the REST + SSE metrics server at `http://localhost:8787` (try
+`http://localhost:8787/docs` for the OpenAPI explorer). A web UI on top of
+this API is planned for v0.2.0 — see the roadmap in the project README.
 
 ## 4. Enable memory
 
@@ -111,6 +112,4 @@ forge evolve my_flow.py --mode auto --runs 10
 ## Next steps
 
 - [Architecture](architecture.md) — understand how Forge works under the hood
-- [Living Memory](memory.md) — deep dive into the hybrid knowledge base
-- [Self-Evolution](self-evolution.md) — the biology-inspired optimization loop
-- [Adapter docs](adapters/langgraph.md) — framework-specific guides
+- [Feature map](feature-map.md) — every feature claim mapped to the test that proves it

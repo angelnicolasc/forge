@@ -14,7 +14,7 @@ Forge is the **first open-source, enterprise-grade harness** that:
 - **Wraps any framework** (LangGraph, CrewAI, AutoGen, or any async callable) in a single command
 - **Self-evolves** — rewrites prompts, swaps models, culls dead agents, and optimizes topology automatically
 - **Remembers everything** — Living Collaborative Memory (vector + graph + symbolic) persists knowledge across runs, projects, and teams
-- **Ships enterprise-ready** — OpenTelemetry tracing, FinOps dashboard, SOC2-ready audit trails, multi-tenant isolation
+- **Ships production-ready** — OpenTelemetry tracing, per-agent FinOps cost tracking, provenance-backed audit trails
 
 ## Quickstart
 
@@ -23,7 +23,7 @@ pip install forge-os
 forge wrap my_langgraph_flow.py --input '{"query": "What is RAG?"}'
 ```
 
-In 47 seconds you'll see:
+A few seconds later you'll see:
 
 ```
 ⚡ FORGE — Universal Agent Harness
@@ -93,6 +93,5 @@ Running task_id=a3f8b2c1...
 
 ## Community
 
-- **Discord**: [discord.gg/forge-ai](https://discord.gg/forge-ai)
-- **GitHub**: [github.com/forge-ai/forge](https://github.com/forge-ai/forge)
-- **X**: [@forgeharness](https://x.com/forgeharness)
+- **GitHub**: [github.com/angelnicolasc/forge](https://github.com/angelnicolasc/forge)
+- **Issues & feature requests**: [github.com/angelnicolasc/forge/issues](https://github.com/angelnicolasc/forge/issues)

@@ -17,21 +17,20 @@ def observe(
     port: int = typer.Option(8787, "--port", "-p", help="API server port."),
     open_browser: bool = typer.Option(True, "--open/--no-open", help="Open dashboard in browser."),
 ) -> None:
-    """Start the Forge observe API server (powers the dashboard).
+    """Start the Forge observe REST + SSE API server.
 
     \b
-    [dim]The API serves real-time metrics, run traces, and evolution history
-    to the forge-dashboard Next.js app.[/dim]
+    [dim]The API serves real-time metrics, run traces, and evolution history.
+    A web UI on top of this API is planned for v0.2.0; until then, consume the
+    endpoints directly or wire them into your own Grafana / Datadog stack.[/dim]
     """
     import uvicorn
 
     from forge_observe.exporters.api import app as api_app
 
     console.print(f"\n  [{FORGE_ORANGE}]⚡ Forge Observe API[/]")
-    console.print(f"  [{FORGE_TEAL}]API Docs:[/] http://{host}:{port}/docs")
-    console.print(
-        f"  [{FORGE_TEAL}]Dashboard:[/] http://localhost:3000  (run: cd apps/forge-dashboard && pnpm dev)\n"  # noqa: E501
-    )
+    console.print(f"  [{FORGE_TEAL}]OpenAPI:[/] http://{host}:{port}/docs")
+    console.print(f"  [{FORGE_TEAL}]SSE stream:[/] http://{host}:{port}/api/v1/stream\n")
 
     if open_browser:
         import webbrowser
