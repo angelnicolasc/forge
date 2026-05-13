@@ -74,6 +74,7 @@ def main(
 
 from forge_cli.commands.doctor import doctor_app  # noqa: E402
 from forge_cli.commands.evolve import evolve_app  # noqa: E402
+from forge_cli.commands.mcp import mcp_app  # noqa: E402
 from forge_cli.commands.memory import memory_app  # noqa: E402
 from forge_cli.commands.observe import observe_app  # noqa: E402
 from forge_cli.commands.rules import rules_app  # noqa: E402
@@ -86,4 +87,5 @@ app.add_typer(evolve_app, name="evolve", help="Trigger the self-evolution loop."
 app.add_typer(observe_app, name="observe", help="Open the live dashboard.")
 app.add_typer(memory_app, name="memory", help="Query, ingest, and inspect the Living Memory.")
 app.add_typer(rules_app, name="rules", help="Validate, lint, explain, and diff rule packs.")
+app.add_typer(mcp_app, name="mcp", help="Manage MCP tool routing, budgets, and cache.")
 app.add_typer(doctor_app, name="doctor", help="Diagnose the local Forge installation.")

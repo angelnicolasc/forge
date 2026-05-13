@@ -13,6 +13,7 @@ members = [
     "forge-adapters",
     "forge-cli",
     "forge-core",
+    "forge-mcp",
     "forge-memory",
     "forge-observe",
     "forge-os",
@@ -1013,6 +1014,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+mcp = [
+    { name = "forge-mcp" },
+]
 rules = [
     { name = "forge-rules" },
 ]
@@ -1021,6 +1025,7 @@ rules = [
 requires-dist = [
     { name = "forge-adapters", editable = "packages/forge-adapters" },
     { name = "forge-core", editable = "packages/forge-core" },
+    { name = "forge-mcp", marker = "extra == 'mcp'", editable = "packages/forge-mcp" },
     { name = "forge-memory", editable = "packages/forge-memory" },
     { name = "forge-observe", editable = "packages/forge-observe" },
     { name = "forge-rules", marker = "extra == 'rules'", editable = "packages/forge-rules" },
@@ -1028,7 +1033,7 @@ requires-dist = [
     { name = "structlog", specifier = ">=24.0,<26.0" },
     { name = "typer", specifier = ">=0.12" },
 ]
-provides-extras = ["rules"]
+provides-extras = ["rules", "mcp"]
 
 [[package]]
 name = "forge-core"
@@ -1065,6 +1070,34 @@ requires-dist = [
     { name = "structlog", specifier = ">=24.0,<26.0" },
 ]
 provides-extras = ["evolution", "intent"]
+
+[[package]]
+name = "forge-mcp"
+version = "0.1.0"
+source = { editable = "packages/forge-mcp" }
+dependencies = [
+    { name = "anyio" },
+    { name = "forge-core" },
+    { name = "pydantic" },
+    { name = "pyyaml" },
+    { name = "structlog" },
+]
+
+[package.optional-dependencies]
+sdk = [
+    { name = "mcp" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "anyio", specifier = ">=4.0" },
+    { name = "forge-core", editable = "packages/forge-core" },
+    { name = "mcp", marker = "extra == 'sdk'", specifier = ">=1.0" },
+    { name = "pydantic", specifier = ">=2.7,<3.0" },
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "structlog", specifier = ">=24.0,<26.0" },
+]
+provides-extras = ["sdk"]
 
 [[package]]
 name = "forge-memory"
@@ -1154,6 +1187,9 @@ crewai = [
 langgraph = [
     { name = "forge-adapters", extra = ["langgraph"] },
 ]
+mcp = [
+    { name = "forge-mcp" },
+]
 rules = [
     { name = "forge-rules" },
 ]
@@ -1167,11 +1203,12 @@ requires-dist = [
     { name = "forge-adapters", extras = ["langgraph"], marker = "extra == 'langgraph'", editable = "packages/forge-adapters" },
     { name = "forge-cli", editable = "packages/forge-cli" },
     { name = "forge-core", editable = "packages/forge-core" },
+    { name = "forge-mcp", marker = "extra == 'mcp'", editable = "packages/forge-mcp" },
     { name = "forge-memory", editable = "packages/forge-memory" },
     { name = "forge-observe", editable = "packages/forge-observe" },
     { name = "forge-rules", marker = "extra == 'rules'", editable = "packages/forge-rules" },
 ]
-provides-extras = ["langgraph", "crewai", "autogen", "all", "rules"]
+provides-extras = ["langgraph", "crewai", "autogen", "all", "rules", "mcp"]
 
 [[package]]
 name = "forge-rules"

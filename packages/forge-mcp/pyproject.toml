@@ -1,7 +1,7 @@
 [project]
-name = "forge-cli"
+name = "forge-mcp"
 version = "0.1.0"
-description = "CLI for Forge — wrap any multi-agent flow in one command. Watch it evolve."
+description = "MCP Meta-Orchestrator for Forge — routes, secures, budgets, and caches tool calls across N upstream MCP servers."
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.11"
@@ -11,30 +11,26 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
-    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Typing :: Typed",
 ]
-keywords = ["cli", "agents", "orchestration", "forge"]
+keywords = ["mcp", "model-context-protocol", "tools", "agents", "routing", "forge"]
 dependencies = [
     "forge-core==0.1.0",
-    "forge-adapters==0.1.0",
-    "forge-observe==0.1.0",
-    "forge-memory==0.1.0",
-    "typer>=0.12",
-    "rich>=13.7",
+    "pydantic>=2.7,<3.0",
     "structlog>=24.0,<26.0",
+    "pyyaml>=6.0",
+    "anyio>=4.0",
 ]
 
 [project.optional-dependencies]
-rules = ["forge-rules==0.1.0"]
-mcp = ["forge-mcp==0.1.0"]
-
-[project.scripts]
-forge = "forge_cli.main:app"
+# Official Anthropic MCP Python SDK — required for real stdio/SSE upstream connections.
+# Core routing/security/budget/cache logic works without it (tests use fakes).
+sdk = ["mcp>=1.0"]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/forge_cli"]
+packages = ["src/forge_mcp"]
