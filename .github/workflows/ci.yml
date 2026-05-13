@@ -142,9 +142,9 @@ jobs:
           python -m venv /tmp/smoke
           /tmp/smoke/bin/pip install --upgrade pip
           # Install from the wheels we just built; --find-links resolves
-          # the five sub-packages (forge-core, forge-cli, etc.) without
-          # hitting PyPI.
-          /tmp/smoke/bin/pip install --no-index --find-links dist/ dist/forge_os-*.whl
+          # the forge-* sub-packages (forge-core, forge-cli, etc.) from the
+          # local dist/ dir; external deps (pydantic, typer, …) come from PyPI.
+          /tmp/smoke/bin/pip install --find-links dist/ dist/forge_os-*.whl
 
       - name: Verify CLI + import
         run: |
