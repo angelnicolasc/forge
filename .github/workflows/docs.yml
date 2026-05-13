@@ -5,18 +5,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 jobs:
-  build-deploy:
-    name: Build & Deploy Docs
+  build:
+    name: Build & Validate Docs
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -25,14 +17,5 @@ jobs:
       - name: Install docs dependencies
         run: uv add mkdocs mkdocs-material mkdocstrings[python] --dev
 
-      - name: Build docs
+      - name: Build docs (strict)
         run: uv run mkdocs build --strict
-
-      - name: Upload pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: site/
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
