@@ -1,6 +1,11 @@
 <div align="center">
+  <img width="1500" height="276" alt="graymatter-banner" src=".github/assets/forge_banner.jpg" />
+</div>
 
-<h1>⚡ Forge</h1>
+
+
+<div align="center">
+
 <p><strong>Universal Agent Harness — Drop your agents. Watch them evolve, remember and win.</strong></p>
 
 [![CI](https://github.com/angelnicolasc/forge/actions/workflows/ci.yml/badge.svg)](https://github.com/angelnicolasc/forge/actions/workflows/ci.yml)
@@ -10,9 +15,6 @@
 [![Coverage](https://img.shields.io/badge/coverage-%E2%89%A575%25-brightgreen.svg)](#)
 
 <br/>
-
-> **2026 is not the year of models. It's the year of harnesses.**
-> The model is commodity. The harness is the moat.
 
 </div>
 
