@@ -17,6 +17,7 @@ forge-os = { workspace = true }
 forge-rules = { workspace = true }
 forge-mcp = { workspace = true }
 forge-skills = { workspace = true }
+forge-spec = { workspace = true }
 
 [tool.uv]
 package = false
@@ -70,7 +71,7 @@ ignore = ["RUF001", "RUF002", "RUF003", "B008"]
 "packages/forge-observe/src/forge_observe/exporters/api.py" = ["TC003"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["forge_core", "forge_memory", "forge_adapters", "forge_observe", "forge_cli", "forge_rules", "forge_mcp", "forge_skills"]
+known-first-party = ["forge_core", "forge_memory", "forge_adapters", "forge_observe", "forge_cli", "forge_rules", "forge_mcp", "forge_skills", "forge_spec"]
 
 [tool.mypy]
 python_version = "3.11"

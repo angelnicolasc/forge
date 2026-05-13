@@ -40,6 +40,7 @@ class RunEventKind(StrEnum):
     EVOLUTION = "evolution"
     CONTEXT_INJECTED = "context_injected"  # fired before LLM call; payload: context_tokens, source
     SKILL_CALL = "skill_call"  # fired after skill handler completes; payload: skill, duration_ms
+    SPEC_VERIFIED = "spec_verified"  # fired after spec verification; payload: spec, compliance_rate, passed
 
 
 class RunStatus(StrEnum):

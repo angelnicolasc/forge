@@ -19,6 +19,7 @@ members = [
     "forge-os",
     "forge-rules",
     "forge-skills",
+    "forge-spec",
     "forge-workspace",
 ]
 
@@ -1024,6 +1025,9 @@ rules = [
 skills = [
     { name = "forge-skills" },
 ]
+spec = [
+    { name = "forge-spec" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -1034,11 +1038,12 @@ requires-dist = [
     { name = "forge-observe", editable = "packages/forge-observe" },
     { name = "forge-rules", marker = "extra == 'rules'", editable = "packages/forge-rules" },
     { name = "forge-skills", marker = "extra == 'skills'", editable = "packages/forge-skills" },
+    { name = "forge-spec", marker = "extra == 'spec'", editable = "packages/forge-spec" },
     { name = "rich", specifier = ">=13.7" },
     { name = "structlog", specifier = ">=24.0,<26.0" },
     { name = "typer", specifier = ">=0.12" },
 ]
-provides-extras = ["rules", "mcp", "skills"]
+provides-extras = ["rules", "mcp", "skills", "spec"]
 
 [[package]]
 name = "forge-core"
@@ -1201,6 +1206,9 @@ rules = [
 skills = [
     { name = "forge-skills" },
 ]
+spec = [
+    { name = "forge-spec" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -1216,8 +1224,9 @@ requires-dist = [
     { name = "forge-observe", editable = "packages/forge-observe" },
     { name = "forge-rules", marker = "extra == 'rules'", editable = "packages/forge-rules" },
     { name = "forge-skills", marker = "extra == 'skills'", editable = "packages/forge-skills" },
+    { name = "forge-spec", marker = "extra == 'spec'", editable = "packages/forge-spec" },
 ]
-provides-extras = ["langgraph", "crewai", "autogen", "all", "rules", "mcp", "skills"]
+provides-extras = ["langgraph", "crewai", "autogen", "all", "rules", "mcp", "skills", "spec"]
 
 [[package]]
 name = "forge-rules"
@@ -1274,6 +1283,32 @@ requires-dist = [
     { name = "structlog", specifier = ">=24.0,<26.0" },
 ]
 provides-extras = ["intent"]
+
+[[package]]
+name = "forge-spec"
+version = "0.1.0"
+source = { editable = "packages/forge-spec" }
+dependencies = [
+    { name = "forge-core" },
+    { name = "pydantic" },
+    { name = "pyyaml" },
+    { name = "structlog" },
+]
+
+[package.optional-dependencies]
+llm = [
+    { name = "anthropic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "anthropic", marker = "extra == 'llm'", specifier = ">=0.40" },
+    { name = "forge-core", editable = "packages/forge-core" },
+    { name = "pydantic", specifier = ">=2.7,<3.0" },
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "structlog", specifier = ">=24.0,<26.0" },
+]
+provides-extras = ["llm"]
 
 [[package]]
 name = "forge-workspace"

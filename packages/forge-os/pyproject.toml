@@ -35,6 +35,7 @@ all = ["forge-adapters[all]==0.1.0"]
 rules = ["forge-rules==0.1.0"]
 mcp = ["forge-mcp==0.1.0"]
 skills = ["forge-skills==0.1.0"]
+spec = ["forge-spec==0.1.0"]
 
 [project.urls]
 Homepage = "https://github.com/angelnicolasc/forge"
