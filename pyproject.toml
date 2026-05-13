@@ -85,7 +85,9 @@ warn_unused_configs = true
 disallow_untyped_defs = true
 
 # Optional SDKs and untyped libs we integrate with — we guard the imports
-# at runtime, so mypy doesn't need stubs.
+# at runtime, so mypy doesn't need stubs. follow_imports = "skip" forces
+# mypy to treat these as untyped regardless of whether they are installed,
+# giving consistent behaviour in local envs (SDK absent) and CI (SDK present).
 [[tool.mypy.overrides]]
 module = [
     "anthropic.*",
@@ -101,6 +103,7 @@ module = [
     "numpy.*",
 ]
 ignore_missing_imports = true
+follow_imports = "skip"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

@@ -88,6 +88,12 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install workspace (for mypy hook)
+        run: uv sync --all-packages --all-extras
+
       - name: Run pre-commit
         uses: pre-commit/action@v3.0.1
 
