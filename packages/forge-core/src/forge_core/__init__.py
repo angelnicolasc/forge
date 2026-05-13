@@ -5,6 +5,7 @@ and self-evolution loop for production multi-agent systems.
 """
 
 from forge_core._version import __version__
+from forge_core.intent import IntentClassifier, get_intent_classifier
 from forge_core.types import (
     AgentCard,
     CostSummary,
@@ -22,6 +23,7 @@ from forge_core.types import (
 __all__ = [
     "AgentCard",
     "CostSummary",
+    "IntentClassifier",
     "Mutation",
     "MutationKind",
     "RunConfig",
@@ -32,4 +34,5 @@ __all__ = [
     "TaskEnvelope",
     "ToolRef",
     "__version__",
+    "get_intent_classifier",
 ]

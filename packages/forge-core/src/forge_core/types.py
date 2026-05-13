@@ -6,6 +6,7 @@ types for zero-coupling extensibility via structural typing (Protocols).
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -13,7 +14,10 @@ from enum import StrEnum
 from typing import Any
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+# SPIFFE URI format: spiffe://<trust-domain>/<workload-identifier>
+_SPIFFE_RE = re.compile(r"^spiffe://(?P<td>[^/]+)/(?P<wl>.+)$")
 
 # ---------------------------------------------------------------------------
 # Enums
@@ -34,6 +38,7 @@ class RunEventKind(StrEnum):
     MEMORY_WRITE = "memory_write"
     ERROR = "error"
     EVOLUTION = "evolution"
+    CONTEXT_INJECTED = "context_injected"  # fired before LLM call; payload: context_tokens, source
 
 
 class RunStatus(StrEnum):
@@ -42,6 +47,7 @@ class RunStatus(StrEnum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
+    INPUT_REQUIRED = "input-required"  # A2A: task suspended awaiting human input
 
 
 class MutationKind(StrEnum):
@@ -78,7 +84,7 @@ class ToolRef(BaseModel):
 
 
 class AgentCard(BaseModel):
-    """Describes an agent in the topology — mirrors A2A Agent Card concept."""
+    """Describes an agent in the topology — A2A Agent Card compliant."""
 
     id: str = Field(default_factory=lambda: uuid4().hex[:12])
     name: str = ""
@@ -91,6 +97,26 @@ class AgentCard(BaseModel):
     upstream: list[str] = Field(default_factory=list)
     downstream: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    # A2A Agent Card fields — all optional, backward-compatible
+    url: str | None = None
+    version: str = "0.1.0"
+    provider: dict[str, Any] = Field(default_factory=dict)
+    # SPIFFE Verifiable Identity Document URI — format-only. Operator-supplied.
+    spiffe_id: str | None = None
+
+    @field_validator("spiffe_id", mode="before")
+    @classmethod
+    def _validate_spiffe_uri(cls, v: object) -> object:
+        if v is None:
+            return v
+        if not isinstance(v, str):
+            raise ValueError("spiffe_id must be a string or None")
+        if not _SPIFFE_RE.fullmatch(v):
+            raise ValueError(
+                f"Invalid SPIFFE URI {v!r}. "
+                "Expected: spiffe://<trust-domain>/<workload-identifier>"
+            )
+        return v
 
 
 class EvolutionConfig(BaseModel):
@@ -162,6 +188,7 @@ class RunEvent(BaseModel):
     model: str | None = None
     input_tokens: int = 0
     output_tokens: int = 0
+    context_tokens: int = 0  # tokens injected into context window (CONTEXT_INJECTED events)
     cost: Decimal = Decimal("0")
     latency_ms: float = 0.0
     data: dict[str, Any] = Field(default_factory=dict)

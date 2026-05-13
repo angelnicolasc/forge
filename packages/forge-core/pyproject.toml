@@ -32,6 +32,10 @@ evolution = [
     "anthropic>=0.40",
     "openai>=1.50",
 ]
+intent = [
+    "sentence-transformers>=3.0",
+    "numpy>=1.26",
+]
 
 [build-system]
 requires = ["hatchling"]

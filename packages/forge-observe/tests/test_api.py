@@ -253,3 +253,45 @@ def test_stream_caps_at_max_subscribers(client: TestClient) -> None:
     finally:
         with _live_lock:
             api_mod._live_subscribers.difference_update(fakes)
+
+
+# ---------------------------------------------------------------------------
+# Fase 0 — A2A discovery
+# ---------------------------------------------------------------------------
+
+
+def test_agent_discovery_endpoint(client: TestClient) -> None:
+    r = client.get("/.well-known/agent.json")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["name"] == "Forge MetaOrchestrator"
+    assert "version" in body
+    assert "capabilities" in body
+    assert "multi-agent-orchestration" in body["capabilities"]
+    # None fields must be excluded
+    assert "spiffe_id" not in body
+    assert "model" not in body
+    assert "system_prompt" not in body
+
+
+def test_agent_discovery_url_when_base_url_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FORGE_OBSERVE_AGENT_BASE_URL", "https://forge.test.io")
+    local_client = TestClient(create_app(version="0.1.0-test"))
+    r = local_client.get("/.well-known/agent.json")
+    assert r.status_code == 200
+    assert r.json()["url"] == "https://forge.test.io"
+
+
+def test_agent_discovery_no_url_when_base_url_unset(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("FORGE_OBSERVE_AGENT_BASE_URL", raising=False)
+    r = client.get("/.well-known/agent.json")
+    assert "url" not in r.json()
+
+
+def test_app_exported_from_forge_observe() -> None:
+    from forge_observe import app as exported_app
+    from forge_observe.exporters.api import app as internal_app
+
+    assert exported_app is internal_app

@@ -2,6 +2,8 @@
 
 from decimal import Decimal
 
+import pytest
+
 from forge_core.types import (
     AgentCard,
     CostSummary,
@@ -138,3 +140,99 @@ class TestCostSummary:
         assert s.total_cost == Decimal("0")
         assert s.llm_calls == 0
         assert s.cost_by_model == {}
+
+
+# ---------------------------------------------------------------------------
+# Fase 0 additions
+# ---------------------------------------------------------------------------
+
+
+class TestAgentCardSpiffe:
+    def test_spiffe_id_none_by_default(self) -> None:
+        card = AgentCard(name="agent")
+        assert card.spiffe_id is None
+
+    def test_valid_spiffe_uri(self) -> None:
+        card = AgentCard(
+            name="agent",
+            spiffe_id="spiffe://trust.example.com/ns/default/sa/worker",
+        )
+        assert card.spiffe_id == "spiffe://trust.example.com/ns/default/sa/worker"
+
+    def test_invalid_scheme_raises(self) -> None:
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            AgentCard(name="agent", spiffe_id="https://trust.example.com/ns/sa")
+
+    def test_missing_workload_raises(self) -> None:
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            AgentCard(name="agent", spiffe_id="spiffe://trust.example.com/")
+
+    def test_missing_trust_domain_raises(self) -> None:
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            AgentCard(name="agent", spiffe_id="spiffe:///workload")
+
+    def test_non_string_raises(self) -> None:
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            AgentCard(name="agent", spiffe_id=42)  # type: ignore[arg-type]
+
+
+class TestAgentCardA2A:
+    def test_a2a_defaults(self) -> None:
+        card = AgentCard(name="agent")
+        assert card.url is None
+        assert card.version == "0.1.0"
+        assert card.provider == {}
+
+    def test_a2a_fields_set(self) -> None:
+        card = AgentCard(
+            name="orchestrator",
+            url="https://forge.example.com",
+            version="1.2.3",
+            provider={"name": "ACME Corp", "url": "https://acme.example.com"},
+        )
+        assert card.url == "https://forge.example.com"
+        assert card.version == "1.2.3"
+        assert card.provider["name"] == "ACME Corp"
+
+    def test_model_dump_exclude_none(self) -> None:
+        card = AgentCard(name="agent")
+        data = card.model_dump(mode="json", exclude_none=True)
+        assert "url" not in data
+        assert "spiffe_id" not in data
+        assert "model" not in data
+        assert "system_prompt" not in data
+
+
+class TestRunStatusInputRequired:
+    def test_input_required_value(self) -> None:
+        assert RunStatus.INPUT_REQUIRED == "input-required"
+
+    def test_run_result_with_input_required(self) -> None:
+        result = RunResult(task_id="t1", status=RunStatus.INPUT_REQUIRED)
+        assert result.status == RunStatus.INPUT_REQUIRED
+
+
+class TestRunEventContextInjected:
+    def test_context_injected_kind_exists(self) -> None:
+        assert RunEventKind.CONTEXT_INJECTED == "context_injected"
+
+    def test_run_event_with_context_tokens(self) -> None:
+        event = RunEvent(
+            kind=RunEventKind.CONTEXT_INJECTED,
+            context_tokens=512,
+            data={"source": "rules", "rule_count": 3},
+        )
+        assert event.context_tokens == 512
+        assert event.kind == RunEventKind.CONTEXT_INJECTED
+
+    def test_context_tokens_default_zero(self) -> None:
+        event = RunEvent(kind=RunEventKind.LLM_CALL)
+        assert event.context_tokens == 0

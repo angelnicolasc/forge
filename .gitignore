@@ -48,3 +48,7 @@ site/
 # Distribution
 *.whl
 *.tar.gz
+
+# Internal dev artifacts (not for public repo)
+DEVLOG.md
+plan-master.md

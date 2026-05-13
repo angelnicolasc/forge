@@ -208,6 +208,47 @@ def create_app(version: str = "0.1.0") -> FastAPI:
         )
 
     # -----------------------------------------------------------------------
+    # A2A discovery
+    # -----------------------------------------------------------------------
+
+    @app.get("/.well-known/agent.json", tags=["a2a"])
+    async def agent_discovery() -> dict[str, Any]:
+        """A2A-compliant discovery document for the Forge orchestrator.
+
+        Returns an AgentCard per the Google Agent-to-Agent (A2A) protocol.
+        Set FORGE_OBSERVE_AGENT_BASE_URL to include the ``url`` field and
+        achieve full A2A compliance; without it the field is omitted.
+        """
+        import forge_core
+        from forge_core.config import ObserveConfig
+        from forge_core.types import AgentCard, ToolRef
+
+        obs = ObserveConfig()
+        card = AgentCard(
+            name="Forge MetaOrchestrator",
+            role="orchestrator",
+            description=(
+                "Universal AI agent harness — self-evolution, hybrid memory, OTel."
+            ),
+            version=forge_core.__version__,
+            url=obs.agent_base_url,
+            capabilities=[
+                "multi-agent-orchestration",
+                "self-evolution",
+                "hybrid-memory",
+                "cost-tracking",
+                "otel-tracing",
+            ],
+            tools=[
+                ToolRef(name="run", description="Execute an agent flow"),
+                ToolRef(name="evolve", description="Trigger the self-evolution loop"),
+                ToolRef(name="memory_query", description="Query hybrid memory"),
+            ],
+            provider={"name": "Forge"},
+        )
+        return card.model_dump(mode="json", exclude_none=True)
+
+    # -----------------------------------------------------------------------
     # Runs
     # -----------------------------------------------------------------------
 

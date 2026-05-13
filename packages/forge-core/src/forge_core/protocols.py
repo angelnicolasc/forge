@@ -217,3 +217,21 @@ class Evaluator(Protocol):
     def weights(self) -> dict[str, float]:
         """Current scoring weights (e.g., {'cost': 0.3, 'latency': 0.2, 'quality': 0.5})."""
         ...
+
+
+@runtime_checkable
+class Classifier(Protocol):
+    """Intent classifier — maps free-text to a labeled intent with confidence.
+
+    The forge-core IntentClassifier satisfies this protocol. forge-rules and
+    forge-skills depend on this protocol, not the concrete implementation,
+    keeping them decoupled from the embedding backend.
+
+    Returns ("unknown", 0.0) when no intent exceeds the configured threshold.
+    The catalog (labeled examples) is registered by callers via register_intent();
+    forge-core only provides the engine, not the domain knowledge.
+    """
+
+    async def classify(self, text: str) -> tuple[str, float]:
+        """Classify text into (intent_label, confidence ∈ [0.0, 1.0])."""
+        ...
