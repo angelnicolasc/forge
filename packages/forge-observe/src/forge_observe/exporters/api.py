@@ -67,7 +67,8 @@ _live_lock = threading.Lock()
 
 # ζ.12 — cap on concurrent SSE subscribers. Beyond this, new clients get
 # HTTP 503 so a single broken dashboard can't DoS the process.
-MAX_LIVE_SUBSCRIBERS = 50
+# Configurable via FORGE_OBSERVE_MAX_SSE_SUBSCRIBERS (default: 50).
+MAX_LIVE_SUBSCRIBERS = int(os.getenv("FORGE_OBSERVE_MAX_SSE_SUBSCRIBERS", "50"))
 
 
 def live_subscriber_count() -> int:
@@ -402,7 +403,10 @@ def create_app(version: str = "0.1.0") -> FastAPI:
             if len(_live_subscribers) >= MAX_LIVE_SUBSCRIBERS:
                 raise HTTPException(
                     status_code=503,
-                    detail=(f"SSE subscriber cap ({MAX_LIVE_SUBSCRIBERS}) reached. Retry later."),
+                    detail=(
+                        f"SSE subscriber cap ({MAX_LIVE_SUBSCRIBERS}) reached. "
+                        "Set FORGE_OBSERVE_MAX_SSE_SUBSCRIBERS to increase. Retry later."
+                    ),
                 )
 
         async def event_source() -> AsyncIterator[bytes]:

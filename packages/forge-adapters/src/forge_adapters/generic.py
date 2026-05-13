@@ -123,7 +123,7 @@ class GenericCallableAdapter(BaseAdapter):
         )
 
         start = time.perf_counter()
-        async with self._instrumented_scope():
+        async with self._instrumented_scope() as instrumentation_report:
             # We probe coroutine-function status on the ORIGINAL callable
             # rather than whatever the user stored, because an SDK wrapper
             # isn't a coroutine function itself even when its ``original``
@@ -139,6 +139,28 @@ class GenericCallableAdapter(BaseAdapter):
                 output = await asyncio.to_thread(self._fn, envelope.input)
 
         elapsed_ms = (time.perf_counter() - start) * 1000
+
+        # Publish ADAPTER_DEGRADED for each SDK whose patch failed so the
+        # problem is visible in the SSE stream, not just in log lines.
+        if (
+            instrumentation_report is not None
+            and self._bus is not None
+            and instrumentation_report.failed
+        ):
+            for sdk_name in instrumentation_report.failed:
+                events.append(
+                    RunEvent(
+                        kind=RunEventKind.ADAPTER_DEGRADED,
+                        run_id=run_id,
+                        agent_id=self._adapter_name,
+                        data={
+                            "adapter": "generic",
+                            "sdk": sdk_name,
+                            "reason": "patch_failed",
+                            "impact": "cost_tracking_disabled_for_this_sdk",
+                        },
+                    )
+                )
         events.append(
             RunEvent(
                 kind=RunEventKind.AGENT_END,

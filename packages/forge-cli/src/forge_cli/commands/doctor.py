@@ -128,6 +128,82 @@ def doctor(
     )
 
 
+@doctor_app.command("update-pricing")
+def update_pricing(
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would be written without saving."
+    ),
+) -> None:
+    """[bold]Download[/] the latest LLM pricing table and cache it locally.
+
+    Pricing is saved to ~/.forge/pricing.json and picked up automatically
+    by DefaultCostModel without requiring a new Forge release. Useful when
+    a provider changes prices between Forge releases.
+
+    Override the download source via FORGE_PRICING_TABLE_URL env var.
+
+    \b
+    Examples:
+      forge doctor update-pricing
+      forge doctor update-pricing --dry-run
+    """
+    import json
+    import os
+
+    from forge_observe.cost_model import BUNDLED_PRICING_TABLE, save_pricing_cache
+
+    url = os.getenv(
+        "FORGE_PRICING_TABLE_URL",
+        "https://raw.githubusercontent.com/angelnicolasc/forge/main/pricing.json",
+    )
+    console.print(f"\n  [{FORGE_ORANGE}]⚡ forge doctor update-pricing[/]\n")
+    console.print(f"  Downloading pricing table from:\n  [dim]{url}[/]\n")
+
+    try:
+        import httpx
+
+        resp = httpx.get(url, timeout=10.0, follow_redirects=True)
+        resp.raise_for_status()
+        remote: dict[str, list[str]] = resp.json()
+    except ImportError:
+        console.print(
+            "  [yellow]⚠[/] httpx is not installed — using bundled pricing table.\n"
+            "  Install with: [bold]pip install httpx[/]"
+        )
+        remote = BUNDLED_PRICING_TABLE
+    except Exception as exc:
+        console.print(
+            f"  [yellow]⚠[/] Download failed ({exc}). Falling back to bundled table."
+        )
+        remote = BUNDLED_PRICING_TABLE
+
+    new_models = [m for m in remote if m not in BUNDLED_PRICING_TABLE]
+    updated_models = [
+        m for m in remote if m in BUNDLED_PRICING_TABLE and remote[m] != BUNDLED_PRICING_TABLE[m]
+    ]
+
+    console.print(f"  Models in remote table : [bold]{len(remote)}[/]")
+    console.print(f"  Models in bundled table: [bold]{len(BUNDLED_PRICING_TABLE)}[/]")
+    if new_models:
+        console.print(f"  New models: [green]{', '.join(new_models)}[/]")
+    if updated_models:
+        console.print(f"  Updated prices: [yellow]{', '.join(updated_models)}[/]")
+
+    if dry_run:
+        console.print(
+            f"\n  [dim]Dry run — no changes written. "
+            f"Remove --dry-run to save to ~/.forge/pricing.json[/]\n"
+        )
+        return
+
+    try:
+        path = save_pricing_cache(remote)
+        console.print(f"\n  [green]✓[/] Pricing table saved to [bold]{path}[/]\n")
+    except Exception as exc:
+        console.print(f"\n  [red]✗[/] Failed to save pricing cache: {exc}\n")
+        raise typer.Exit(1)
+
+
 def _check_network(table: Table) -> None:  # pragma: no cover — network-dependent
     """Best-effort liveness check of the two LLM providers Forge instruments."""
     try:

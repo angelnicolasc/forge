@@ -174,8 +174,20 @@ class LLMCallInterceptor(Protocol):
         input_tokens: int,
         output_tokens: int,
         output: Any = None,
+        thinking_tokens: int = 0,
+        cached_input_tokens: int = 0,
     ) -> None:
         """Close the span, publish a populated ``LLM_CALL`` event to the bus."""
+        ...
+
+    async def on_llm_token(
+        self,
+        span_id: str,
+        token: str,
+        *,
+        is_thinking: bool = False,
+    ) -> None:
+        """Publish a single streaming token chunk. No-op if span is unknown."""
         ...
 
     async def on_llm_error(self, span_id: str, error: BaseException) -> None:
@@ -187,12 +199,19 @@ class LLMCallInterceptor(Protocol):
 class CostModel(Protocol):
     """Pricing model for LLM API calls.
 
-    Maps (model_name, input_tokens, output_tokens) to cost in USD.
-    Used by forge-observe for real-time cost tracking and by the
-    evolution loop for cost optimization.
+    Maps (model_name, input_tokens, output_tokens[, thinking_tokens,
+    cached_input_tokens]) to cost in USD. Implementations that do not
+    support thinking or prompt caching may ignore the extra parameters.
     """
 
-    def cost(self, model: str, input_tokens: int, output_tokens: int) -> Decimal:
+    def cost(
+        self,
+        model: str,
+        input_tokens: int,
+        output_tokens: int,
+        thinking_tokens: int = 0,
+        cached_input_tokens: int = 0,
+    ) -> Decimal:
         """Calculate the cost for a single LLM call."""
         ...
 

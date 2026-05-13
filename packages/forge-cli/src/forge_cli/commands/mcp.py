@@ -150,6 +150,49 @@ async def _do_call(
         return ToolResult(tool_name=tool_name, error=str(exc))
 
 
+@mcp_app.command("serve")
+def mcp_serve(
+    host: str = typer.Option("127.0.0.1", "--host", help="Bind address for SSE transport."),
+    port: int = typer.Option(8765, "--port", "-p", help="Port for SSE transport."),
+    stdio: bool = typer.Option(False, "--stdio", help="Use stdin/stdout transport instead of SSE."),
+) -> None:
+    """[bold]Start[/] Forge as an MCP server (expose memory, evolution, and runs as tools).
+
+    Any MCP-compatible client — Claude Desktop, Claude Code, custom agents —
+    can connect and call forge tools directly.
+
+    Requires: pip install 'forge-mcp[sdk]'
+
+    \b
+    Examples:
+      forge mcp serve --stdio          # Claude Desktop (stdio transport)
+      forge mcp serve --port 8765      # HTTP + SSE transport
+    """
+    try:
+        from forge_mcp.forge_server import ForgeMCPServer
+    except ImportError:
+        console.print(
+            "[red]✗[/] forge-mcp[sdk] is not installed.\n"
+            "  Run: [bold]pip install 'forge-mcp[sdk]'[/]"
+        )
+        raise typer.Exit(1)
+
+    srv = ForgeMCPServer()
+
+    try:
+        if stdio:
+            console.print(f"  [dim]Starting Forge MCP server (stdio transport)...[/]")
+            asyncio.run(srv.serve_stdio())
+        else:
+            console.print(
+                f"  Starting Forge MCP server on [bold]{host}:{port}[/]\n"
+                f"  [dim]SSE endpoint: http://{host}:{port}/sse[/]"
+            )
+            asyncio.run(srv.serve_sse(host=host, port=port))
+    except KeyboardInterrupt:
+        console.print("\n  [dim]Forge MCP server stopped.[/]")
+
+
 @mcp_app.command("status")
 def mcp_status(
     config: Path = typer.Argument(..., help="forge-mcp YAML config file.", metavar="CONFIG"),

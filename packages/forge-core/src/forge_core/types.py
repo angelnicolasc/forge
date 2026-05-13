@@ -14,6 +14,9 @@ from enum import StrEnum
 from typing import Any
 from uuid import uuid4
 
+# Pydantic requires typing_extensions.TypedDict on Python < 3.12
+from typing_extensions import TypedDict
+
 from pydantic import BaseModel, Field, field_validator
 
 # SPIFFE URI format: spiffe://<trust-domain>/<workload-identifier>
@@ -42,6 +45,8 @@ class RunEventKind(StrEnum):
     SKILL_CALL = "skill_call"  # fired after skill handler completes; payload: skill, duration_ms
     SPEC_VERIFIED = "spec_verified"  # fired after spec verification; payload: spec, compliance_rate, passed
     REVIEW_COMPLETE = "review_complete"  # fired after review gate; payload: hook, allowed, finding_count
+    LLM_TOKEN = "llm_token"  # one streaming chunk; payload: token, is_thinking
+    ADAPTER_DEGRADED = "adapter_degraded"  # SDK patch failed silently; payload: adapter, sdk, reason, impact
 
 
 class RunStatus(StrEnum):
@@ -159,6 +164,25 @@ class RunConfig(BaseModel):
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
 
 
+class ForgeMemoryContext(TypedDict):
+    """Typed shape of the ``forge_memory`` key injected into ``TaskEnvelope.context``."""
+
+    entries: list[MemoryEntry]
+    query: str
+    hits: int
+
+
+class TaskEnvelopeContext(TypedDict, total=False):
+    """Typed contract for ``TaskEnvelope.context``.
+
+    ``total=False`` means every key is optional, preserving backward
+    compatibility with callers that pass arbitrary ``dict[str, Any]`` values.
+    New well-known keys should be added here as they are formalized.
+    """
+
+    forge_memory: ForgeMemoryContext
+
+
 class TaskEnvelope(BaseModel):
     """Universal task input — the single entry point for any Forge run."""
 
@@ -166,7 +190,7 @@ class TaskEnvelope(BaseModel):
     input: dict[str, Any]
     config: RunConfig = Field(default_factory=RunConfig)
     memory_context: list[str] = Field(default_factory=list)
-    context: dict[str, Any] = Field(default_factory=dict)
+    context: TaskEnvelopeContext = Field(default_factory=TaskEnvelopeContext)
     tags: dict[str, str] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
@@ -191,6 +215,8 @@ class RunEvent(BaseModel):
     model: str | None = None
     input_tokens: int = 0
     output_tokens: int = 0
+    thinking_tokens: int = 0  # extended thinking tokens (Anthropic claude-opus-4+)
+    cached_input_tokens: int = 0  # prompt-cache read tokens (billed at ~10% of input price)
     context_tokens: int = 0  # tokens injected into context window (CONTEXT_INJECTED events)
     cost: Decimal = Decimal("0")
     latency_ms: float = 0.0

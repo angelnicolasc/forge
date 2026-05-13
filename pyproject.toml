@@ -112,11 +112,13 @@ omit = [
     "*/_version.py",
     "*/__main__.py",
 ]
-branch = false
+branch = true
 
 [tool.coverage.report]
-# 75% is the launch gate per plan ζ.8; raise only after a green week.
-fail_under = 75
+# First measurement with branch=true (enabled 2026-05-13 per audit remediation).
+# Combined statement+branch coverage landed at 76%. Setting floor to 77% now;
+# target 80% in next sprint once forge-spec runner/constraints gaps are closed.
+fail_under = 77
 skip_covered = false
 show_missing = true
 exclude_lines = [

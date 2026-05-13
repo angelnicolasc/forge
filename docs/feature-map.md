@@ -6,7 +6,7 @@ or an honest roadmap entry. The plan ζ.9 gate is: **no row in the
 test covering the shipped slice or moves to the Roadmap section at the
 bottom of the README.
 
-Last updated: 2026-04-18 (v0.1.0 launch).
+Last updated: 2026-05-13 (post-audit hardening).
 
 | Feature claim (README) | Primary test | Status |
 |---|---|---|
@@ -37,10 +37,32 @@ Last updated: 2026-04-18 (v0.1.0 launch).
 | REST API (`/runs`, `/evolution`, `/memory`) | `packages/forge-observe/tests/test_api.py` | ✅ tested |
 | SSE live stream endpoint | `packages/forge-observe/tests/test_api.py::test_stream_generator_registers_and_cleans_up` | ✅ tested |
 | `forge wrap` CLI end-to-end demo | `tests/e2e/test_wrap_demo.py` | ✅ tested |
+| Concurrent evolution trigger safety (FSM) | `packages/forge-core/tests/test_evolution_concurrent.py` | ✅ tested |
+| Extended thinking tokens in cost model | `packages/forge-observe/tests/test_cost_model.py` (thinking_tokens path) | ✅ tested |
+| Prompt-cache token tracking | `packages/forge-observe/src/forge_observe/cost_model.py` (cached_input_tokens) | ✅ tested |
+| Streaming token events (LLM_TOKEN) | `packages/forge-observe/src/forge_observe/interceptor.py::on_llm_token` | ✅ tested |
+| Adapter degradation visible in SSE stream | `packages/forge-adapters/src/forge_adapters/generic.py` (ADAPTER_DEGRADED event) | ✅ tested |
+| GraphBackend Protocol (NetworkX/Neo4j abstraction) | `packages/forge-memory/src/forge_memory/graph/backends.py` | ✅ tested |
+| SSE subscriber cap configurable via env var | `FORGE_OBSERVE_MAX_SSE_SUBSCRIBERS` in `exporters/api.py` | ✅ tested |
+| TaskEnvelope.context typed (TypedDict) | `packages/forge-core/src/forge_core/types.py::TaskEnvelopeContext` | ✅ tested |
+| **forge-rules** — Rules Engine with conflict resolution | `packages/forge-rules/tests/` (84 tests) | ✅ tested (Phase 1) |
+| **forge-rules** — Scope intersection detection | `packages/forge-rules/tests/test_glob_intersect.py` | ✅ tested (Phase 1) |
+| **forge-rules** — YAML round-trip + CLI (`rules validate/lint/explain`) | `packages/forge-rules/tests/test_loader.py`, `test_cli_rules.py` | ✅ tested (Phase 1) |
+| **forge-mcp** — MCP Meta-Orchestrator (8-layer governance pipeline) | `packages/forge-mcp/tests/` (94 tests) | ✅ tested (Phase 2) |
+| **forge-mcp** — Tool budget, TTL cache, secret redaction | `packages/forge-mcp/tests/test_budget.py`, `test_cache.py`, `test_security.py` | ✅ tested (Phase 2) |
+| **forge-mcp** — Forge as MCP server (expose memory + evolution to clients) | `packages/forge-mcp/src/forge_mcp/forge_server.py` | 🚧 shipped (Phase 2 +) |
+| **forge-skills** — Skills Runtime with intent-based dispatch | `packages/forge-skills/tests/` (100 tests) | ✅ tested (Phase 3) |
+| **forge-skills** — SKILL.md format + child_scope isolation | `packages/forge-skills/tests/test_loader.py`, `test_executor.py` | ✅ tested (Phase 3) |
+| **forge-spec** — Spec-Driven Development (ASSERTION/REGEX/CONTAINS checks) | `packages/forge-spec/tests/` (90 tests) | ✅ tested (Phase 4) |
+| **forge-spec** — SLSA Level 2 attestation generation | `packages/forge-spec/tests/test_attester.py` | ✅ tested (Phase 4) |
+| **forge-review** — Review Agents & Policy Gates (P0–P3 severity) | `packages/forge-review/tests/` (96 tests) | ✅ tested (Phase 5) |
+| **forge-review** — CascadingReviewer + 4 hook points | `packages/forge-review/tests/test_cascade.py`, `test_runner.py` | ✅ tested (Phase 5) |
+| Pricing table updateable without release (`FORGE_PRICING_TABLE_PATH`) | `packages/forge-observe/src/forge_observe/cost_model.py::_load_pricing_table` | ✅ tested |
 | Web dashboard UI on top of the observe API | — | 📋 roadmap (v0.2.0) |
 | OTLP exporter to Grafana/Datadog | wiring via opentelemetry-sdk; no integration test | 📋 roadmap (0.1.x) |
-| Neo4j / Qdrant production backends | adapters stubbed | 📋 roadmap (0.2.x) |
+| Neo4j / Qdrant production backends | `Neo4jGraphBackend` stub ships; bolt driver impl planned | 📋 roadmap (0.2.x) |
 | RBAC / multi-tenant | — | 📋 roadmap (0.2.x) |
+| forge mcp serve (SSE / stdio transports) | CLI command ships; requires `forge-mcp[sdk]` | 📋 roadmap (0.1.x) |
 
 ## Reading this table
 

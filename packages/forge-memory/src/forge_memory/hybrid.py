@@ -32,6 +32,7 @@ import structlog
 
 from forge_core.circuit_breaker import CircuitBreaker, CircuitOpenError
 from forge_core.types import MemoryEntry, MemoryQuery
+from forge_memory.graph.backends import GraphBackend
 from forge_memory.graph.networkx_backend import NetworkXBackend
 from forge_memory.ingestion import IngestionPipeline
 from forge_memory.symbolic.rules import RuleEngine, default_rule_engine
@@ -56,7 +57,7 @@ class HybridMemory:
     def __init__(
         self,
         vector_backend: Any | None = None,
-        graph_backend: Any | None = None,
+        graph_backend: GraphBackend | None = None,
         rule_engine: RuleEngine | None = None,
         version_store: MemoryVersionStore | None = None,
         ingestion_pipeline: IngestionPipeline | None = None,

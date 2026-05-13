@@ -175,6 +175,8 @@ class ForgeLLMInterceptor:
         input_tokens: int,
         output_tokens: int,
         output: Any = None,
+        thinking_tokens: int = 0,
+        cached_input_tokens: int = 0,
     ) -> None:
         """Close the span, compute cost, and publish an ``LLM_CALL`` event."""
         # ζ.5a — breaker-suppressed start returned the sentinel; its "end"
@@ -193,11 +195,17 @@ class ForgeLLMInterceptor:
             return
 
         latency_ms = (time.perf_counter() - state.start_perf) * 1000.0
-        cost = self._cost_model.cost(state.model, input_tokens, output_tokens)
+        cost = self._cost_model.cost(
+            state.model, input_tokens, output_tokens,
+            thinking_tokens=thinking_tokens,
+            cached_input_tokens=cached_input_tokens,
+        )
 
         # Set OTel attributes and close span.
         state.otel_span.set_attribute("forge.input_tokens", input_tokens)
         state.otel_span.set_attribute("forge.output_tokens", output_tokens)
+        state.otel_span.set_attribute("forge.thinking_tokens", thinking_tokens)
+        state.otel_span.set_attribute("forge.cached_input_tokens", cached_input_tokens)
         state.otel_span.set_attribute("forge.cost_usd", str(cost))
         state.otel_span.set_attribute("forge.latency_ms", latency_ms)
         state.otel_span.set_status(Status(StatusCode.OK))
@@ -211,11 +219,38 @@ class ForgeLLMInterceptor:
             model=state.model,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
+            thinking_tokens=thinking_tokens,
+            cached_input_tokens=cached_input_tokens,
             cost=cost,
             latency_ms=latency_ms,
             span_id=span_id,
             parent_span_id=state.parent_span_id,
             data={"metadata": state.metadata} if state.metadata else {},
+        )
+        await self._bus.publish(event)
+
+    async def on_llm_token(
+        self,
+        span_id: str,
+        token: str,
+        *,
+        is_thinking: bool = False,
+    ) -> None:
+        """Publish a single streaming token chunk to the event bus.
+
+        Best-effort: if the span is unknown (e.g. breaker-suppressed or
+        orphaned) the event is still published with ``run_id=None``.
+        Adapters that do not stream simply never call this method.
+        """
+        if span_id == _BREAKER_OPEN_SPAN:
+            return
+        state = self._open_spans.get(span_id)
+        event = RunEvent(
+            kind=RunEventKind.LLM_TOKEN,
+            run_id=state.run_id if state else None,
+            agent_id=state.agent_id if state else None,
+            span_id=span_id,
+            data={"token": token, "is_thinking": is_thinking},
         )
         await self._bus.publish(event)
 

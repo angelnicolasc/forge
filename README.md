@@ -247,6 +247,22 @@ Forge ships as six composable packages. Installing `forge-os` pulls all of them.
 
 ---
 
+## Environment Variables
+
+Feature flags and runtime configuration via environment variables.
+
+| Variable | Default | Description |
+|---|---|---|
+| `FORGE_ENABLE_EVOLUTION_AUTO` | `0` | Auto-apply evolution mutations without human approval. Off by default; enable only in trusted environments. |
+| `FORGE_ENABLE_LLM_JUDGE` | `0` | Evaluate run quality with an LLM call after each run. **Adds ~1 LLM call per run.** Model configurable via `FORGE_LLM_JUDGE_MODEL` (default: `claude-haiku-4-20250514`). Expected cost: ~$0.001/evaluation at Haiku pricing. |
+| `FORGE_LLM_JUDGE_MODEL` | `claude-haiku-4-20250514` | Model used by the LLM-as-judge scorer when `FORGE_ENABLE_LLM_JUDGE=1`. |
+| `FORGE_LLM_CIRCUIT_BREAKER` | `1` | Enable the LLM circuit breaker (trips after 5 consecutive failures; 30s recovery). Set to `0` to disable in tests. |
+| `FORGE_OBSERVE_MAX_SSE_SUBSCRIBERS` | `50` | Maximum concurrent SSE subscribers on `/api/v1/stream`. Returns HTTP 503 beyond this limit. |
+| `FORGE_API_ALLOWED_ORIGINS` | `` | Comma-separated CORS origins for the observe API (e.g. `http://localhost:5173`). Empty = same-origin only. |
+| `FORGE_PRICING_TABLE_PATH` | `` | Path to a JSON pricing table that overrides the bundled prices. Useful when model prices change before a new release ships. |
+
+---
+
 ## Roadmap
 
 v0.1.0 is **backend + CLI only**. The items below are out of scope for this tag
