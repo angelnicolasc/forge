@@ -32,6 +32,7 @@ langgraph = ["forge-adapters[langgraph]==0.1.0"]
 crewai = ["forge-adapters[crewai]==0.1.0"]
 autogen = ["forge-adapters[autogen]==0.1.0"]
 all = ["forge-adapters[all]==0.1.0"]
+rules = ["forge-rules==0.1.0"]
 
 [project.urls]
 Homepage = "https://github.com/angelnicolasc/forge"

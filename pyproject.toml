@@ -14,6 +14,7 @@ forge-memory = { workspace = true }
 forge-observe = { workspace = true }
 forge-cli = { workspace = true }
 forge-os = { workspace = true }
+forge-rules = { workspace = true }
 
 [tool.uv]
 package = false
@@ -67,7 +68,7 @@ ignore = ["RUF001", "RUF002", "RUF003", "B008"]
 "packages/forge-observe/src/forge_observe/exporters/api.py" = ["TC003"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["forge_core", "forge_memory", "forge_adapters", "forge_observe", "forge_cli"]
+known-first-party = ["forge_core", "forge_memory", "forge_adapters", "forge_observe", "forge_cli", "forge_rules"]
 
 [tool.mypy]
 python_version = "3.11"
@@ -97,6 +98,7 @@ addopts = "-ra -q --strict-markers --import-mode=importlib"
 markers = [
     "slow: marks tests as slow",
     "integration: marks integration tests",
+    "requires_sentence_transformers: marks tests that load a sentence-transformers model (slow, skipped in fast CI)",
 ]
 
 [tool.coverage.run]

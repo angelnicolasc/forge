@@ -16,6 +16,7 @@ members = [
     "forge-memory",
     "forge-observe",
     "forge-os",
+    "forge-rules",
     "forge-workspace",
 ]
 
@@ -1011,16 +1012,23 @@ dependencies = [
     { name = "typer" },
 ]
 
+[package.optional-dependencies]
+rules = [
+    { name = "forge-rules" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "forge-adapters", editable = "packages/forge-adapters" },
     { name = "forge-core", editable = "packages/forge-core" },
     { name = "forge-memory", editable = "packages/forge-memory" },
     { name = "forge-observe", editable = "packages/forge-observe" },
+    { name = "forge-rules", marker = "extra == 'rules'", editable = "packages/forge-rules" },
     { name = "rich", specifier = ">=13.7" },
     { name = "structlog", specifier = ">=24.0,<26.0" },
     { name = "typer", specifier = ">=0.12" },
 ]
+provides-extras = ["rules"]
 
 [[package]]
 name = "forge-core"
@@ -1039,18 +1047,24 @@ evolution = [
     { name = "anthropic" },
     { name = "openai" },
 ]
+intent = [
+    { name = "numpy" },
+    { name = "sentence-transformers" },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "anthropic", marker = "extra == 'evolution'", specifier = ">=0.40" },
+    { name = "numpy", marker = "extra == 'intent'", specifier = ">=1.26" },
     { name = "openai", marker = "extra == 'evolution'", specifier = ">=1.50" },
     { name = "opentelemetry-api", specifier = ">=1.25" },
     { name = "opentelemetry-sdk", specifier = ">=1.25,<2.0" },
     { name = "pydantic", specifier = ">=2.7,<3.0" },
     { name = "pydantic-settings", specifier = ">=2.4,<3.0" },
+    { name = "sentence-transformers", marker = "extra == 'intent'", specifier = ">=3.0" },
     { name = "structlog", specifier = ">=24.0,<26.0" },
 ]
-provides-extras = ["evolution"]
+provides-extras = ["evolution", "intent"]
 
 [[package]]
 name = "forge-memory"
@@ -1140,6 +1154,9 @@ crewai = [
 langgraph = [
     { name = "forge-adapters", extra = ["langgraph"] },
 ]
+rules = [
+    { name = "forge-rules" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -1152,8 +1169,39 @@ requires-dist = [
     { name = "forge-core", editable = "packages/forge-core" },
     { name = "forge-memory", editable = "packages/forge-memory" },
     { name = "forge-observe", editable = "packages/forge-observe" },
+    { name = "forge-rules", marker = "extra == 'rules'", editable = "packages/forge-rules" },
 ]
-provides-extras = ["langgraph", "crewai", "autogen", "all"]
+provides-extras = ["langgraph", "crewai", "autogen", "all", "rules"]
+
+[[package]]
+name = "forge-rules"
+version = "0.1.0"
+source = { editable = "packages/forge-rules" }
+dependencies = [
+    { name = "forge-core" },
+    { name = "pydantic" },
+    { name = "pyyaml" },
+    { name = "structlog" },
+]
+
+[package.optional-dependencies]
+intent = [
+    { name = "forge-core", extra = ["intent"] },
+]
+opa = [
+    { name = "requests" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "forge-core", editable = "packages/forge-core" },
+    { name = "forge-core", extras = ["intent"], marker = "extra == 'intent'", editable = "packages/forge-core" },
+    { name = "pydantic", specifier = ">=2.7,<3.0" },
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "requests", marker = "extra == 'opa'", specifier = ">=2.32" },
+    { name = "structlog", specifier = ">=24.0,<26.0" },
+]
+provides-extras = ["intent", "opa"]
 
 [[package]]
 name = "forge-workspace"
