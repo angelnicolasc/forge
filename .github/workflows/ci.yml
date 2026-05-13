@@ -32,7 +32,7 @@ jobs:
           cache-dependency-glob: "uv.lock"
 
       - name: Install dev dependencies
-        run: uv sync --all-extras
+        run: uv sync --all-packages --all-extras
 
       - name: Ruff lint
         run: uv run ruff check packages/ --output-format=github
@@ -65,7 +65,7 @@ jobs:
           enable-cache: true
 
       - name: Install workspace
-        run: uv sync --all-extras
+        run: uv sync --all-packages --all-extras
 
       - name: Run tests
         run: uv run pytest --cov=packages --cov-report=xml --cov-report=term-missing --cov-fail-under=75
@@ -159,7 +159,7 @@ jobs:
       - uses: astral-sh/setup-uv@v3
 
       - name: Install workspace
-        run: uv sync --all-extras
+        run: uv sync --all-packages --all-extras
 
       - name: Run crewai_content example
         run: uv run python examples/crewai_content/flow.py '{"topic":"AI harnesses"}'

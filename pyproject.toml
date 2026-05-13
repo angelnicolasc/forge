@@ -95,6 +95,10 @@ module = [
     "google.generativeai.*",
     "networkx",
     "chromadb.*",
+    "sentence_transformers",
+    "sentence_transformers.*",
+    "numpy",
+    "numpy.*",
 ]
 ignore_missing_imports = true
 

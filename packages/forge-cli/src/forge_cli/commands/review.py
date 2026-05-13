@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -23,7 +24,7 @@ _SEV_COLOR = {
 }
 
 
-def _import_review():
+def _import_review() -> Any:
     try:
         import forge_review
 
@@ -36,7 +37,7 @@ def _import_review():
         raise typer.Exit(code=1) from None
 
 
-def _print_review_result(result) -> None:
+def _print_review_result(result: Any) -> None:
     _import_review()
     summary = result.summary
     console.print(
