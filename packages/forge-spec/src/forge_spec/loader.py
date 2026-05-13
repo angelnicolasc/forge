@@ -13,7 +13,6 @@ Artifact files:
 
 from __future__ import annotations
 
-import io
 from pathlib import Path
 from typing import Any
 
@@ -43,8 +42,7 @@ def _parse_yaml(text: str, label: str) -> dict[str, Any]:
         raise ValueError(f"YAML parse error in {label!r}: {exc}") from exc
     if not isinstance(data, dict):
         raise ValueError(
-            f"YAML must be a mapping at the top level, got {type(data).__name__}. "
-            f"Source: {label!r}"
+            f"YAML must be a mapping at the top level, got {type(data).__name__}. Source: {label!r}"
         )
     return data
 
@@ -65,7 +63,9 @@ def load_acceptance_yaml(source: str | Path | Any) -> list[AcceptanceCriterion]:
     data = _parse_yaml(text, label)
     raw = data.get("acceptance_criteria", data.get("criteria", []))
     if not isinstance(raw, list):
-        raise ValueError(f"acceptance.yaml must contain a list under 'acceptance_criteria'. Source: {label!r}")
+        raise ValueError(
+            f"acceptance.yaml must contain a list under 'acceptance_criteria'. Source: {label!r}"
+        )
     try:
         return [AcceptanceCriterion.model_validate(item) for item in raw]
     except ValidationError as exc:

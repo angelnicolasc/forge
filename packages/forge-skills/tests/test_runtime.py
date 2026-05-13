@@ -3,18 +3,16 @@
 from __future__ import annotations
 
 import asyncio
-import textwrap
-from pathlib import Path
-
-import pytest
+from typing import TYPE_CHECKING
 
 from forge_core.types import RunEvent, RunEventKind
-from forge_skills.dispatcher import IntentDispatcher
 from forge_skills.runtime import SkillRuntime
 from forge_skills.types import SkillDef, SkillParam
 
 from .conftest import VALID_SKILL_MD
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Fake classifier (same pattern as test_dispatcher.py)
@@ -32,9 +30,7 @@ class _FakeClassifier:
         return self._responses.get(text, ("unknown", 0.0))
 
 
-def _inject_fake_classifier(
-    rt: SkillRuntime, responses: dict[str, tuple[str, float]]
-) -> None:
+def _inject_fake_classifier(rt: SkillRuntime, responses: dict[str, tuple[str, float]]) -> None:
     rt._dispatcher._classifier = _FakeClassifier(responses)
 
 
@@ -129,9 +125,7 @@ class TestSkillRuntimeInvoke:
     def test_invoke_with_required_args(self) -> None:
         rt = SkillRuntime()
         rt.register(
-            SkillDef(name="add", parameters=[
-                SkillParam(name="a"), SkillParam(name="b")
-            ]),
+            SkillDef(name="add", parameters=[SkillParam(name="a"), SkillParam(name="b")]),
             handler=_add_handler,
         )
         result = asyncio.run(rt.invoke("add", arguments={"a": 2, "b": 3}))

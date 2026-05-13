@@ -8,7 +8,7 @@ Source conventions (same as forge-mcp loader):
 
 from __future__ import annotations
 
-import io
+import contextlib
 import re
 from pathlib import Path
 from typing import Any
@@ -46,7 +46,7 @@ def _split_frontmatter(text: str) -> tuple[dict[str, Any], str]:
         meta = yaml.safe_load(m.group(1)) or {}
     except yaml.YAMLError as exc:
         raise ValueError(f"YAML frontmatter parse error: {exc}") from exc
-    body = text[m.end():]
+    body = text[m.end() :]
     return meta, body
 
 
@@ -72,8 +72,7 @@ def load_skill_md(source: str | Path | Any) -> SkillDef:
     meta, body = _split_frontmatter(text)
     if not meta:
         raise ValueError(
-            "SKILL.md must begin with a YAML frontmatter block (--- ... ---). "
-            f"Source: {label!r}"
+            f"SKILL.md must begin with a YAML frontmatter block (--- ... ---). Source: {label!r}"
         )
     return _build_skill(meta, body=body, source=label)
 
@@ -99,8 +98,6 @@ def load_dir(directory: str | Path, *, glob: str = "**/*.md") -> list[SkillDef]:
     root = Path(directory)
     skills: list[SkillDef] = []
     for path in sorted(root.glob(glob)):
-        try:
+        with contextlib.suppress(Exception):
             skills.append(load_skill_md(path))
-        except Exception:
-            pass
     return skills

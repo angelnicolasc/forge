@@ -1,9 +1,8 @@
 """Tests for forge_mcp.cache — ToolCallCache exact-match TTL cache."""
+
 from __future__ import annotations
 
 import time
-
-import pytest
 
 from forge_mcp.cache import ToolCallCache
 
@@ -57,8 +56,8 @@ class TestToolCallCache:
     def test_stats_tracks_hits_and_misses(self) -> None:
         cache = ToolCallCache()
         cache.put("tool", {"a": 1}, "v")
-        cache.get("tool", {"a": 1})   # hit
-        cache.get("tool", {"a": 2})   # miss
+        cache.get("tool", {"a": 1})  # hit
+        cache.get("tool", {"a": 2})  # miss
         stats = cache.stats()
         assert stats["hits"] == 1
         assert stats["misses"] == 1

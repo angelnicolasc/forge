@@ -4,11 +4,9 @@ from __future__ import annotations
 
 import asyncio
 
-import pytest
-
 from forge_core.context import run_scope
 from forge_core.types import RunContext, RunEvent, RunEventKind
-from forge_skills.executor import ArgumentError, SkillBudgetError, SkillExecutor
+from forge_skills.executor import SkillExecutor
 from forge_skills.types import SkillDef, SkillInvocation, SkillParam
 
 
@@ -104,9 +102,7 @@ class TestSkillExecutorArgumentValidation:
         assert "text" in result.error
 
     def test_optional_arg_not_required(self) -> None:
-        skill = _skill(
-            params=[SkillParam(name="limit", required=False, default=10)]
-        )
+        skill = _skill(params=[SkillParam(name="limit", required=False, default=10)])
         ex = SkillExecutor()
         result = asyncio.run(ex.execute(skill, _ok_handler, _inv(args={})))
         assert result.ok

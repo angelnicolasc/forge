@@ -1,6 +1,6 @@
 [project]
 name = "forge-skills"
-version = "0.1.0"
+version = "0.2.0"
 description = "Skills Runtime for Forge — intent-based dispatch, SKILL.md loading, and sub-run execution."
 readme = "README.md"
 license = "Apache-2.0"
@@ -20,7 +20,7 @@ classifiers = [
 ]
 keywords = ["agents", "llm", "skills", "orchestration", "intent", "dispatch"]
 dependencies = [
-    "forge-core==0.1.0",
+    "forge-core==0.2.0",
     "pydantic>=2.7,<3.0",
     "structlog>=24.0,<26.0",
     "pyyaml>=6.0",

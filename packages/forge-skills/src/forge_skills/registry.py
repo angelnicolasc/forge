@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import structlog
 
-from forge_skills.types import SkillDef, SkillHandlerFn
+if TYPE_CHECKING:
+    from forge_skills.types import SkillDef, SkillHandlerFn
 
 logger = structlog.get_logger(__name__)
 

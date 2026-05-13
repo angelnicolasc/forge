@@ -1,6 +1,6 @@
 [project]
 name = "forge-cli"
-version = "0.1.0"
+version = "0.2.0"
 description = "CLI for Forge — wrap any multi-agent flow in one command. Watch it evolve."
 readme = "README.md"
 license = "Apache-2.0"
@@ -16,21 +16,21 @@ classifiers = [
 ]
 keywords = ["cli", "agents", "orchestration", "forge"]
 dependencies = [
-    "forge-core==0.1.0",
-    "forge-adapters==0.1.0",
-    "forge-observe==0.1.0",
-    "forge-memory==0.1.0",
+    "forge-core==0.2.0",
+    "forge-adapters==0.2.0",
+    "forge-observe==0.2.0",
+    "forge-memory==0.2.0",
     "typer>=0.12",
     "rich>=13.7",
     "structlog>=24.0,<26.0",
 ]
 
 [project.optional-dependencies]
-rules = ["forge-rules==0.1.0"]
-mcp = ["forge-mcp==0.1.0"]
-skills = ["forge-skills==0.1.0"]
-spec = ["forge-spec==0.1.0"]
-review = ["forge-review==0.1.0"]
+rules = ["forge-rules==0.2.0"]
+mcp = ["forge-mcp==0.2.0"]
+skills = ["forge-skills==0.2.0"]
+spec = ["forge-spec==0.2.0"]
+review = ["forge-review==0.2.0"]
 
 [project.scripts]
 forge = "forge_cli.main:app"

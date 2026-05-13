@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 from forge_review.types import (
-    Finding,
-    FindingSeverity,
     PolicyDecision,
     ReviewConfig,
     ReviewResult,
@@ -25,7 +23,8 @@ class PolicyGate:
         min_confidence = self._config.min_confidence
 
         blocked = [
-            f for f in review_result.findings
+            f
+            for f in review_result.findings
             if f.severity in block_severities and f.confidence >= min_confidence
         ]
 

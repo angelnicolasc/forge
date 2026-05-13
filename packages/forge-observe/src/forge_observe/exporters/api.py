@@ -228,9 +228,7 @@ def create_app(version: str = "0.1.0") -> FastAPI:
         card = AgentCard(
             name="Forge MetaOrchestrator",
             role="orchestrator",
-            description=(
-                "Universal AI agent harness — self-evolution, hybrid memory, OTel."
-            ),
+            description=("Universal AI agent harness — self-evolution, hybrid memory, OTel."),
             version=forge_core.__version__,
             url=obs.agent_base_url,
             capabilities=[

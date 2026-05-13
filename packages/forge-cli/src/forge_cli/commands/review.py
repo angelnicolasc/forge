@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -27,17 +26,18 @@ _SEV_COLOR = {
 def _import_review():
     try:
         import forge_review
+
         return forge_review
     except ImportError:
         err_console.print(
             "[red]forge-review is not installed.[/red] Install with: "
             "[bold]pip install forge-review[/bold]"
         )
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from None
 
 
 def _print_review_result(result) -> None:
-    forge_review = _import_review()
+    _import_review()
     summary = result.summary
     console.print(
         Panel(
@@ -69,29 +69,40 @@ def _print_review_result(result) -> None:
             f"{f.confidence:.0%}",
         )
     console.print(table)
-    console.print(
-        f"\n[dim]P0:{summary['p0']}  P1:{summary['p1']}  P2:{summary['p2']}  P3:{summary['p3']}[/dim]"
-    )
+    p = summary
+    console.print(f"\n[dim]P0:{p['p0']}  P1:{p['p1']}  P2:{p['p2']}  P3:{p['p3']}[/dim]")
 
 
 @review_app.command("run")
 def review_run(
-    hook: str = typer.Option("pre_merge", "--hook", "-k", help="Hook kind: on_plan | pre_apply | pre_stop | pre_merge"),
-    run_result_file: Optional[Path] = typer.Option(None, "--run-result", help="Path to RunResult JSON (else reads stdin)"),
+    hook: str = typer.Option(
+        "pre_merge",
+        "--hook",
+        "-k",
+        help="Hook kind: on_plan | pre_apply | pre_stop | pre_merge",
+    ),
+    run_result_file: Path | None = typer.Option(
+        None,
+        "--run-result",
+        help="Path to RunResult JSON (else reads stdin)",
+    ),
     run_id: str = typer.Option("", "--run-id", help="Run ID to record in the review result"),
     output_json: bool = typer.Option(False, "--json", help="Output ReviewResult as JSON"),
 ) -> None:
     """Run all review agents against a RunResult and apply the policy gate."""
     import asyncio
+
     forge_review = _import_review()
-    from forge_core.types import RunResult, HookKind as CoreHookKind
+    from forge_core.types import RunResult
 
     # Parse hook kind
     try:
-        hook_kind = forge_review.HookKind(hook)
+        forge_review.HookKind(hook)
     except ValueError:
-        err_console.print(f"[red]Unknown hook:[/red] {hook!r}. Choose: on_plan, pre_apply, pre_stop, pre_merge")
-        raise typer.Exit(code=1)
+        err_console.print(
+            f"[red]Unknown hook:[/red] {hook!r}. Choose: on_plan, pre_apply, pre_stop, pre_merge"
+        )
+        raise typer.Exit(code=1) from None
 
     # Load RunResult
     if run_result_file:
@@ -108,7 +119,7 @@ def review_run(
         run_result_obj = RunResult.model_validate(raw)
     except Exception as exc:
         err_console.print(f"[red]Invalid RunResult JSON:[/red] {exc}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from exc
 
     runner = forge_review.ReviewRunner()
     review_result, decision = asyncio.run(runner.pre_merge(run_result_obj, run_id=run_id))
@@ -137,6 +148,6 @@ def review_show(
         result = forge_review.ReviewResult.model_validate(data)
     except Exception as exc:
         err_console.print(f"[red]Error loading result:[/red] {exc}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from exc
 
     _print_review_result(result)

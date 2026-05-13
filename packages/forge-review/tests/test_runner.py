@@ -6,10 +6,8 @@ import asyncio
 from decimal import Decimal
 
 from forge_core.types import CostSummary, RunEventKind, RunResult, RunStatus
-from forge_review.agents import ErrorRateReviewer
 from forge_review.runner import ReviewRunner
 from forge_review.types import Finding, FindingSeverity, HookKind, ReviewConfig, ReviewContext
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -68,7 +66,7 @@ class TestReviewRunnerDefaults:
 
     def test_over_cost_run_blocked(self):
         runner = ReviewRunner()
-        result, decision = asyncio.run(runner.pre_merge(_run(total_cost=Decimal("15.00"))))
+        _result, decision = asyncio.run(runner.pre_merge(_run(total_cost=Decimal("15.00"))))
         assert decision.allowed is False
 
 
@@ -86,17 +84,17 @@ class TestHookHelpers:
 
     def test_pre_apply_returns_result_and_decision(self):
         runner = ReviewRunner(reviewers=[_FixedReviewer("noop", [])])
-        result, decision = asyncio.run(runner.pre_apply("model_swap"))
+        result, _decision = asyncio.run(runner.pre_apply("model_swap"))
         assert result.hook == HookKind.PRE_APPLY
 
     def test_pre_stop_uses_run_result(self):
         runner = ReviewRunner()
-        result, decision = asyncio.run(runner.pre_stop(_run()))
+        result, _decision = asyncio.run(runner.pre_stop(_run()))
         assert result.hook == HookKind.PRE_STOP
 
     def test_pre_merge_uses_run_result(self):
         runner = ReviewRunner()
-        result, decision = asyncio.run(runner.pre_merge(_run()))
+        result, _decision = asyncio.run(runner.pre_merge(_run()))
         assert result.hook == HookKind.PRE_MERGE
 
     def test_run_id_propagated(self):
@@ -149,6 +147,7 @@ class TestCustomReviewers:
 class TestGateMethod:
     def test_gate_evaluates_existing_result(self):
         from forge_review.types import ReviewResult
+
         result = ReviewResult(
             hook=HookKind.PRE_MERGE,
             findings=[Finding(severity=FindingSeverity.P0, title="t", message="m")],
@@ -158,6 +157,7 @@ class TestGateMethod:
 
     def test_gate_allows_clean_result(self):
         from forge_review.types import ReviewResult
+
         result = ReviewResult(hook=HookKind.PRE_MERGE)
         decision = ReviewRunner().gate(result)
         assert decision.allowed is True

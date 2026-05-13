@@ -16,7 +16,6 @@ from forge_spec.types import (
     SpecDef,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -44,9 +43,7 @@ class TestSpecConstraintGuard:
             assert guard.is_allowed(kind)
 
     def test_empty_blocked_list_blocks_all(self):
-        spec = _make_spec(
-            constraints=[SpecConstraint(id="c1", description="no mutations")]
-        )
+        spec = _make_spec(constraints=[SpecConstraint(id="c1", description="no mutations")])
         guard = SpecConstraintGuard(spec)
         for kind in MutationKind:
             assert not guard.is_allowed(kind)
@@ -103,9 +100,7 @@ class TestSpecConstraintGuard:
         assert MutationKind.PROMPT_REWRITE not in blocked
 
     def test_blocked_kinds_with_empty_list_blocks_all_mutation_kinds(self):
-        spec = _make_spec(
-            constraints=[SpecConstraint(id="c1", description="no mutations at all")]
-        )
+        spec = _make_spec(constraints=[SpecConstraint(id="c1", description="no mutations at all")])
         guard = SpecConstraintGuard(spec)
         assert guard.blocked_kinds() == set(MutationKind)
 
@@ -149,8 +144,12 @@ class TestSpecConstraintGuard:
     def test_multiple_constraints_can_all_violate(self):
         spec = _make_spec(
             constraints=[
-                SpecConstraint(id="c1", description="a", mutation_kinds_blocked=[MutationKind.MODEL_SWAP]),
-                SpecConstraint(id="c2", description="b", mutation_kinds_blocked=[MutationKind.MODEL_SWAP]),
+                SpecConstraint(
+                    id="c1", description="a", mutation_kinds_blocked=[MutationKind.MODEL_SWAP]
+                ),
+                SpecConstraint(
+                    id="c2", description="b", mutation_kinds_blocked=[MutationKind.MODEL_SWAP]
+                ),
             ]
         )
         guard = SpecConstraintGuard(spec)

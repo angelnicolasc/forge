@@ -10,18 +10,19 @@ Security model:
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from forge_mcp.types import ServerConfig, ToolPolicy
+if TYPE_CHECKING:
+    from forge_mcp.types import ServerConfig, ToolPolicy
 
 # Common secret patterns — conservative, favour false-positives over false-negatives.
 _SECRET_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"(?i)(api[_-]?key|token|secret|password|bearer)\s*[:=]\s*\S+"),
-    re.compile(r"sk-[a-zA-Z0-9]{20,}"),                          # OpenAI/Anthropic key
-    re.compile(r"ghp_[a-zA-Z0-9]{20,}"),                          # GitHub PAT
-    re.compile(r"glpat-[a-zA-Z0-9\-_]{20,}"),                     # GitLab PAT
+    re.compile(r"sk-[a-zA-Z0-9]{20,}"),  # OpenAI/Anthropic key
+    re.compile(r"ghp_[a-zA-Z0-9]{20,}"),  # GitHub PAT
+    re.compile(r"glpat-[a-zA-Z0-9\-_]{20,}"),  # GitLab PAT
     re.compile(r"(?:^|\s)Bearer\s+[A-Za-z0-9\-_.~+/]+=*", re.MULTILINE),  # Bearer token
-    re.compile(r"eyJ[a-zA-Z0-9+/]{10,}={0,2}"),                   # JWT (base64 header)
+    re.compile(r"eyJ[a-zA-Z0-9+/]{10,}={0,2}"),  # JWT (base64 header)
 ]
 
 
@@ -41,9 +42,7 @@ def is_allowed(server: ServerConfig, tool_name: str, caller_id: str = "") -> boo
     policy = server.tools.get(tool_name)
     if policy is None or not policy.allowed:
         return False
-    if policy.allowed_callers and caller_id not in policy.allowed_callers:
-        return False
-    return True
+    return not (policy.allowed_callers and caller_id not in policy.allowed_callers)
 
 
 def redact_secrets(text: str) -> str:

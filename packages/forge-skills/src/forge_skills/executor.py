@@ -35,9 +35,7 @@ class SkillBudgetError(RuntimeError):
     def __init__(self, skill_name: str, limit: int) -> None:
         self.skill_name = skill_name
         self.limit = limit
-        super().__init__(
-            f"Skill '{skill_name}' exceeded its call budget of {limit} per run."
-        )
+        super().__init__(f"Skill '{skill_name}' exceeded its call budget of {limit} per run.")
 
 
 class ArgumentError(ValueError):
@@ -146,7 +144,7 @@ class SkillExecutor:
                         handler(invocation.arguments),
                         timeout=skill.timeout_seconds,
                     )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return SkillResult(
                 skill_name=skill.name,
                 error=f"Skill '{skill.name}' timed out after {skill.timeout_seconds}s.",

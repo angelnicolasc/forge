@@ -52,7 +52,7 @@ async def run_parallel(
         return_exceptions=True,
     )
     findings: list[Finding] = []
-    for agent, result in zip(agents, results):
+    for agent, result in zip(agents, results, strict=False):
         if isinstance(result, BaseException):
             agent_name = getattr(agent, "name", repr(agent))
             log.warning("reviewer_exception", reviewer=agent_name, error=str(result))

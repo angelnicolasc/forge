@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import io
-from pathlib import Path
 
 import pytest
 
@@ -14,8 +13,7 @@ from forge_spec.loader import (
     load_spec_yaml,
     merge_spec_files,
 )
-from forge_spec.types import AcceptanceCriterion, CheckType, Risk, SpecDef
-
+from forge_spec.types import CheckType
 
 MINIMAL_SPEC = """\
 name: test-spec

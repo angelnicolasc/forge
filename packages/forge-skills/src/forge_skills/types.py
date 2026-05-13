@@ -43,11 +43,10 @@ class SkillDef(BaseModel):
     body: str = ""
 
     @model_validator(mode="after")
-    def _name_valid(self) -> "SkillDef":
+    def _name_valid(self) -> SkillDef:
         if " " in self.name:
             raise ValueError(
-                f"Skill name must not contain spaces: {self.name!r}. "
-                "Use hyphens or underscores."
+                f"Skill name must not contain spaces: {self.name!r}. Use hyphens or underscores."
             )
         return self
 

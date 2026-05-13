@@ -14,7 +14,7 @@ Layer order for every tool call:
 from __future__ import annotations
 
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -22,10 +22,12 @@ from forge_core.circuit_breaker import CircuitBreaker, CircuitOpenError
 from forge_core.types import RunEvent, RunEventKind
 from forge_mcp.budget import BudgetExceededError, ToolBudget
 from forge_mcp.cache import ToolCallCache
-from forge_mcp.client import MCPClientProtocol
 from forge_mcp.router import RoutingError, ToolRouter
 from forge_mcp.security import get_policy, is_allowed, redact_value
 from forge_mcp.types import BudgetSnapshot, ServerConfig, ToolCall, ToolResult
+
+if TYPE_CHECKING:
+    from forge_mcp.client import MCPClientProtocol
 
 logger = structlog.get_logger(__name__)
 
@@ -159,9 +161,7 @@ class MetaMCPServer:
             raw = await breaker.call(client.call_tool, call.tool_name, call.arguments)
         except CircuitOpenError as exc:
             logger.warning("mcp.circuit.open", tool=call.tool_name, server=server.name)
-            return ToolResult(
-                tool_name=call.tool_name, server_name=server.name, error=str(exc)
-            )
+            return ToolResult(tool_name=call.tool_name, server_name=server.name, error=str(exc))
         except Exception as exc:
             logger.error(
                 "mcp.upstream.error",
@@ -169,9 +169,7 @@ class MetaMCPServer:
                 server=server.name,
                 error=repr(exc),
             )
-            return ToolResult(
-                tool_name=call.tool_name, server_name=server.name, error=str(exc)
-            )
+            return ToolResult(tool_name=call.tool_name, server_name=server.name, error=str(exc))
 
         # 7. Secret redaction
         content = redact_value(raw, policy)

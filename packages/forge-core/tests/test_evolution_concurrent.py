@@ -24,7 +24,6 @@ from forge_core.config import EvolutionConfig, ForgeConfig
 from forge_core.harness import MetaOrchestrator
 from forge_core.types import TaskEnvelope
 
-
 # ---------------------------------------------------------------------------
 # Fakes
 # ---------------------------------------------------------------------------
@@ -106,9 +105,7 @@ async def test_five_simultaneous_runs_trigger_evolution_at_most_once() -> None:
     loop = _CountingEvolutionLoop()
     orch.attach_evolution_loop(loop)
 
-    await asyncio.gather(
-        *[orch.run(TaskEnvelope(input={"q": f"run-{i}"})) for i in range(5)]
-    )
+    await asyncio.gather(*[orch.run(TaskEnvelope(input={"q": f"run-{i}"})) for i in range(5)])
     await _drain(orch)
 
     # The interval debouncer (min_interval=60s) ensures that after the first

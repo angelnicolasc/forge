@@ -12,7 +12,6 @@ mandates the optional `mcp>=1.0` extra and a running MCP server binary.
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Any, Protocol, runtime_checkable
 
 
@@ -93,12 +92,10 @@ class StdioMCPClient:
 
     async def connect(self) -> None:
         try:
-            from mcp import ClientSession  # type: ignore[import-not-found]
-            from mcp.client.stdio import StdioServerParameters, stdio_client  # type: ignore[import-not-found]
+            import mcp  # type: ignore[import-not-found]  # noqa: F401
         except ImportError as exc:
             raise ImportError(
-                "StdioMCPClient requires the 'mcp' extra: "
-                "pip install forge-mcp[sdk]"
+                "StdioMCPClient requires the 'mcp' extra: pip install forge-mcp[sdk]"
             ) from exc
         # Real connection logic deferred — see DT-1 in DEVLOG.md
         raise NotImplementedError("StdioMCPClient.connect() is not yet implemented (DT-1)")

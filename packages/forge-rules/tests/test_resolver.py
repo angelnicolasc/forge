@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from forge_rules.resolver import _path_specificity, _pick_winner, resolve
 from forge_rules.types import IntraStrategy, Rule, RuleAction
 

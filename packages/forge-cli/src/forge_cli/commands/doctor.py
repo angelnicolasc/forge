@@ -147,7 +147,6 @@ def update_pricing(
       forge doctor update-pricing
       forge doctor update-pricing --dry-run
     """
-    import json
     import os
 
     from forge_observe.cost_model import BUNDLED_PRICING_TABLE, save_pricing_cache
@@ -172,9 +171,7 @@ def update_pricing(
         )
         remote = BUNDLED_PRICING_TABLE
     except Exception as exc:
-        console.print(
-            f"  [yellow]⚠[/] Download failed ({exc}). Falling back to bundled table."
-        )
+        console.print(f"  [yellow]⚠[/] Download failed ({exc}). Falling back to bundled table.")
         remote = BUNDLED_PRICING_TABLE
 
     new_models = [m for m in remote if m not in BUNDLED_PRICING_TABLE]
@@ -191,8 +188,8 @@ def update_pricing(
 
     if dry_run:
         console.print(
-            f"\n  [dim]Dry run — no changes written. "
-            f"Remove --dry-run to save to ~/.forge/pricing.json[/]\n"
+            "\n  [dim]Dry run — no changes written. "
+            "Remove --dry-run to save to ~/.forge/pricing.json[/]\n"
         )
         return
 
@@ -201,7 +198,7 @@ def update_pricing(
         console.print(f"\n  [green]✓[/] Pricing table saved to [bold]{path}[/]\n")
     except Exception as exc:
         console.print(f"\n  [red]✗[/] Failed to save pricing cache: {exc}\n")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
 
 def _check_network(table: Table) -> None:  # pragma: no cover — network-dependent

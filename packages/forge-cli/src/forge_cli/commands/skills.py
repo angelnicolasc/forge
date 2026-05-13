@@ -8,7 +8,6 @@ ImportError only when they actually run a skills sub-command.
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
 import typer
@@ -46,7 +45,7 @@ def list_skills(
         from forge_skills.loader import load_dir
     except ImportError:
         err.print("forge-skills is not installed. Run: pip install forge-skills")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
     if not skills_dir.exists():
         err.print(f"Directory not found: {skills_dir}")
@@ -87,7 +86,7 @@ def explain_skill(
         from forge_skills.loader import load_dir
     except ImportError:
         err.print("forge-skills is not installed. Run: pip install forge-skills")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
     loaded = {s.name: s for s in load_dir(skills_dir)}
     skill = loaded.get(name)
@@ -133,13 +132,13 @@ def run_skill(
         from forge_skills.runtime import SkillRuntime
     except ImportError:
         err.print("forge-skills is not installed. Run: pip install forge-skills")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
     try:
         arguments = json.loads(args_json)
     except json.JSONDecodeError as exc:
         err.print(f"Invalid --args JSON: {exc}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
     import asyncio
 
@@ -153,6 +152,7 @@ def run_skill(
         err.print(f"[bold]Error:[/bold] {result.error}")
         raise typer.Exit(1)
 
-    console.print(f"[bold green]✓[/bold green] {result.skill_name} completed in "
-                  f"{result.duration_ms:.1f}ms")
+    console.print(
+        f"[bold green]✓[/bold green] {result.skill_name} completed in {result.duration_ms:.1f}ms"
+    )
     console.print(result.output)

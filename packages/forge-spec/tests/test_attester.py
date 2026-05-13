@@ -19,7 +19,9 @@ def _make_spec(name: str = "test-spec") -> SpecDef:
     return SpecDef(
         name=name,
         acceptance_criteria=[
-            AcceptanceCriterion(id="ac-1", description="d", check_type=CheckType.CONTAINS, expected="x"),
+            AcceptanceCriterion(
+                id="ac-1", description="d", check_type=CheckType.CONTAINS, expected="x"
+            ),
         ],
     )
 
@@ -33,10 +35,7 @@ def _make_verify_result(
 ) -> VerifyResult:
     if statuses is None:
         statuses = [CriterionStatus.PASSED]
-    results = [
-        CriterionResult(criterion_id=f"ac-{i}", status=s)
-        for i, s in enumerate(statuses, 1)
-    ]
+    results = [CriterionResult(criterion_id=f"ac-{i}", status=s) for i, s in enumerate(statuses, 1)]
     return VerifyResult(
         spec_name=spec.name,
         spec_version=spec.version,

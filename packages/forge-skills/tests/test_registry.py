@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from forge_skills.registry import SkillNotFoundError, SkillRegistry
-from forge_skills.types import SkillDef, SkillParam
+from forge_skills.types import SkillDef
 
 
 def _skill(name: str, tags: list[str] | None = None) -> SkillDef:
@@ -50,7 +50,7 @@ class TestSkillRegistry:
     def test_overwrite_clears_old_handler(self) -> None:
         reg = SkillRegistry()
         reg.register(_skill("ping"), _handler)
-        reg.register(_skill("ping"))          # re-register without handler
+        reg.register(_skill("ping"))  # re-register without handler
         assert reg.get_handler("ping") is None
 
     def test_overwrite_replaces_definition(self) -> None:
@@ -115,8 +115,13 @@ class TestSkillRegistry:
 
     def test_multiple_handlers_independent(self) -> None:
         reg = SkillRegistry()
-        async def h1(args: dict) -> str: return "h1"
-        async def h2(args: dict) -> str: return "h2"
+
+        async def h1(args: dict) -> str:
+            return "h1"
+
+        async def h2(args: dict) -> str:
+            return "h2"
+
         reg.register(_skill("skill-a"), h1)
         reg.register(_skill("skill-b"), h2)
         assert reg.get_handler("skill-a") is h1

@@ -15,7 +15,6 @@ from forge_skills.dispatcher import DispatchError, IntentDispatcher
 from forge_skills.registry import SkillRegistry
 from forge_skills.types import SkillDef
 
-
 # ---------------------------------------------------------------------------
 # Fake classifier — no sentence-transformers required
 # ---------------------------------------------------------------------------

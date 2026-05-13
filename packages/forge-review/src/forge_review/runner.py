@@ -8,11 +8,9 @@ from typing import Any
 import structlog
 
 from forge_core.types import RunEvent, RunEventKind
-
 from forge_review.agents import (
     CostCeilingReviewer,
     ErrorRateReviewer,
-    ReviewAgent,
     run_parallel,
 )
 from forge_review.policy import PolicyGate
@@ -46,9 +44,7 @@ class ReviewRunner:
         bus: Any = None,
     ) -> None:
         self._reviewers: list[Any] = (
-            reviewers
-            if reviewers is not None
-            else [ErrorRateReviewer(), CostCeilingReviewer()]
+            reviewers if reviewers is not None else [ErrorRateReviewer(), CostCeilingReviewer()]
         )
         self._config = config or ReviewConfig()
         self._gate = PolicyGate(self._config)

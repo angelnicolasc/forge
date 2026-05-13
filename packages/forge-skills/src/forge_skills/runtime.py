@@ -5,8 +5,7 @@ Combines SkillRegistry + SkillExecutor + IntentDispatcher into one object.
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -21,6 +20,9 @@ from forge_skills.types import (
     SkillInvocation,
     SkillResult,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = structlog.get_logger(__name__)
 

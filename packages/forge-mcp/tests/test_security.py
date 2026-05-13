@@ -1,7 +1,6 @@
 """Tests for forge_mcp.security — deny-by-default and secret redaction."""
-from __future__ import annotations
 
-import pytest
+from __future__ import annotations
 
 from forge_mcp.security import get_policy, is_allowed, redact_secrets, redact_value
 from forge_mcp.types import ServerConfig, ToolPolicy

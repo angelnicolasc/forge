@@ -6,8 +6,7 @@ import json
 
 import yaml
 
-from forge_spec.types import SpecAttestation, SpecDef, VerifyResult
-from forge_spec.types import CriterionStatus
+from forge_spec.types import CriterionStatus, SpecAttestation, SpecDef, VerifyResult
 
 
 class SpecAttester:

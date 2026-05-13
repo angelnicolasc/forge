@@ -47,7 +47,7 @@ class Rule(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def _validate_id_no_spaces(self) -> "Rule":
+    def _validate_id_no_spaces(self) -> Rule:
         if " " in self.id:
             raise ValueError(f"Rule id must not contain spaces: {self.id!r}")
         return self
@@ -64,7 +64,7 @@ class RulePack(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def _validate_unique_ids(self) -> "RulePack":
+    def _validate_unique_ids(self) -> RulePack:
         seen: set[str] = set()
         for rule in self.rules:
             if rule.id in seen:

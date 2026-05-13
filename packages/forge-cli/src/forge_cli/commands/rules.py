@@ -30,7 +30,7 @@ def rules_validate(
         pack = load_yaml(pack_file)
     except ValueError as exc:
         console.print(f"[red]✗ Parse error:[/]\n{exc}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
     engine = RulesEngine()
     errors = engine.validate(pack)
@@ -65,7 +65,7 @@ def rules_lint(
         pack = load_yaml(pack_file)
     except ValueError as exc:
         console.print(f"[red]✗ Parse error:[/]\n{exc}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
     engine = RulesEngine()
     engine.load_pack(pack)
@@ -113,7 +113,7 @@ def rules_explain(
         pack = load_yaml(pack_file)
     except ValueError as exc:
         console.print(f"[red]✗ Parse error:[/]\n{exc}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
     engine = RulesEngine()
     engine.load_pack(pack)
@@ -168,7 +168,7 @@ def rules_diff(
         b = load_yaml(pack_b)
     except ValueError as exc:
         console.print(f"[red]✗ Parse error:[/]\n{exc}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
     rules_a = {r.id: r for r in a.rules}
     rules_b = {r.id: r for r in b.rules}

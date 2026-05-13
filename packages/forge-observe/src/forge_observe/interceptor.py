@@ -196,7 +196,9 @@ class ForgeLLMInterceptor:
 
         latency_ms = (time.perf_counter() - state.start_perf) * 1000.0
         cost = self._cost_model.cost(
-            state.model, input_tokens, output_tokens,
+            state.model,
+            input_tokens,
+            output_tokens,
             thinking_tokens=thinking_tokens,
             cached_input_tokens=cached_input_tokens,
         )

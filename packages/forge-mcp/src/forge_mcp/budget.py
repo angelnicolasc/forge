@@ -15,9 +15,7 @@ class BudgetExceededError(RuntimeError):
     """Raised when a tool has consumed all its allowed calls for this run."""
 
     def __init__(self, tool_name: str, limit: int) -> None:
-        super().__init__(
-            f"Tool '{tool_name}' has reached its call limit of {limit} per run."
-        )
+        super().__init__(f"Tool '{tool_name}' has reached its call limit of {limit} per run.")
         self.tool_name = tool_name
         self.limit = limit
 

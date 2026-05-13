@@ -1,6 +1,6 @@
 [project]
 name = "forge-adapters"
-version = "0.1.0"
+version = "0.2.0"
 description = "Framework adapters for Forge — drop-in wrappers for LangGraph, CrewAI, AutoGen, and any async callable."
 readme = "README.md"
 license = "Apache-2.0"
@@ -16,7 +16,7 @@ classifiers = [
 ]
 keywords = ["agents", "langgraph", "crewai", "autogen", "adapters"]
 dependencies = [
-    "forge-core==0.1.0",
+    "forge-core==0.2.0",
     "pydantic>=2.7,<3.0",
     "structlog>=24.0,<26.0",
 ]

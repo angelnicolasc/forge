@@ -8,8 +8,7 @@ import textwrap
 import pytest
 
 from forge_rules.loader import dump_yaml, load_yaml
-from forge_rules.types import RuleAction, RulePack
-
+from forge_rules.types import RuleAction
 
 VALID_YAML = textwrap.dedent("""
     name: safety-rules

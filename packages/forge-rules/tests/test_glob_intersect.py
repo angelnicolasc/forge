@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from forge_rules.glob_intersect import (
     _glob_to_regex,
     find_intersections,

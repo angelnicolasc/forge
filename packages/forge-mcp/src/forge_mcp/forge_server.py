@@ -36,7 +36,6 @@ Requires the ``[sdk]`` extra:
 
 from __future__ import annotations
 
-import asyncio
 from typing import TYPE_CHECKING, Any
 
 import structlog

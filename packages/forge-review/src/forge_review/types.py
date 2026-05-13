@@ -19,9 +19,9 @@ class FindingSeverity(StrEnum):
 
 
 class HookKind(StrEnum):
-    ON_PLAN   = "on_plan"    # agent has produced a plan, before execution starts
+    ON_PLAN = "on_plan"  # agent has produced a plan, before execution starts
     PRE_APPLY = "pre_apply"  # EvolutionLoop is about to apply a mutation
-    PRE_STOP  = "pre_stop"   # orchestrator is about to cancel a running task
+    PRE_STOP = "pre_stop"  # orchestrator is about to cancel a running task
     PRE_MERGE = "pre_merge"  # run completed; gate before results are accepted
 
 
@@ -32,8 +32,8 @@ class Finding(BaseModel):
     severity: FindingSeverity
     title: str
     message: str
-    source: str = ""       # name of the reviewer that produced this finding
-    location: str = ""     # e.g. "agent:planner", "field:system_prompt", or ""
+    source: str = ""  # name of the reviewer that produced this finding
+    location: str = ""  # e.g. "agent:planner", "field:system_prompt", or ""
     confidence: float = Field(ge=0.0, le=1.0, default=1.0)
     tags: list[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

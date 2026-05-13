@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import io
 import textwrap
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from forge_skills.loader import load_dir, load_skill_md, load_skill_yaml
-from forge_skills.types import SkillDef
 
 from .conftest import VALID_SKILL_MD
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class TestLoadSkillMd:

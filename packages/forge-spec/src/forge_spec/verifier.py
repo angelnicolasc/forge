@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 from forge_core.types import RunEvent, RunEventKind, RunResult
-
 from forge_spec.types import (
     AcceptanceCriterion,
     CheckType,
@@ -48,7 +47,7 @@ _SAFE_BUILTINS: dict[str, Any] = {
 class SpecVerifier:
     """Evaluate a SpecDef against a RunResult and produce a VerifyResult."""
 
-    def __init__(self, *, bus: "EventBus | None" = None) -> None:
+    def __init__(self, *, bus: EventBus | None = None) -> None:
         self._bus = bus
 
     async def verify(self, spec: SpecDef, run_result: RunResult) -> VerifyResult:
@@ -64,10 +63,7 @@ class SpecVerifier:
 
         compliance_rate = _compute_compliance(results, spec.acceptance_criteria)
         passed = compliance_rate >= 1.0 or (
-            all(
-                r.status in (CriterionStatus.PASSED, CriterionStatus.SKIPPED)
-                for r in results
-            )
+            all(r.status in (CriterionStatus.PASSED, CriterionStatus.SKIPPED) for r in results)
             and any(r.status == CriterionStatus.PASSED for r in results)
         )
 
@@ -100,9 +96,7 @@ class SpecVerifier:
     # Internal evaluation dispatch
     # ------------------------------------------------------------------
 
-    def _evaluate(
-        self, criterion: AcceptanceCriterion, run_result: RunResult
-    ) -> CriterionResult:
+    def _evaluate(self, criterion: AcceptanceCriterion, run_result: RunResult) -> CriterionResult:
         try:
             if criterion.check_type == CheckType.ASSERTION:
                 return self._check_assertion(criterion, run_result)
@@ -117,7 +111,7 @@ class SpecVerifier:
                 message=f"check_type '{criterion.check_type}' not yet supported (deferred)",
                 expected=criterion.expected,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return CriterionResult(
                 criterion_id=criterion.id,
                 status=CriterionStatus.ERROR,
@@ -134,7 +128,7 @@ class SpecVerifier:
             "run_result": run_result,
         }
         # DT-1: eval with restricted builtins — safe for developer tool, not for untrusted input.
-        actual = eval(expr, namespace)  # noqa: S307
+        actual = eval(expr, namespace)
         ok = bool(actual)
         return CriterionResult(
             criterion_id=criterion.id,

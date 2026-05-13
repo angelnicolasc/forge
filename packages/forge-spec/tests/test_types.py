@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import hashlib
-
+from forge_core.types import MutationKind
 from forge_spec.types import (
     AcceptanceCriterion,
     CheckType,
@@ -15,8 +14,6 @@ from forge_spec.types import (
     SpecDef,
     VerifyResult,
 )
-from forge_core.types import MutationKind
-
 
 # ---------------------------------------------------------------------------
 # AcceptanceCriterion
@@ -117,6 +114,7 @@ class TestSpecDef:
     def test_spec_hash_excludes_created_at(self):
         s1 = self._make_spec()
         import time
+
         time.sleep(0.01)
         s2 = self._make_spec()
         assert s1.spec_hash == s2.spec_hash
@@ -154,8 +152,7 @@ class TestSpecDef:
 class TestVerifyResult:
     def _make_result(self, statuses: list[CriterionStatus]) -> VerifyResult:
         results = [
-            CriterionResult(criterion_id=f"ac-{i}", status=s)
-            for i, s in enumerate(statuses)
+            CriterionResult(criterion_id=f"ac-{i}", status=s) for i, s in enumerate(statuses)
         ]
         return VerifyResult(
             spec_name="s",
@@ -203,6 +200,7 @@ class TestSpecAttestation:
 
     def test_roundtrip_json(self):
         import json
+
         a = SpecAttestation(
             spec_name="s",
             spec_version="0.1.0",

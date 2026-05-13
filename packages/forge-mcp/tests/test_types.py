@@ -1,8 +1,6 @@
 """Tests for forge_mcp.types."""
-from __future__ import annotations
 
-import pytest
-from pydantic import ValidationError
+from __future__ import annotations
 
 from forge_mcp.types import (
     BudgetSnapshot,

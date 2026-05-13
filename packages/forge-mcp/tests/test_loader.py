@@ -1,15 +1,13 @@
 """Tests for forge_mcp.loader — YAML config round-trip."""
+
 from __future__ import annotations
 
 import io
-import os
 import textwrap
 
 import pytest
 
 from forge_mcp.loader import dump_yaml, load_yaml
-from forge_mcp.types import ToolTransport
-
 
 VALID_YAML = textwrap.dedent("""
     cache_ttl: 120

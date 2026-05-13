@@ -7,7 +7,6 @@ import asyncio
 from forge_review.cascade import CascadingReviewer
 from forge_review.types import Finding, FindingSeverity, HookKind, ReviewConfig, ReviewContext
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -77,12 +76,8 @@ class TestCascadingWithLLM:
 
     def test_llm_skipped_when_heuristics_block_p0(self):
         cr = CascadingReviewer(
-            heuristic_reviewers=[
-                _FixedReviewer("h1", [_finding(FindingSeverity.P0)])
-            ],
-            llm_reviewers=[
-                _FixedReviewer("llm1", [_finding(FindingSeverity.P3, "llm-info")])
-            ],
+            heuristic_reviewers=[_FixedReviewer("h1", [_finding(FindingSeverity.P0)])],
+            llm_reviewers=[_FixedReviewer("llm1", [_finding(FindingSeverity.P3, "llm-info")])],
         )
         findings = asyncio.run(cr.review(_ctx()))
         assert len(findings) == 1
@@ -90,24 +85,16 @@ class TestCascadingWithLLM:
 
     def test_llm_skipped_when_heuristics_block_p1(self):
         cr = CascadingReviewer(
-            heuristic_reviewers=[
-                _FixedReviewer("h1", [_finding(FindingSeverity.P1)])
-            ],
-            llm_reviewers=[
-                _FixedReviewer("llm1", [_finding(FindingSeverity.P3, "llm")])
-            ],
+            heuristic_reviewers=[_FixedReviewer("h1", [_finding(FindingSeverity.P1)])],
+            llm_reviewers=[_FixedReviewer("llm1", [_finding(FindingSeverity.P3, "llm")])],
         )
         findings = asyncio.run(cr.review(_ctx()))
         assert len(findings) == 1
 
     def test_llm_runs_when_heuristic_finds_only_p2(self):
         cr = CascadingReviewer(
-            heuristic_reviewers=[
-                _FixedReviewer("h1", [_finding(FindingSeverity.P2)])
-            ],
-            llm_reviewers=[
-                _FixedReviewer("llm1", [_finding(FindingSeverity.P3, "llm")])
-            ],
+            heuristic_reviewers=[_FixedReviewer("h1", [_finding(FindingSeverity.P2)])],
+            llm_reviewers=[_FixedReviewer("llm1", [_finding(FindingSeverity.P3, "llm")])],
         )
         findings = asyncio.run(cr.review(_ctx()))
         assert len(findings) == 2
@@ -115,12 +102,8 @@ class TestCascadingWithLLM:
     def test_cascade_disabled_llm_always_runs(self):
         config = ReviewConfig(cascade_on_blocking=False)
         cr = CascadingReviewer(
-            heuristic_reviewers=[
-                _FixedReviewer("h1", [_finding(FindingSeverity.P0)])
-            ],
-            llm_reviewers=[
-                _FixedReviewer("llm1", [_finding(FindingSeverity.P3, "llm")])
-            ],
+            heuristic_reviewers=[_FixedReviewer("h1", [_finding(FindingSeverity.P0)])],
+            llm_reviewers=[_FixedReviewer("llm1", [_finding(FindingSeverity.P3, "llm")])],
             config=config,
         )
         findings = asyncio.run(cr.review(_ctx()))
@@ -128,12 +111,8 @@ class TestCascadingWithLLM:
 
     def test_combined_findings_order(self):
         cr = CascadingReviewer(
-            heuristic_reviewers=[
-                _FixedReviewer("h1", [_finding(FindingSeverity.P2, "heur")])
-            ],
-            llm_reviewers=[
-                _FixedReviewer("llm1", [_finding(FindingSeverity.P3, "llm")])
-            ],
+            heuristic_reviewers=[_FixedReviewer("h1", [_finding(FindingSeverity.P2, "heur")])],
+            llm_reviewers=[_FixedReviewer("llm1", [_finding(FindingSeverity.P3, "llm")])],
         )
         findings = asyncio.run(cr.review(_ctx()))
         assert findings[0].title == "heur"

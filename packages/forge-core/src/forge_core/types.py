@@ -14,10 +14,10 @@ from enum import StrEnum
 from typing import Any
 from uuid import uuid4
 
+from pydantic import BaseModel, Field, field_validator
+
 # Pydantic requires typing_extensions.TypedDict on Python < 3.12
 from typing_extensions import TypedDict
-
-from pydantic import BaseModel, Field, field_validator
 
 # SPIFFE URI format: spiffe://<trust-domain>/<workload-identifier>
 _SPIFFE_RE = re.compile(r"^spiffe://(?P<td>[^/]+)/(?P<wl>.+)$")
@@ -43,10 +43,10 @@ class RunEventKind(StrEnum):
     EVOLUTION = "evolution"
     CONTEXT_INJECTED = "context_injected"  # fired before LLM call; payload: context_tokens, source
     SKILL_CALL = "skill_call"  # fired after skill handler completes; payload: skill, duration_ms
-    SPEC_VERIFIED = "spec_verified"  # fired after spec verification; payload: spec, compliance_rate, passed
-    REVIEW_COMPLETE = "review_complete"  # fired after review gate; payload: hook, allowed, finding_count
+    SPEC_VERIFIED = "spec_verified"  # after spec verification; payload: spec, rate, passed
+    REVIEW_COMPLETE = "review_complete"  # after review gate; payload: hook, allowed, finding_count
     LLM_TOKEN = "llm_token"  # one streaming chunk; payload: token, is_thinking
-    ADAPTER_DEGRADED = "adapter_degraded"  # SDK patch failed silently; payload: adapter, sdk, reason, impact
+    ADAPTER_DEGRADED = "adapter_degraded"  # SDK patch failed; payload: adapter, sdk, reason, impact
 
 
 class RunStatus(StrEnum):
@@ -121,8 +121,7 @@ class AgentCard(BaseModel):
             raise ValueError("spiffe_id must be a string or None")
         if not _SPIFFE_RE.fullmatch(v):
             raise ValueError(
-                f"Invalid SPIFFE URI {v!r}. "
-                "Expected: spiffe://<trust-domain>/<workload-identifier>"
+                f"Invalid SPIFFE URI {v!r}. Expected: spiffe://<trust-domain>/<workload-identifier>"
             )
         return v
 

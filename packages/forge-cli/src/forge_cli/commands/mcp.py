@@ -43,7 +43,7 @@ def mcp_list_tools(
         servers, _ = load_yaml(config)
     except (ValueError, TypeError) as exc:
         console.print(f"[red]✗ Config error:[/]\n{exc}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
     table = Table(title="Registered MCP Tools", border_style=FORGE_ORANGE)
     table.add_column("Server", style="bold white")
@@ -64,14 +64,12 @@ def mcp_list_tools(
                 redact_str,
             )
         if not srv.tools:
-            table.add_row(srv.name, f"[dim](no tools — all denied by default)[/]", "—", "—", "—")
+            table.add_row(srv.name, "[dim](no tools — all denied by default)[/]", "—", "—", "—")
 
     console.print(table)
 
     total_tools = sum(len(s.tools) for s in servers)
-    allowed_tools = sum(
-        sum(1 for p in s.tools.values() if p.allowed) for s in servers
-    )
+    allowed_tools = sum(sum(1 for p in s.tools.values() if p.allowed) for s in servers)
     console.print(
         f"\n  [{FORGE_GRAY}]{len(servers)} server(s), "
         f"{total_tools} tool(s) declared, "
@@ -82,12 +80,8 @@ def mcp_list_tools(
 @mcp_app.command("call")
 def mcp_call(
     tool: str = typer.Argument(..., help="Tool name to invoke.", metavar="TOOL"),
-    config: Path = typer.Option(
-        Path("mcp.yaml"), "--config", "-c", help="forge-mcp config file."
-    ),
-    args: str = typer.Option(
-        "{}", "--args", "-a", help="Tool arguments as a JSON string."
-    ),
+    config: Path = typer.Option(Path("mcp.yaml"), "--config", "-c", help="forge-mcp config file."),
+    args: str = typer.Option("{}", "--args", "-a", help="Tool arguments as a JSON string."),
     run_id: str = typer.Option("", "--run-id", help="Run ID for event tracking."),
     caller_id: str = typer.Option("", "--caller-id", help="Caller identity for allowlist checks."),
 ) -> None:
@@ -100,7 +94,7 @@ def mcp_call(
         arguments: dict[str, Any] = json.loads(args)
     except json.JSONDecodeError as exc:
         console.print(f"[red]✗ Invalid JSON args:[/] {exc}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
     result = asyncio.run(_do_call(config, tool, arguments, run_id, caller_id))
 
@@ -108,7 +102,7 @@ def mcp_call(
         console.print(f"  [red]✗ Error:[/] {result.error}")
         raise typer.Exit(1)
 
-    icon = f"[dim](cached)[/]" if result.cached else ""
+    icon = "[dim](cached)[/]" if result.cached else ""
     console.print(
         f"  [{FORGE_TEAL}]✓[/] {tool} via [{FORGE_GRAY}]{result.server_name}[/] "
         f"[dim]({result.duration_ms:.0f}ms)[/] {icon}"
@@ -147,6 +141,7 @@ async def _do_call(
         return await meta.call_tool(call)
     except ToolDeniedError as exc:
         from forge_mcp.types import ToolResult
+
         return ToolResult(tool_name=tool_name, error=str(exc))
 
 
@@ -175,13 +170,13 @@ def mcp_serve(
             "[red]✗[/] forge-mcp[sdk] is not installed.\n"
             "  Run: [bold]pip install 'forge-mcp[sdk]'[/]"
         )
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
     srv = ForgeMCPServer()
 
     try:
         if stdio:
-            console.print(f"  [dim]Starting Forge MCP server (stdio transport)...[/]")
+            console.print("  [dim]Starting Forge MCP server (stdio transport)...[/]")
             asyncio.run(srv.serve_stdio())
         else:
             console.print(
@@ -208,7 +203,7 @@ def mcp_status(
         servers, options = load_yaml(config)
     except (ValueError, TypeError) as exc:
         console.print(f"[red]✗ Config error:[/]\n{exc}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
     table = Table(title="MCP Server Status", border_style=FORGE_ORANGE)
     table.add_column("Server", style="bold white")

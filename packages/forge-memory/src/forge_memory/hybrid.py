@@ -26,18 +26,20 @@ Usage:
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
 from forge_core.circuit_breaker import CircuitBreaker, CircuitOpenError
 from forge_core.types import MemoryEntry, MemoryQuery
-from forge_memory.graph.backends import GraphBackend
 from forge_memory.graph.networkx_backend import NetworkXBackend
 from forge_memory.ingestion import IngestionPipeline
 from forge_memory.symbolic.rules import RuleEngine, default_rule_engine
 from forge_memory.vector.chromadb_backend import ChromaDBBackend
 from forge_memory.versioning import MemoryVersionStore
+
+if TYPE_CHECKING:
+    from forge_memory.graph.backends import GraphBackend
 
 logger = structlog.get_logger()
 

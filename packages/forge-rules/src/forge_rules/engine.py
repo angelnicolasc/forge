@@ -13,9 +13,7 @@ a CONTEXT_INJECTED RunEvent on the EventBus if one is registered.
 
 from __future__ import annotations
 
-import asyncio
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -24,7 +22,17 @@ from forge_rules.glob_intersect import find_intersections
 from forge_rules.loader import load_yaml
 from forge_rules.resolver import resolve
 from forge_rules.selector import select_rules
-from forge_rules.types import IntraStrategy, Rule, RuleAction, RulePack, RuleSelection, ScopeIntersection
+from forge_rules.types import (
+    IntraStrategy,
+    Rule,
+    RuleAction,
+    RulePack,
+    RuleSelection,
+    ScopeIntersection,
+)
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = structlog.get_logger(__name__)
 
@@ -87,11 +95,7 @@ class RulesEngine:
         Returns:
             RuleSelection with the winning rules, denied ids, and conflict count.
         """
-        packs = (
-            [p for p in self._packs if p.name == pack_name]
-            if pack_name
-            else self._packs
-        )
+        packs = [p for p in self._packs if p.name == pack_name] if pack_name else self._packs
 
         all_matched: list[Rule] = []
         strategy = IntraStrategy.MOST_SPECIFIC_WINS
@@ -157,11 +161,7 @@ class RulesEngine:
         Returns a list of ScopeIntersection objects (empty = clean).
         Only considers rules from *pack_name* if specified.
         """
-        packs = (
-            [p for p in self._packs if p.name == pack_name]
-            if pack_name
-            else self._packs
-        )
+        packs = [p for p in self._packs if p.name == pack_name] if pack_name else self._packs
         scope_map: dict[str, list[str]] = {}
         for pack in packs:
             for rule in pack.rules:

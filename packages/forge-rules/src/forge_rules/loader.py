@@ -20,14 +20,16 @@ YAML schema (example):
 
 from __future__ import annotations
 
-import io
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
 from pydantic import ValidationError
 
 from forge_rules.types import RulePack
+
+if TYPE_CHECKING:
+    import io
 
 
 def load_yaml(source: str | Path | io.IOBase) -> RulePack:
@@ -38,11 +40,8 @@ def load_yaml(source: str | Path | io.IOBase) -> RulePack:
     """
     if isinstance(source, (str, Path)):
         path = Path(source)
-        if path.exists():
-            text = path.read_text(encoding="utf-8")
-        else:
-            # Treat as raw YAML string if path doesn't exist on disk
-            text = str(source)
+        # Treat as raw YAML string if path doesn't exist on disk
+        text = path.read_text(encoding="utf-8") if path.exists() else str(source)
     elif hasattr(source, "read"):
         text = source.read()
         if isinstance(text, bytes):

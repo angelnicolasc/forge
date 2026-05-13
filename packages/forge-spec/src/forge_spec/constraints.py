@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from forge_core.types import MutationKind
 
-from forge_spec.types import SpecConstraint, SpecDef
+if TYPE_CHECKING:
+    from forge_spec.types import SpecConstraint, SpecDef
 
 try:
     from forge_core.types import Mutation

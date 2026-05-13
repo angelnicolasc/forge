@@ -16,7 +16,10 @@ the rule list at lint time, not at inference time.
 from __future__ import annotations
 
 import re
-from collections.abc import Iterator
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 def _glob_to_regex(pattern: str) -> re.Pattern[str]:
@@ -72,9 +75,13 @@ def _probe_paths_from_pattern(pattern: str) -> list[str]:
     normalized = pattern.lstrip("/")
 
     # Replace ** with a concrete segment pair and * with a word
-    concrete = normalized.replace("**/", "src/subdir/").replace("/**", "/file").replace(
-        "**", "anything"
-    ).replace("*", "example").replace("?", "x")
+    concrete = (
+        normalized.replace("**/", "src/subdir/")
+        .replace("/**", "/file")
+        .replace("**", "anything")
+        .replace("*", "example")
+        .replace("?", "x")
+    )
 
     # If pattern had no extension, add .py as a common extension
     if "." not in concrete.split("/")[-1]:
@@ -85,7 +92,7 @@ def _probe_paths_from_pattern(pattern: str) -> list[str]:
     # Also try the pattern with a deeper nesting
     parts = concrete.split("/")
     if len(parts) >= 2:
-        probes.append("/".join(["deep"] + parts))
+        probes.append("/".join(["deep", *parts]))
 
     return probes
 

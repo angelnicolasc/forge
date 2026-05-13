@@ -11,9 +11,12 @@ is logged at registration time so operators notice the override.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import structlog
 
-from forge_mcp.types import ServerConfig
+if TYPE_CHECKING:
+    from forge_mcp.types import ServerConfig
 
 logger = structlog.get_logger(__name__)
 

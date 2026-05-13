@@ -1,6 +1,6 @@
 [project]
 name = "forge-os"
-version = "0.1.0"
+version = "0.2.0"
 description = "Forge — universal agent harness (meta-package). Installs forge-core, forge-cli, forge-observe, forge-memory, and forge-adapters together."
 readme = "README.md"
 license = "Apache-2.0"
@@ -20,23 +20,23 @@ classifiers = [
 ]
 keywords = ["agents", "llm", "orchestration", "harness", "multi-agent", "self-evolving", "forge"]
 dependencies = [
-    "forge-core==0.1.0",
-    "forge-cli==0.1.0",
-    "forge-observe==0.1.0",
-    "forge-memory==0.1.0",
-    "forge-adapters==0.1.0",
+    "forge-core==0.2.0",
+    "forge-cli==0.2.0",
+    "forge-observe==0.2.0",
+    "forge-memory==0.2.0",
+    "forge-adapters==0.2.0",
 ]
 
 [project.optional-dependencies]
-langgraph = ["forge-adapters[langgraph]==0.1.0"]
-crewai = ["forge-adapters[crewai]==0.1.0"]
-autogen = ["forge-adapters[autogen]==0.1.0"]
-all = ["forge-adapters[all]==0.1.0"]
-rules = ["forge-rules==0.1.0"]
-mcp = ["forge-mcp==0.1.0"]
-skills = ["forge-skills==0.1.0"]
-spec = ["forge-spec==0.1.0"]
-review = ["forge-review==0.1.0"]
+langgraph = ["forge-adapters[langgraph]==0.2.0"]
+crewai = ["forge-adapters[crewai]==0.2.0"]
+autogen = ["forge-adapters[autogen]==0.2.0"]
+all = ["forge-adapters[all]==0.2.0"]
+rules = ["forge-rules==0.2.0"]
+mcp = ["forge-mcp==0.2.0"]
+skills = ["forge-skills==0.2.0"]
+spec = ["forge-spec==0.2.0"]
+review = ["forge-review==0.2.0"]
 
 [project.urls]
 Homepage = "https://github.com/angelnicolasc/forge"

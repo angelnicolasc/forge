@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from forge_review.agents import run_parallel
-from forge_review.types import Finding, FindingSeverity, ReviewConfig, ReviewContext
+from forge_review.types import Finding, ReviewConfig, ReviewContext
 
 
 class CascadingReviewer:
@@ -34,10 +34,7 @@ class CascadingReviewer:
         findings = await run_parallel(self._heuristic, context)
 
         if self._llm:
-            should_skip = (
-                self._config.cascade_on_blocking
-                and self._has_blocking(findings)
-            )
+            should_skip = self._config.cascade_on_blocking and self._has_blocking(findings)
             if not should_skip:
                 llm_findings = await run_parallel(self._llm, context)
                 findings.extend(llm_findings)

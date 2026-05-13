@@ -1,4 +1,5 @@
 """Tests for forge_mcp.budget — ToolBudget accounting."""
+
 from __future__ import annotations
 
 import pytest

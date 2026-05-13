@@ -15,7 +15,6 @@ from __future__ import annotations
 
 from forge_rules.types import IntraStrategy, Rule, RuleAction
 
-
 _ACTION_RANK: dict[RuleAction, int] = {
     RuleAction.DENY: 2,
     RuleAction.REQUIRE: 1,

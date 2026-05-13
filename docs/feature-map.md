@@ -1,6 +1,6 @@
 # Feature Map
 
-Every feature claim in [`README.md`](../README.md) maps to a concrete test
+Every feature claim in the [README](https://github.com/angelnicolasc/forge#readme) maps to a concrete test
 or an honest roadmap entry. The plan ζ.9 gate is: **no row in the
 `Status` column may be 🚧**. If something is partial, it either has a
 test covering the shipped slice or moves to the Roadmap section at the

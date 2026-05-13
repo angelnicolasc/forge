@@ -6,9 +6,7 @@ from __future__ import annotations
 import json
 import os
 from decimal import Decimal
-from pathlib import Path
-
-import pytest
+from typing import TYPE_CHECKING
 
 from forge_observe.cost_model import (
     BUNDLED_PRICING_TABLE,
@@ -19,6 +17,10 @@ from forge_observe.cost_model import (
     save_pricing_cache,
 )
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    import pytest
 
 # ---------------------------------------------------------------------------
 # Basic cost calculation
@@ -65,7 +67,7 @@ def test_combined_all_token_types() -> None:
     cm = DefaultCostModel()
     cost = cm.cost(
         "claude-opus-4-20250514",
-        input_tokens=1_000_000,   # 15.00
+        input_tokens=1_000_000,  # 15.00
         output_tokens=1_000_000,  # 75.00
         thinking_tokens=1_000_000,  # 3.00
         cached_input_tokens=1_000_000,  # 1.50
@@ -130,7 +132,9 @@ def test_mock_model_nonzero_cost() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_env_var_override_loads_custom_pricing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_env_var_override_loads_custom_pricing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     pricing_file = tmp_path / "pricing.json"
     pricing_file.write_text(json.dumps({"test-model-override": ["5.00", "10.00", "0.00", "0.50"]}))
     monkeypatch.setenv("FORGE_PRICING_TABLE_PATH", str(pricing_file))

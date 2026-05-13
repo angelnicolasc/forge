@@ -122,8 +122,6 @@ class IntentClassifier:
         if not examples:
             raise ValueError(f"Intent '{label}' must have at least one example.")
 
-        import numpy as np
-
         model = self._ensure_model()
         raw: np.ndarray = model.encode(
             examples,

@@ -5,11 +5,8 @@ from __future__ import annotations
 import asyncio
 import textwrap
 
-import pytest
-
 from forge_rules.engine import RulesEngine
 from forge_rules.types import IntraStrategy, Rule, RuleAction, RulePack
-
 
 # ---------------------------------------------------------------------------
 # Helpers

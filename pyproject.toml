@@ -30,6 +30,9 @@ dev-dependencies = [
     "ruff>=0.7",
     "pre-commit>=4.0",
     "hypothesis>=6.100",
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.7.6",
+    "mkdocstrings>=1.0.4",
 ]
 
 [tool.ruff]

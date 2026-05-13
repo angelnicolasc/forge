@@ -8,7 +8,6 @@ import pytest
 
 from forge_skills.types import SkillDef, SkillParam
 
-
 VALID_SKILL_MD = textwrap.dedent("""
     ---
     name: summarize

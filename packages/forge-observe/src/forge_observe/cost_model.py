@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import json
 import os
-import time
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -39,13 +38,22 @@ logger = structlog.get_logger()
 _MODEL_PRICING: dict[str, tuple[Decimal, Decimal, Decimal, Decimal]] = {
     # Anthropic — thinking_per_m based on published extended-thinking pricing
     "claude-opus-4-20250514": (
-        Decimal("15.00"), Decimal("75.00"), Decimal("3.00"), Decimal("1.50"),
+        Decimal("15.00"),
+        Decimal("75.00"),
+        Decimal("3.00"),
+        Decimal("1.50"),
     ),
     "claude-sonnet-4-20250514": (
-        Decimal("3.00"), Decimal("15.00"), Decimal("0.00"), Decimal("0.30"),
+        Decimal("3.00"),
+        Decimal("15.00"),
+        Decimal("0.00"),
+        Decimal("0.30"),
     ),
     "claude-haiku-4-20250514": (
-        Decimal("0.80"), Decimal("4.00"), Decimal("0.00"), Decimal("0.08"),
+        Decimal("0.80"),
+        Decimal("4.00"),
+        Decimal("0.00"),
+        Decimal("0.08"),
     ),
     # OpenAI
     "gpt-4o": (Decimal("2.50"), Decimal("10.00"), Decimal("0.00"), Decimal("0.25")),
@@ -102,7 +110,10 @@ def _parse_pricing_json(
     for model, vals in raw.items():
         if len(vals) >= 4:
             out[model] = (
-                Decimal(vals[0]), Decimal(vals[1]), Decimal(vals[2]), Decimal(vals[3]),
+                Decimal(vals[0]),
+                Decimal(vals[1]),
+                Decimal(vals[2]),
+                Decimal(vals[3]),
             )
         elif len(vals) == 2:
             out[model] = (Decimal(vals[0]), Decimal(vals[1]), Decimal("0"), Decimal("0"))
@@ -207,7 +218,8 @@ class DefaultCostModel:
         self._warned_unknown.discard(model)
 
     def _resolve_pricing(
-        self, model: str,
+        self,
+        model: str,
     ) -> tuple[Decimal, Decimal, Decimal, Decimal] | None:
         """Resolve pricing, trying exact match first then prefix match."""
         if model in self._pricing:
@@ -236,6 +248,5 @@ def save_pricing_cache(pricing: dict[str, list[str]]) -> Path:
 # Expose the bundled table as JSON-serialisable for ``forge doctor --update-pricing``
 # to compare against a remote source without importing the full class.
 BUNDLED_PRICING_TABLE: dict[str, list[str]] = {
-    model: [str(v) for v in vals]
-    for model, vals in _MODEL_PRICING.items()
+    model: [str(v) for v in vals] for model, vals in _MODEL_PRICING.items()
 }

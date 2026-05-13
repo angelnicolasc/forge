@@ -4,15 +4,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from forge_core.types import RunResult
-
 from forge_spec.attester import SpecAttester
 from forge_spec.constraints import SpecConstraintGuard
-from forge_spec.types import SpecAttestation, SpecDef, VerifyResult
 from forge_spec.verifier import SpecVerifier
 
 if TYPE_CHECKING:
     from forge_core.protocols import EventBus
+    from forge_core.types import RunResult
+    from forge_spec.types import SpecAttestation, SpecDef, VerifyResult
 
 
 @runtime_checkable
@@ -35,7 +34,7 @@ class SpecRunner:
         self,
         *,
         refiner: SpecRefinerProtocol | None = None,
-        bus: "EventBus | None" = None,
+        bus: EventBus | None = None,
     ) -> None:
         self._verifier = SpecVerifier(bus=bus)
         self._attester = SpecAttester()

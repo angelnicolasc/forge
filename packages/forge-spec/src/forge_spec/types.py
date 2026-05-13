@@ -5,28 +5,29 @@ from __future__ import annotations
 import hashlib
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
-from forge_core.types import MutationKind
+if TYPE_CHECKING:
+    from forge_core.types import MutationKind
 
 
 class CheckType(StrEnum):
     ASSERTION = "assertion"  # Python bool expression; run_result + helpers in scope
-    REGEX = "regex"          # re.search(expected, str(output))
-    CONTAINS = "contains"    # expected in str(output)
+    REGEX = "regex"  # re.search(expected, str(output))
+    CONTAINS = "contains"  # expected in str(output)
     LLM_JUDGE = "llm_judge"  # deferred — requires forge-spec[llm] (DT-3)
-    SCRIPT = "script"        # deferred — external script execution (DT-4)
+    SCRIPT = "script"  # deferred — external script execution (DT-4)
 
 
 class CriterionStatus(StrEnum):
     PENDING = "pending"
     PASSED = "passed"
     FAILED = "failed"
-    SKIPPED = "skipped"   # LLM_JUDGE / SCRIPT before their engine is wired
-    ERROR = "error"       # exception during evaluation
+    SKIPPED = "skipped"  # LLM_JUDGE / SCRIPT before their engine is wired
+    ERROR = "error"  # exception during evaluation
 
 
 class AcceptanceCriterion(BaseModel):

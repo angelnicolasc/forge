@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from forge_review.policy import PolicyGate
 from forge_review.types import (
     Finding,
@@ -12,7 +10,6 @@ from forge_review.types import (
     ReviewConfig,
     ReviewResult,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -28,7 +25,7 @@ def _result(*severities: FindingSeverity, confidences: list[float] | None = None
         confidences = [1.0] * len(severities)
     findings = [
         Finding(severity=s, title=f"f{i}", message="m", confidence=c)
-        for i, (s, c) in enumerate(zip(severities, confidences))
+        for i, (s, c) in enumerate(zip(severities, confidences, strict=False))
     ]
     return ReviewResult(hook=HookKind.PRE_MERGE, findings=findings)
 
@@ -110,23 +107,17 @@ class TestPolicyGateDefaults:
 class TestPolicyGateMinConfidence:
     def test_low_confidence_p0_does_not_block(self):
         config = ReviewConfig(min_confidence=0.8)
-        decision = PolicyGate(config).evaluate(
-            _result(FindingSeverity.P0, confidences=[0.5])
-        )
+        decision = PolicyGate(config).evaluate(_result(FindingSeverity.P0, confidences=[0.5]))
         assert decision.allowed is True
 
     def test_exactly_at_threshold_blocks(self):
         config = ReviewConfig(min_confidence=0.8)
-        decision = PolicyGate(config).evaluate(
-            _result(FindingSeverity.P0, confidences=[0.8])
-        )
+        decision = PolicyGate(config).evaluate(_result(FindingSeverity.P0, confidences=[0.8]))
         assert decision.allowed is False
 
     def test_above_threshold_blocks(self):
         config = ReviewConfig(min_confidence=0.8)
-        decision = PolicyGate(config).evaluate(
-            _result(FindingSeverity.P0, confidences=[0.9])
-        )
+        decision = PolicyGate(config).evaluate(_result(FindingSeverity.P0, confidences=[0.9]))
         assert decision.allowed is False
 
 
@@ -148,7 +139,5 @@ class TestPolicyGateCustomBlockOn:
 
     def test_empty_block_on_always_allows(self):
         config = ReviewConfig(block_on=[])
-        decision = PolicyGate(config).evaluate(
-            _result(FindingSeverity.P0, FindingSeverity.P1)
-        )
+        decision = PolicyGate(config).evaluate(_result(FindingSeverity.P0, FindingSeverity.P1))
         assert decision.allowed is True

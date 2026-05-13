@@ -1,4 +1,5 @@
 """Tests for forge_mcp.router — ToolRouter."""
+
 from __future__ import annotations
 
 import pytest

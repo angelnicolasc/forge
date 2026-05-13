@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import asyncio
 
-import pytest
-
 from forge_core.types import RunResult, RunStatus
 from forge_spec.types import (
     AcceptanceCriterion,
@@ -14,7 +12,6 @@ from forge_spec.types import (
     SpecDef,
 )
 from forge_spec.verifier import SpecVerifier, _compute_compliance
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -228,6 +225,7 @@ class TestEventBusIntegration:
         asyncio.run(SpecVerifier(bus=FakeBus()).verify(spec, run))
         assert len(events) == 1
         from forge_core.types import RunEventKind
+
         assert events[0].kind == RunEventKind.SPEC_VERIFIED
 
     def test_no_event_without_bus(self):

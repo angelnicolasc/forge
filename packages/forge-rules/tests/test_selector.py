@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from forge_rules.selector import _intent_matches, _scope_matches, group_by_action, select_rules
 from forge_rules.types import Rule, RuleAction, RulePack
 

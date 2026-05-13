@@ -6,10 +6,14 @@ The classifier is loaded lazily on the first classify call.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import structlog
 
 from forge_skills.registry import SkillNotFoundError, SkillRegistry
-from forge_skills.types import SkillDef
+
+if TYPE_CHECKING:
+    from forge_skills.types import SkillDef
 
 logger = structlog.get_logger(__name__)
 

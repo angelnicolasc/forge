@@ -28,16 +28,18 @@ YAML schema (example):
 
 from __future__ import annotations
 
-import io
 import os
 import re
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
 from pydantic import ValidationError
 
-from forge_mcp.types import ServerConfig, ToolPolicy
+from forge_mcp.types import ServerConfig
+
+if TYPE_CHECKING:
+    import io
 
 _ENV_RE = re.compile(r"\$\{(\w+)\}")
 

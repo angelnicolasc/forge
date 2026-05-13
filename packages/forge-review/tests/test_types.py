@@ -12,7 +12,6 @@ from forge_review.types import (
     ReviewResult,
 )
 
-
 # ---------------------------------------------------------------------------
 # FindingSeverity
 # ---------------------------------------------------------------------------
@@ -78,6 +77,7 @@ class TestFinding:
 
     def test_roundtrip_json(self):
         import json
+
         f = Finding(severity=FindingSeverity.P3, title="info", message="all good")
         data = json.loads(f.model_dump_json())
         f2 = Finding.model_validate(data)
@@ -92,8 +92,7 @@ class TestFinding:
 
 def _make_result(*severities: FindingSeverity, hook: HookKind = HookKind.PRE_MERGE) -> ReviewResult:
     findings = [
-        Finding(severity=s, title=f"finding {i}", message="m")
-        for i, s in enumerate(severities)
+        Finding(severity=s, title=f"finding {i}", message="m") for i, s in enumerate(severities)
     ]
     return ReviewResult(hook=hook, findings=findings)
 
@@ -106,7 +105,9 @@ class TestReviewResult:
         assert r.blocking_findings == []
 
     def test_summary_counts(self):
-        r = _make_result(FindingSeverity.P0, FindingSeverity.P1, FindingSeverity.P2, FindingSeverity.P3)
+        r = _make_result(
+            FindingSeverity.P0, FindingSeverity.P1, FindingSeverity.P2, FindingSeverity.P3
+        )
         s = r.summary
         assert s["p0"] == 1
         assert s["p1"] == 1

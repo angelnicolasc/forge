@@ -1,7 +1,9 @@
 """Tests for forge_mcp.server — MetaMCPServer integration."""
+
 from __future__ import annotations
 
 import asyncio
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -9,6 +11,8 @@ from forge_mcp.client import FakeMCPClient
 from forge_mcp.server import MetaMCPServer, ToolDeniedError
 from forge_mcp.types import ServerConfig, ToolCall, ToolPolicy
 
+if TYPE_CHECKING:
+    from forge_core.types import RunEvent
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -271,7 +275,7 @@ class TestCircuitBreaker:
 
 class TestEventBus:
     def test_tool_call_event_emitted(self) -> None:
-        from forge_core.types import RunEvent, RunEventKind
+        from forge_core.types import RunEventKind
 
         published: list[RunEvent] = []
 
@@ -292,7 +296,6 @@ class TestEventBus:
         assert published[0].run_id == "run-123"
 
     def test_no_event_on_cache_hit(self) -> None:
-        from forge_core.types import RunEvent
 
         published: list[RunEvent] = []
 
@@ -306,7 +309,7 @@ class TestEventBus:
         cfg = _server(tools={"tool": policy})
         meta.add_server(cfg, FakeMCPClient(responses={"tool": "v"}))
 
-        asyncio.run(meta.call_tool(_call("tool")))   # miss → event
-        asyncio.run(meta.call_tool(_call("tool")))   # hit  → no event
+        asyncio.run(meta.call_tool(_call("tool")))  # miss → event
+        asyncio.run(meta.call_tool(_call("tool")))  # hit  → no event
 
         assert len(published) == 1

@@ -1,6 +1,6 @@
 [project]
 name = "forge-review"
-version = "0.1.0"
+version = "0.2.0"
 description = "Review Agents and Policy Gates for Forge — parallel reviewers, cascading heuristics, severity-based blocking."
 readme = "README.md"
 license = "Apache-2.0"
@@ -20,7 +20,7 @@ classifiers = [
 ]
 keywords = ["agents", "llm", "review", "policy", "gates", "quality", "forge"]
 dependencies = [
-    "forge-core==0.1.0",
+    "forge-core==0.2.0",
     "pydantic>=2.7,<3.0",
     "structlog>=24.0,<26.0",
     "anyio>=4.0",
@@ -28,7 +28,7 @@ dependencies = [
 
 [project.optional-dependencies]
 spec = [
-    "forge-spec==0.1.0",
+    "forge-spec==0.2.0",
 ]
 
 [build-system]

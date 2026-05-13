@@ -77,10 +77,10 @@ from forge_cli.commands.evolve import evolve_app  # noqa: E402
 from forge_cli.commands.mcp import mcp_app  # noqa: E402
 from forge_cli.commands.memory import memory_app  # noqa: E402
 from forge_cli.commands.observe import observe_app  # noqa: E402
+from forge_cli.commands.review import review_app  # noqa: E402
 from forge_cli.commands.rules import rules_app  # noqa: E402
 from forge_cli.commands.run import run_app  # noqa: E402
 from forge_cli.commands.skills import skills_app  # noqa: E402
-from forge_cli.commands.review import review_app  # noqa: E402
 from forge_cli.commands.spec import spec_app  # noqa: E402
 from forge_cli.commands.wrap import wrap_app  # noqa: E402
 

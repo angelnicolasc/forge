@@ -5,8 +5,6 @@ from __future__ import annotations
 import asyncio
 from decimal import Decimal
 
-import pytest
-
 from forge_core.types import CostSummary, RunResult, RunStatus
 from forge_review.agents import (
     CostCeilingReviewer,
@@ -17,7 +15,6 @@ from forge_review.agents import (
     run_parallel,
 )
 from forge_review.types import FindingSeverity, HookKind, ReviewContext
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -65,8 +62,10 @@ class TestReviewAgentProtocol:
             @property
             def name(self) -> str:
                 return "my_agent"
+
             async def review(self, context):
                 return []
+
         assert isinstance(MyAgent(), ReviewAgent)
 
 
@@ -86,6 +85,7 @@ class TestRunParallel:
 
         class NoOpAgent:
             name = "noop"
+
             async def review(self, context):
                 return []
 
@@ -95,14 +95,13 @@ class TestRunParallel:
     def test_multiple_agents_combined(self):
         run = _run(errors=["boom"], total_cost=Decimal("15.00"))
         ctx = _ctx(run_result=run)
-        findings = asyncio.run(run_parallel(
-            [ErrorRateReviewer(), CostCeilingReviewer()], ctx
-        ))
+        findings = asyncio.run(run_parallel([ErrorRateReviewer(), CostCeilingReviewer()], ctx))
         assert len(findings) == 2
 
     def test_exception_in_agent_becomes_p2_finding(self):
         class BrokenAgent:
             name = "broken"
+
             async def review(self, context):
                 raise RuntimeError("internal error")
 
@@ -116,6 +115,7 @@ class TestRunParallel:
     def test_exception_does_not_block_other_agents(self):
         class BrokenAgent:
             name = "broken"
+
             async def review(self, context):
                 raise ValueError("bad")
 
@@ -217,6 +217,7 @@ class TestSpecConstraintReviewer:
     def test_with_spec_and_kind_blocked(self):
         from forge_core.types import MutationKind
         from forge_spec.types import SpecConstraint, SpecDef
+
         spec = SpecDef(
             name="s",
             constraints=[
@@ -237,6 +238,7 @@ class TestSpecConstraintReviewer:
     def test_with_spec_and_kind_allowed(self):
         from forge_core.types import MutationKind
         from forge_spec.types import SpecConstraint, SpecDef
+
         spec = SpecDef(
             name="s",
             constraints=[

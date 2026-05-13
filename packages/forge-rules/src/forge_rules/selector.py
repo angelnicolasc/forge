@@ -16,7 +16,7 @@ import fnmatch
 
 import structlog
 
-from forge_rules.types import IntraStrategy, Rule, RulePack, RuleAction
+from forge_rules.types import Rule, RuleAction, RulePack
 
 logger = structlog.get_logger(__name__)
 

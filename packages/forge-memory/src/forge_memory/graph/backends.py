@@ -22,9 +22,10 @@ codebase stays coupled only to the simpler ``MemoryBackend`` contract.
 
 from __future__ import annotations
 
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
-from forge_core.types import MemoryEntry, MemoryQuery
+if TYPE_CHECKING:
+    from forge_core.types import MemoryEntry, MemoryQuery
 
 
 @runtime_checkable
@@ -93,9 +94,7 @@ class GraphBackend(Protocol):
         """
         ...
 
-    async def get_neighbors(
-        self, node_id: str, *, direction: str = "both"
-    ) -> list[str]:
+    async def get_neighbors(self, node_id: str, *, direction: str = "both") -> list[str]:
         """Return IDs of nodes adjacent to ``node_id``.
 
         ``direction`` is ``'in'``, ``'out'``, or ``'both'``.
@@ -170,9 +169,7 @@ class Neo4jGraphBackend:
     async def add_node(self, node_id: str, properties: dict[str, Any]) -> None:
         raise NotImplementedError(self._MSG)
 
-    async def add_edge(
-        self, src: str, dst: str, relation: str, properties: dict[str, Any]
-    ) -> None:
+    async def add_edge(self, src: str, dst: str, relation: str, properties: dict[str, Any]) -> None:
         raise NotImplementedError(self._MSG)
 
     async def traverse(

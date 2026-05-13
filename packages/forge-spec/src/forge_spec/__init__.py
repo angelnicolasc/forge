@@ -32,8 +32,17 @@ __all__ = [
     "CriterionStatus",
     "Risk",
     "SpecAttestation",
+    # attester
+    "SpecAttester",
     "SpecConstraint",
+    # constraints
+    "SpecConstraintGuard",
     "SpecDef",
+    # runner
+    "SpecRefinerProtocol",
+    "SpecRunner",
+    # verifier
+    "SpecVerifier",
     "VerifyResult",
     # loader
     "dump_spec_yaml",
@@ -41,13 +50,4 @@ __all__ = [
     "load_risk_register_yaml",
     "load_spec_yaml",
     "merge_spec_files",
-    # verifier
-    "SpecVerifier",
-    # attester
-    "SpecAttester",
-    # constraints
-    "SpecConstraintGuard",
-    # runner
-    "SpecRefinerProtocol",
-    "SpecRunner",
 ]
