@@ -41,6 +41,7 @@ class RunEventKind(StrEnum):
     CONTEXT_INJECTED = "context_injected"  # fired before LLM call; payload: context_tokens, source
     SKILL_CALL = "skill_call"  # fired after skill handler completes; payload: skill, duration_ms
     SPEC_VERIFIED = "spec_verified"  # fired after spec verification; payload: spec, compliance_rate, passed
+    REVIEW_COMPLETE = "review_complete"  # fired after review gate; payload: hook, allowed, finding_count
 
 
 class RunStatus(StrEnum):

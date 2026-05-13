@@ -80,6 +80,7 @@ from forge_cli.commands.observe import observe_app  # noqa: E402
 from forge_cli.commands.rules import rules_app  # noqa: E402
 from forge_cli.commands.run import run_app  # noqa: E402
 from forge_cli.commands.skills import skills_app  # noqa: E402
+from forge_cli.commands.review import review_app  # noqa: E402
 from forge_cli.commands.spec import spec_app  # noqa: E402
 from forge_cli.commands.wrap import wrap_app  # noqa: E402
 
@@ -91,5 +92,6 @@ app.add_typer(memory_app, name="memory", help="Query, ingest, and inspect the Li
 app.add_typer(rules_app, name="rules", help="Validate, lint, explain, and diff rule packs.")
 app.add_typer(mcp_app, name="mcp", help="Manage MCP tool routing, budgets, and cache.")
 app.add_typer(skills_app, name="skills", help="Load, inspect, and invoke Forge skills.")
+app.add_typer(review_app, name="review", help="Run review agents and policy gates.")
 app.add_typer(spec_app, name="spec", help="Init, verify, and attest Forge specs.")
 app.add_typer(doctor_app, name="doctor", help="Diagnose the local Forge installation.")
