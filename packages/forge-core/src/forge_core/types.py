@@ -39,6 +39,7 @@ class RunEventKind(StrEnum):
     ERROR = "error"
     EVOLUTION = "evolution"
     CONTEXT_INJECTED = "context_injected"  # fired before LLM call; payload: context_tokens, source
+    SKILL_CALL = "skill_call"  # fired after skill handler completes; payload: skill, duration_ms
 
 
 class RunStatus(StrEnum):

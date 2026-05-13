@@ -79,6 +79,7 @@ from forge_cli.commands.memory import memory_app  # noqa: E402
 from forge_cli.commands.observe import observe_app  # noqa: E402
 from forge_cli.commands.rules import rules_app  # noqa: E402
 from forge_cli.commands.run import run_app  # noqa: E402
+from forge_cli.commands.skills import skills_app  # noqa: E402
 from forge_cli.commands.wrap import wrap_app  # noqa: E402
 
 app.add_typer(wrap_app, name="wrap", help="Wrap a multi-agent flow and instrument it.")
@@ -88,4 +89,5 @@ app.add_typer(observe_app, name="observe", help="Open the live dashboard.")
 app.add_typer(memory_app, name="memory", help="Query, ingest, and inspect the Living Memory.")
 app.add_typer(rules_app, name="rules", help="Validate, lint, explain, and diff rule packs.")
 app.add_typer(mcp_app, name="mcp", help="Manage MCP tool routing, budgets, and cache.")
+app.add_typer(skills_app, name="skills", help="Load, inspect, and invoke Forge skills.")
 app.add_typer(doctor_app, name="doctor", help="Diagnose the local Forge installation.")
