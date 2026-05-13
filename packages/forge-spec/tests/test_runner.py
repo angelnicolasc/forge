@@ -102,6 +102,13 @@ class TestSpecConstraintGuard:
         assert MutationKind.AGENT_ADD in blocked
         assert MutationKind.PROMPT_REWRITE not in blocked
 
+    def test_blocked_kinds_with_empty_list_blocks_all_mutation_kinds(self):
+        spec = _make_spec(
+            constraints=[SpecConstraint(id="c1", description="no mutations at all")]
+        )
+        guard = SpecConstraintGuard(spec)
+        assert guard.blocked_kinds() == set(MutationKind)
+
     def test_allowed_kinds_complement_of_blocked(self):
         spec = _make_spec(
             constraints=[

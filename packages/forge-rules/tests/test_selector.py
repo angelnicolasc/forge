@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from forge_rules.selector import _intent_matches, _scope_matches, select_rules
+from forge_rules.selector import _intent_matches, _scope_matches, group_by_action, select_rules
 from forge_rules.types import Rule, RuleAction, RulePack
 
 
@@ -103,3 +103,17 @@ class TestSelectRules:
     def test_empty_pack_returns_empty(self) -> None:
         pack = _pack([])
         assert select_rules(pack) == []
+
+
+class TestGroupByAction:
+    def test_groups_rules_by_action(self) -> None:
+        r1 = _rule("a", enabled=True)
+        r2 = Rule(id="b", action=RuleAction.DENY, description="b", content="deny it")
+        result = group_by_action([r1, r2])
+        assert r1 in result[RuleAction.SUGGEST]
+        assert r2 in result[RuleAction.DENY]
+
+    def test_empty_input_returns_all_actions_empty(self) -> None:
+        result = group_by_action([])
+        assert all(v == [] for v in result.values())
+        assert set(result.keys()) == set(RuleAction)
