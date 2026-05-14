@@ -19,7 +19,11 @@
 
 ---
 
-## What is Forge?
+<br/>
+
+<h2 align="center">What is Forge?</h2>
+
+<br/>
 
 Forge is an **open-source, enterprise-grade agent harness** that wraps any multi-agent flow and gives it real-time cost tracking, cross-run memory, OpenTelemetry tracing, spec-driven governance, and an opt-in self-evolution loop — in one command.
 
@@ -56,9 +60,15 @@ Running task_id=a3f8b2c1...
 ╰─────────────────────────────────────────────────╯
 ```
 
+<br/>
+
 ---
 
-## Why Forge?
+<br/>
+
+<h2 align="center">Why Forge?</h2>
+
+<br/>
 
 | | Build from scratch | Forge |
 |---|:---:|:---:|
@@ -71,14 +81,24 @@ Running task_id=a3f8b2c1...
 | Audit trail | ✗ Log files | ✓ Full provenance chain |
 | Production-ready | ✗ Weeks | ✓ Day 1 |
 
+<br/>
+
 ---
 
-## Features
+<br/>
 
-### 🎯 Universal Drop-in Adapter
+<h2 align="center">Features</h2>
+
+<br/>
+
+<h3 align="center">🎯 Universal Drop-in Adapter</h3>
+
 Wraps **LangGraph**, **CrewAI**, **AutoGen**, or any async callable. No migration required. Framework is auto-detected from imports.
 
-### 🧬 Self-Evolution Loop
+<br/>
+
+<h3 align="center">🧬 Self-Evolution Loop</h3>
+
 Every run generates telemetry. The evolution loop analyzes it and proposes (or auto-applies) mutations:
 - **Prompt rewrites** — fix recurring error patterns via LLM-structured output (`PromptRewriteMutator`)
 - **Model swaps** — downgrade expensive models for lower-complexity tasks (`ModelSwapMutator`)
@@ -92,11 +112,14 @@ forge evolve run my_flow.py --mode auto
 # ⚗  Proposed: Swap researcher from claude-opus → claude-sonnet
 # ↳ Applied. Fitness: 0.72 → 0.91 (+0.19)
 
-forge evolve status        # read the journal
+forge evolve status          # read the journal
 forge evolve resume my_flow.py   # re-arm the breaker
 ```
 
-### 🧠 Living Collaborative Memory
+<br/>
+
+<h3 align="center">🧠 Living Collaborative Memory</h3>
+
 A hybrid knowledge base that accumulates and retrieves knowledge across runs:
 - **Vector layer** (ChromaDB + sentence-transformers): semantic search over all agent outputs
 - **Graph layer** (NetworkX, SQLite-backed WAL): entity-relationship traversal with temporal validity
@@ -111,7 +134,10 @@ forge memory ingest my_document.txt --tag topic=RAG
 forge memory status
 ```
 
-### 📊 Observability + FinOps
+<br/>
+
+<h3 align="center">📊 Observability + FinOps</h3>
+
 - OpenTelemetry tracing with per-agent spans — wire to any OTLP-compatible collector (Grafana Tempo, Datadog, Jaeger)
 - Real-time cost breakdown by agent and model — thinking tokens and cached input tokens tracked separately
 - Three-tier pricing resolution: `FORGE_PRICING_TABLE_PATH` → `~/.forge/pricing.json` (7-day TTL) → bundled table; unknown models warn loudly instead of silently billing $0
@@ -124,7 +150,10 @@ forge doctor                   # diagnose your installation
 forge doctor update-pricing    # refresh the local pricing cache
 ```
 
-### 🔧 MCP Meta-Orchestrator
+<br/>
+
+<h3 align="center">🔧 MCP Meta-Orchestrator</h3>
+
 Routes, secures, and budgets all Model Context Protocol tool calls through an 8-layer governance pipeline:
 1. Tool routing (O(1) bidirectional index)
 2. Policy enforcement (deny-by-default allowlist per caller)
@@ -142,7 +171,10 @@ forge mcp serve                # expose Forge memory + evolution as MCP tools
 forge mcp status               # inspect budget and cache state
 ```
 
-### 📋 Rules Engine
+<br/>
+
+<h3 align="center">📋 Rules Engine</h3>
+
 Context-aware rule packs with a fixed precedence lattice and compile-time scope analysis:
 - **Deny > Require > Suggest** — precedence enforced at merge time, not at inference
 - **Scope intersection detection** — overlapping glob patterns flagged at lint time (O(N²), not per-request)
@@ -156,7 +188,10 @@ forge rules explain --path "src/**"  # show which rules apply
 forge rules diff v1.yaml v2.yaml
 ```
 
-### 🎓 Skills Runtime
+<br/>
+
+<h3 align="center">🎓 Skills Runtime</h3>
+
 Intent-based skill dispatch with structured SKILL.md loading:
 - **SKILL.md format**: YAML frontmatter with name, description, examples, parameters, tools, timeout, budget, tags — compatible with Claude Code skill ecosystem
 - **IntentDispatcher**: dual-threshold confidence enforcement before invocation
@@ -169,7 +204,10 @@ forge skills explain <name>    # describe parameters and examples
 forge skills run <name> <args> # invoke a skill
 ```
 
-### 📐 Spec-Driven Development
+<br/>
+
+<h3 align="center">📐 Spec-Driven Development</h3>
+
 Structured acceptance criteria, deterministic attestation, and evolution guardrails:
 - **SpecVerifier**: ASSERTION, REGEX, CONTAINS checks with per-criterion weighting
 - **SpecAttester**: SLSA Level 2-inspired provenance with canonical SHA-256 spec hash
@@ -182,7 +220,10 @@ forge spec verify --spec my_feature.yaml --result run.json
 forge spec attest --spec my_feature.yaml   # generate provenance
 ```
 
-### 🔍 Review Agents & Policy Gates
+<br/>
+
+<h3 align="center">🔍 Review Agents & Policy Gates</h3>
+
 Parallel review pipeline with severity-based blocking:
 - **P0** — blocks unconditionally (security, data loss)
 - **P1** — blocks by default (quality gates)
@@ -196,12 +237,21 @@ forge review run --context run.json
 forge review show --id <review_id>
 ```
 
-### 🩺 `forge doctor`
+<br/>
+
+<h3 align="center">🩺 forge doctor</h3>
+
 Diagnose a local install in one command: Python version, installed adapter extras, active memory backends, environment variable state, and optional network egress (`--network`).
+
+<br/>
 
 ---
 
-## Architecture
+<br/>
+
+<h2 align="center">Architecture</h2>
+
+<br/>
 
 ```
 ┌───────────────────────────────────────────────────────────────────────┐
@@ -251,9 +301,15 @@ Diagnose a local install in one command: Python version, installed adapter extra
 
 Full write-up in [docs/architecture.md](docs/architecture.md).
 
+<br/>
+
 ---
 
-## Installation
+<br/>
+
+<h2 align="center">Installation</h2>
+
+<br/>
 
 ```bash
 # Core harness + CLI (LangGraph, CrewAI, AutoGen adapters require extras)
@@ -275,11 +331,17 @@ pip install 'forge-os[review]'     # review agents + policy gates
 
 **Requirements**: Python 3.11+. No Docker required for local development.
 
+<br/>
+
 ---
 
-## Quickstart
+<br/>
 
-### 1. Wrap an existing flow
+<h2 align="center">Quickstart</h2>
+
+<br/>
+
+<h3 align="center">1. Wrap an existing flow</h3>
 
 ```python
 # my_flow.py
@@ -304,7 +366,9 @@ app = graph.compile()
 forge wrap my_flow.py --input '{"query": "What is RAG?"}'
 ```
 
-### 2. Enable memory and evolution
+<br/>
+
+<h3 align="center">2. Enable memory and evolution</h3>
 
 ```bash
 forge wrap my_flow.py \
@@ -312,7 +376,9 @@ forge wrap my_flow.py \
   --evolution
 ```
 
-### 3. Use the Python SDK
+<br/>
+
+<h3 align="center">3. Use the Python SDK</h3>
 
 ```python
 import asyncio
@@ -333,7 +399,9 @@ async def main():
 asyncio.run(main())
 ```
 
-### 4. Add a spec and enforce it through evolution
+<br/>
+
+<h3 align="center">4. Add a spec and enforce it through evolution</h3>
 
 ```bash
 forge spec init acceptance.yaml
@@ -343,9 +411,15 @@ forge wrap my_flow.py --spec acceptance.yaml --evolution
 # SpecConstraintGuard now blocks any mutation that would violate the spec
 ```
 
+<br/>
+
 ---
 
-## Packages
+<br/>
+
+<h2 align="center">Packages</h2>
+
+<br/>
 
 Forge ships as eleven composable packages. Installing `forge-os` pulls the core set; optional extras add the governance and tooling layers.
 
@@ -363,9 +437,15 @@ Forge ships as eleven composable packages. Installing `forge-os` pulls the core 
 | `forge-review` | [![PyPI](https://img.shields.io/pypi/v/forge-review.svg)](https://pypi.org/project/forge-review/) | Parallel review agents with P0–P3 severity and cascading policy gates |
 | `forge-os` | [![PyPI](https://img.shields.io/pypi/v/forge-os.svg)](https://pypi.org/project/forge-os/) | Meta-package — installs core, CLI, adapters, memory, and observe |
 
+<br/>
+
 ---
 
-## Environment Variables
+<br/>
+
+<h2 align="center">Environment Variables</h2>
+
+<br/>
 
 | Variable | Default | Description |
 |---|---|---|
@@ -383,9 +463,15 @@ Forge ships as eleven composable packages. Installing `forge-os` pulls the core 
 | `FORGE_PRICING_TABLE_URL` | *(configured)* | URL used by `forge doctor update-pricing` to refresh the local pricing cache. |
 | `FORGE_OBSERVE_AGENT_BASE_URL` | *(empty)* | Base URL published in the A2A Agent Card at `/.well-known/agent.json`. |
 
+<br/>
+
 ---
 
-## Roadmap
+<br/>
+
+<h2 align="center">Roadmap</h2>
+
+<br/>
 
 **v0.2.0 is live** — the full governance platform (forge-spec, forge-review, forge-rules, forge-skills, forge-os-mcp) ships in this release alongside the core harness, adapters, memory, and observability stack.
 
@@ -399,22 +485,28 @@ Planned for upcoming releases:
 
 Anything that graduates to shipped must land with a row in [docs/feature-map.md](docs/feature-map.md).
 
+<br/>
+
 ---
 
-## Contributing
+<br/>
+
+<h2 align="center">Contributing</h2>
+
+<br/>
 
 Issues, bug reports, and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and open an issue at [github.com/angelnicolasc/forge/issues](https://github.com/angelnicolasc/forge/issues).
 
 Security reports: please read [SECURITY.md](SECURITY.md).
 
+<br/>
+
 ---
 
-## License
+<br/>
+
+<h2 align="center">License</h2>
+
+<br/>
 
 Apache 2.0 — enterprise-friendly, commercial use allowed. See [LICENSE](LICENSE).
-
----
-
-<div align="center">
-<sub>Built by <a href="https://github.com/angelnicolasc">Angel DiCerutti</a>. Drop your agents. Watch them evolve.</sub>
-</div>
