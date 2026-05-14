@@ -38,7 +38,7 @@ jobs:
         with:
           packages-dir: dist/
           password: ${{ secrets.PYPI_API_TOKEN }}
-          skip_existing: true
+          skip-existing: true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
