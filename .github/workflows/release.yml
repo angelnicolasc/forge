@@ -20,9 +20,10 @@ jobs:
 
       - name: Build all packages
         run: |
-          mkdir -p dist
+          ROOT=$(pwd)
+          mkdir -p "$ROOT/dist"
           for pkg in packages/*/; do
-            uv build --directory "$pkg" --out-dir dist/
+            uv build --directory "$pkg" --out-dir "$ROOT/dist"
           done
 
       - name: Generate SBOM
