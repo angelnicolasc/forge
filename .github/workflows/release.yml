@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: write
-  id-token: write
 
 jobs:
   publish:
@@ -26,10 +25,6 @@ jobs:
             uv build --package $(basename $pkg) --out-dir dist/
           done
 
-      # Supply-chain hardening (ζ.10): SBOM + SLSA provenance on every
-      # tag. The SBOM catalogs every transitive dep in SPDX form;
-      # provenance proves the wheel came from this workflow run and
-      # this commit SHA — both become PyPI-verifiable once uploaded.
       - name: Generate SBOM
         uses: anchore/sbom-action@v0
         with:
@@ -41,6 +36,7 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
+          password: ${{ secrets.PYPI_API_TOKEN }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
