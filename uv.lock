@@ -10,13 +10,13 @@ resolution-markers = [
 
 [manifest]
 members = [
-    "forge-adapters",
-    "forge-cli",
-    "forge-core",
-    "forge-mcp",
-    "forge-memory",
-    "forge-observe",
     "forge-os",
+    "forge-os-adapters",
+    "forge-os-cli",
+    "forge-os-core",
+    "forge-os-mcp",
+    "forge-os-memory",
+    "forge-os-observe",
     "forge-review",
     "forge-rules",
     "forge-skills",
@@ -985,11 +985,71 @@ wheels = [
 ]
 
 [[package]]
-name = "forge-adapters"
+name = "forge-os"
+version = "0.2.0"
+source = { editable = "packages/forge-os" }
+dependencies = [
+    { name = "forge-os-adapters" },
+    { name = "forge-os-cli" },
+    { name = "forge-os-core" },
+    { name = "forge-os-memory" },
+    { name = "forge-os-observe" },
+]
+
+[package.optional-dependencies]
+all = [
+    { name = "forge-os-adapters", extra = ["all"] },
+]
+autogen = [
+    { name = "forge-os-adapters", extra = ["autogen"] },
+]
+crewai = [
+    { name = "forge-os-adapters", extra = ["crewai"] },
+]
+langgraph = [
+    { name = "forge-os-adapters", extra = ["langgraph"] },
+]
+mcp = [
+    { name = "forge-os-mcp" },
+]
+review = [
+    { name = "forge-review" },
+]
+rules = [
+    { name = "forge-rules" },
+]
+skills = [
+    { name = "forge-skills" },
+]
+spec = [
+    { name = "forge-spec" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "forge-os-adapters", editable = "packages/forge-adapters" },
+    { name = "forge-os-adapters", extras = ["all"], marker = "extra == 'all'", editable = "packages/forge-adapters" },
+    { name = "forge-os-adapters", extras = ["autogen"], marker = "extra == 'autogen'", editable = "packages/forge-adapters" },
+    { name = "forge-os-adapters", extras = ["crewai"], marker = "extra == 'crewai'", editable = "packages/forge-adapters" },
+    { name = "forge-os-adapters", extras = ["langgraph"], marker = "extra == 'langgraph'", editable = "packages/forge-adapters" },
+    { name = "forge-os-cli", editable = "packages/forge-cli" },
+    { name = "forge-os-core", editable = "packages/forge-core" },
+    { name = "forge-os-mcp", marker = "extra == 'mcp'", editable = "packages/forge-mcp" },
+    { name = "forge-os-memory", editable = "packages/forge-memory" },
+    { name = "forge-os-observe", editable = "packages/forge-observe" },
+    { name = "forge-review", marker = "extra == 'review'", editable = "packages/forge-review" },
+    { name = "forge-rules", marker = "extra == 'rules'", editable = "packages/forge-rules" },
+    { name = "forge-skills", marker = "extra == 'skills'", editable = "packages/forge-skills" },
+    { name = "forge-spec", marker = "extra == 'spec'", editable = "packages/forge-spec" },
+]
+provides-extras = ["langgraph", "crewai", "autogen", "all", "rules", "mcp", "skills", "spec", "review"]
+
+[[package]]
+name = "forge-os-adapters"
 version = "0.2.0"
 source = { editable = "packages/forge-adapters" }
 dependencies = [
-    { name = "forge-core" },
+    { name = "forge-os-core" },
     { name = "pydantic" },
     { name = "structlog" },
 ]
@@ -1016,7 +1076,7 @@ requires-dist = [
     { name = "autogen-agentchat", marker = "extra == 'autogen'", specifier = ">=0.4" },
     { name = "crewai", marker = "extra == 'all'", specifier = ">=0.80" },
     { name = "crewai", marker = "extra == 'crewai'", specifier = ">=0.80" },
-    { name = "forge-core", editable = "packages/forge-core" },
+    { name = "forge-os-core", editable = "packages/forge-core" },
     { name = "langgraph", marker = "extra == 'all'", specifier = ">=0.2" },
     { name = "langgraph", marker = "extra == 'langgraph'", specifier = ">=0.2" },
     { name = "pydantic", specifier = ">=2.7,<3.0" },
@@ -1025,14 +1085,14 @@ requires-dist = [
 provides-extras = ["langgraph", "crewai", "autogen", "all"]
 
 [[package]]
-name = "forge-cli"
+name = "forge-os-cli"
 version = "0.2.0"
 source = { editable = "packages/forge-cli" }
 dependencies = [
-    { name = "forge-adapters" },
-    { name = "forge-core" },
-    { name = "forge-memory" },
-    { name = "forge-observe" },
+    { name = "forge-os-adapters" },
+    { name = "forge-os-core" },
+    { name = "forge-os-memory" },
+    { name = "forge-os-observe" },
     { name = "rich" },
     { name = "structlog" },
     { name = "typer" },
@@ -1040,7 +1100,7 @@ dependencies = [
 
 [package.optional-dependencies]
 mcp = [
-    { name = "forge-mcp" },
+    { name = "forge-os-mcp" },
 ]
 review = [
     { name = "forge-review" },
@@ -1057,11 +1117,11 @@ spec = [
 
 [package.metadata]
 requires-dist = [
-    { name = "forge-adapters", editable = "packages/forge-adapters" },
-    { name = "forge-core", editable = "packages/forge-core" },
-    { name = "forge-mcp", marker = "extra == 'mcp'", editable = "packages/forge-mcp" },
-    { name = "forge-memory", editable = "packages/forge-memory" },
-    { name = "forge-observe", editable = "packages/forge-observe" },
+    { name = "forge-os-adapters", editable = "packages/forge-adapters" },
+    { name = "forge-os-core", editable = "packages/forge-core" },
+    { name = "forge-os-mcp", marker = "extra == 'mcp'", editable = "packages/forge-mcp" },
+    { name = "forge-os-memory", editable = "packages/forge-memory" },
+    { name = "forge-os-observe", editable = "packages/forge-observe" },
     { name = "forge-review", marker = "extra == 'review'", editable = "packages/forge-review" },
     { name = "forge-rules", marker = "extra == 'rules'", editable = "packages/forge-rules" },
     { name = "forge-skills", marker = "extra == 'skills'", editable = "packages/forge-skills" },
@@ -1073,7 +1133,7 @@ requires-dist = [
 provides-extras = ["rules", "mcp", "skills", "spec", "review"]
 
 [[package]]
-name = "forge-core"
+name = "forge-os-core"
 version = "0.2.0"
 source = { editable = "packages/forge-core" }
 dependencies = [
@@ -1109,12 +1169,12 @@ requires-dist = [
 provides-extras = ["evolution", "intent"]
 
 [[package]]
-name = "forge-mcp"
+name = "forge-os-mcp"
 version = "0.2.0"
 source = { editable = "packages/forge-mcp" }
 dependencies = [
     { name = "anyio" },
-    { name = "forge-core" },
+    { name = "forge-os-core" },
     { name = "pydantic" },
     { name = "pyyaml" },
     { name = "structlog" },
@@ -1128,7 +1188,7 @@ sdk = [
 [package.metadata]
 requires-dist = [
     { name = "anyio", specifier = ">=4.0" },
-    { name = "forge-core", editable = "packages/forge-core" },
+    { name = "forge-os-core", editable = "packages/forge-core" },
     { name = "mcp", marker = "extra == 'sdk'", specifier = ">=1.0" },
     { name = "pydantic", specifier = ">=2.7,<3.0" },
     { name = "pyyaml", specifier = ">=6.0" },
@@ -1137,12 +1197,12 @@ requires-dist = [
 provides-extras = ["sdk"]
 
 [[package]]
-name = "forge-memory"
+name = "forge-os-memory"
 version = "0.2.0"
 source = { editable = "packages/forge-memory" }
 dependencies = [
     { name = "chromadb" },
-    { name = "forge-core" },
+    { name = "forge-os-core" },
     { name = "networkx" },
     { name = "pydantic" },
     { name = "sentence-transformers" },
@@ -1160,7 +1220,7 @@ qdrant = [
 [package.metadata]
 requires-dist = [
     { name = "chromadb", specifier = ">=0.5" },
-    { name = "forge-core", editable = "packages/forge-core" },
+    { name = "forge-os-core", editable = "packages/forge-core" },
     { name = "neo4j", marker = "extra == 'neo4j'", specifier = ">=5.20" },
     { name = "networkx", specifier = ">=3.3" },
     { name = "pydantic", specifier = ">=2.7,<3.0" },
@@ -1171,12 +1231,12 @@ requires-dist = [
 provides-extras = ["neo4j", "qdrant"]
 
 [[package]]
-name = "forge-observe"
+name = "forge-os-observe"
 version = "0.2.0"
 source = { editable = "packages/forge-observe" }
 dependencies = [
     { name = "fastapi" },
-    { name = "forge-core" },
+    { name = "forge-os-core" },
     { name = "opentelemetry-api" },
     { name = "opentelemetry-exporter-otlp" },
     { name = "opentelemetry-sdk" },
@@ -1189,7 +1249,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115,<0.120" },
-    { name = "forge-core", editable = "packages/forge-core" },
+    { name = "forge-os-core", editable = "packages/forge-core" },
     { name = "opentelemetry-api", specifier = ">=1.25" },
     { name = "opentelemetry-exporter-otlp", specifier = ">=1.25" },
     { name = "opentelemetry-sdk", specifier = ">=1.25,<2.0" },
@@ -1200,72 +1260,12 @@ requires-dist = [
 ]
 
 [[package]]
-name = "forge-os"
-version = "0.2.0"
-source = { editable = "packages/forge-os" }
-dependencies = [
-    { name = "forge-adapters" },
-    { name = "forge-cli" },
-    { name = "forge-core" },
-    { name = "forge-memory" },
-    { name = "forge-observe" },
-]
-
-[package.optional-dependencies]
-all = [
-    { name = "forge-adapters", extra = ["all"] },
-]
-autogen = [
-    { name = "forge-adapters", extra = ["autogen"] },
-]
-crewai = [
-    { name = "forge-adapters", extra = ["crewai"] },
-]
-langgraph = [
-    { name = "forge-adapters", extra = ["langgraph"] },
-]
-mcp = [
-    { name = "forge-mcp" },
-]
-review = [
-    { name = "forge-review" },
-]
-rules = [
-    { name = "forge-rules" },
-]
-skills = [
-    { name = "forge-skills" },
-]
-spec = [
-    { name = "forge-spec" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "forge-adapters", editable = "packages/forge-adapters" },
-    { name = "forge-adapters", extras = ["all"], marker = "extra == 'all'", editable = "packages/forge-adapters" },
-    { name = "forge-adapters", extras = ["autogen"], marker = "extra == 'autogen'", editable = "packages/forge-adapters" },
-    { name = "forge-adapters", extras = ["crewai"], marker = "extra == 'crewai'", editable = "packages/forge-adapters" },
-    { name = "forge-adapters", extras = ["langgraph"], marker = "extra == 'langgraph'", editable = "packages/forge-adapters" },
-    { name = "forge-cli", editable = "packages/forge-cli" },
-    { name = "forge-core", editable = "packages/forge-core" },
-    { name = "forge-mcp", marker = "extra == 'mcp'", editable = "packages/forge-mcp" },
-    { name = "forge-memory", editable = "packages/forge-memory" },
-    { name = "forge-observe", editable = "packages/forge-observe" },
-    { name = "forge-review", marker = "extra == 'review'", editable = "packages/forge-review" },
-    { name = "forge-rules", marker = "extra == 'rules'", editable = "packages/forge-rules" },
-    { name = "forge-skills", marker = "extra == 'skills'", editable = "packages/forge-skills" },
-    { name = "forge-spec", marker = "extra == 'spec'", editable = "packages/forge-spec" },
-]
-provides-extras = ["langgraph", "crewai", "autogen", "all", "rules", "mcp", "skills", "spec", "review"]
-
-[[package]]
 name = "forge-review"
 version = "0.2.0"
 source = { editable = "packages/forge-review" }
 dependencies = [
     { name = "anyio" },
-    { name = "forge-core" },
+    { name = "forge-os-core" },
     { name = "pydantic" },
     { name = "structlog" },
 ]
@@ -1278,7 +1278,7 @@ spec = [
 [package.metadata]
 requires-dist = [
     { name = "anyio", specifier = ">=4.0" },
-    { name = "forge-core", editable = "packages/forge-core" },
+    { name = "forge-os-core", editable = "packages/forge-core" },
     { name = "forge-spec", marker = "extra == 'spec'", editable = "packages/forge-spec" },
     { name = "pydantic", specifier = ">=2.7,<3.0" },
     { name = "structlog", specifier = ">=24.0,<26.0" },
@@ -1290,7 +1290,7 @@ name = "forge-rules"
 version = "0.2.0"
 source = { editable = "packages/forge-rules" }
 dependencies = [
-    { name = "forge-core" },
+    { name = "forge-os-core" },
     { name = "pydantic" },
     { name = "pyyaml" },
     { name = "structlog" },
@@ -1298,7 +1298,7 @@ dependencies = [
 
 [package.optional-dependencies]
 intent = [
-    { name = "forge-core", extra = ["intent"] },
+    { name = "forge-os-core", extra = ["intent"] },
 ]
 opa = [
     { name = "requests" },
@@ -1306,8 +1306,8 @@ opa = [
 
 [package.metadata]
 requires-dist = [
-    { name = "forge-core", editable = "packages/forge-core" },
-    { name = "forge-core", extras = ["intent"], marker = "extra == 'intent'", editable = "packages/forge-core" },
+    { name = "forge-os-core", editable = "packages/forge-core" },
+    { name = "forge-os-core", extras = ["intent"], marker = "extra == 'intent'", editable = "packages/forge-core" },
     { name = "pydantic", specifier = ">=2.7,<3.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "requests", marker = "extra == 'opa'", specifier = ">=2.32" },
@@ -1320,7 +1320,7 @@ name = "forge-skills"
 version = "0.2.0"
 source = { editable = "packages/forge-skills" }
 dependencies = [
-    { name = "forge-core" },
+    { name = "forge-os-core" },
     { name = "pydantic" },
     { name = "pyyaml" },
     { name = "structlog" },
@@ -1328,13 +1328,13 @@ dependencies = [
 
 [package.optional-dependencies]
 intent = [
-    { name = "forge-core", extra = ["intent"] },
+    { name = "forge-os-core", extra = ["intent"] },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "forge-core", editable = "packages/forge-core" },
-    { name = "forge-core", extras = ["intent"], marker = "extra == 'intent'", editable = "packages/forge-core" },
+    { name = "forge-os-core", editable = "packages/forge-core" },
+    { name = "forge-os-core", extras = ["intent"], marker = "extra == 'intent'", editable = "packages/forge-core" },
     { name = "pydantic", specifier = ">=2.7,<3.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "structlog", specifier = ">=24.0,<26.0" },
@@ -1346,7 +1346,7 @@ name = "forge-spec"
 version = "0.2.0"
 source = { editable = "packages/forge-spec" }
 dependencies = [
-    { name = "forge-core" },
+    { name = "forge-os-core" },
     { name = "pydantic" },
     { name = "pyyaml" },
     { name = "structlog" },
@@ -1360,7 +1360,7 @@ llm = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", marker = "extra == 'llm'", specifier = ">=0.40" },
-    { name = "forge-core", editable = "packages/forge-core" },
+    { name = "forge-os-core", editable = "packages/forge-core" },
     { name = "pydantic", specifier = ">=2.7,<3.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "structlog", specifier = ">=24.0,<26.0" },
