@@ -8,7 +8,6 @@ on:
 permissions:
   contents: write
   id-token: write
-  attestations: write
 
 jobs:
   publish:
@@ -37,11 +36,6 @@ jobs:
           path: ./dist
           format: spdx-json
           output-file: forge-os.spdx.json
-
-      - name: Attest build provenance
-        uses: actions/attest-build-provenance@v1
-        with:
-          subject-path: dist/*
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
