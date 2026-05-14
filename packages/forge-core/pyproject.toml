@@ -37,6 +37,12 @@ intent = [
     "numpy>=1.26",
 ]
 
+[project.urls]
+Homepage = "https://github.com/angelnicolasc/forge"
+Repository = "https://github.com/angelnicolasc/forge"
+Issues = "https://github.com/angelnicolasc/forge/issues"
+Changelog = "https://github.com/angelnicolasc/forge/blob/main/CHANGELOG.md"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

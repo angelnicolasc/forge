@@ -32,6 +32,12 @@ skills = ["forge-skills==0.2.0"]
 spec = ["forge-spec==0.2.0"]
 review = ["forge-review==0.2.0"]
 
+[project.urls]
+Homepage = "https://github.com/angelnicolasc/forge"
+Repository = "https://github.com/angelnicolasc/forge"
+Issues = "https://github.com/angelnicolasc/forge/issues"
+Changelog = "https://github.com/angelnicolasc/forge/blob/main/CHANGELOG.md"
+
 [project.scripts]
 forge = "forge_cli.main:app"
 
