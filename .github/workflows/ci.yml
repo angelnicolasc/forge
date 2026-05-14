@@ -108,6 +108,7 @@ jobs:
 
       - name: Build all packages
         run: |
+          set -e
           for pkg in packages/*/; do
             echo "Building $pkg..."
             uv build --package $(basename $pkg) --out-dir dist/
@@ -141,10 +142,16 @@ jobs:
         run: |
           python -m venv /tmp/smoke
           /tmp/smoke/bin/pip install --upgrade pip
-          # Install from the wheels we just built; --find-links resolves
-          # the forge-* sub-packages (forge-core, forge-cli, etc.) from the
-          # local dist/ dir; external deps (pydantic, typer, …) come from PyPI.
-          /tmp/smoke/bin/pip install --find-links dist/ dist/forge_os-*.whl
+          # Pass every forge-* wheel as an explicit path so pip is forced to
+          # use our locally-built wheels (not any same-named package on PyPI).
+          # External runtime deps (pydantic, typer, rich, …) resolve from PyPI.
+          /tmp/smoke/bin/pip install \
+            dist/forge_core-*.whl \
+            dist/forge_adapters-*.whl \
+            dist/forge_memory-*.whl \
+            dist/forge_observe-*.whl \
+            dist/forge_cli-*.whl \
+            dist/forge_os-*.whl
 
       - name: Verify CLI + import
         run: |
