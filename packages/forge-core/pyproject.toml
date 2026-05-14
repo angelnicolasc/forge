@@ -1,5 +1,5 @@
 [project]
-name = "forge-core"
+name = "forge-os-core"
 version = "0.2.0"
 description = "Core orchestration engine for Forge — universal agent harness with self-evolution capabilities."
 readme = "README.md"

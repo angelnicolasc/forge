@@ -22,7 +22,7 @@ jobs:
         run: |
           mkdir -p dist
           for pkg in packages/*/; do
-            uv build --package $(basename $pkg) --out-dir dist/
+            uv build --directory "$pkg" --out-dir dist/
           done
 
       - name: Generate SBOM

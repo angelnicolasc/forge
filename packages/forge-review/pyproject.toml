@@ -20,7 +20,7 @@ classifiers = [
 ]
 keywords = ["agents", "llm", "review", "policy", "gates", "quality", "forge"]
 dependencies = [
-    "forge-core==0.2.0",
+    "forge-os-core==0.2.0",
     "pydantic>=2.7,<3.0",
     "structlog>=24.0,<26.0",
     "anyio>=4.0",

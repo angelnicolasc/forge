@@ -1,5 +1,5 @@
 [project]
-name = "forge-memory"
+name = "forge-os-memory"
 version = "0.2.0"
 description = "Living Collaborative Memory for Forge — hybrid vector + graph + symbolic knowledge base with versioning and provenance."
 readme = "README.md"
@@ -16,7 +16,7 @@ classifiers = [
 ]
 keywords = ["memory", "knowledge-base", "vector-db", "graph-db", "agents"]
 dependencies = [
-    "forge-core==0.2.0",
+    "forge-os-core==0.2.0",
     "pydantic>=2.7,<3.0",
     "structlog>=24.0,<26.0",
     "chromadb>=0.5",

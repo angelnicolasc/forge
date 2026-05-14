@@ -8,14 +8,14 @@ requires-python = ">=3.11"
 members = ["packages/*"]
 
 [tool.uv.sources]
-forge-core = { workspace = true }
-forge-adapters = { workspace = true }
-forge-memory = { workspace = true }
-forge-observe = { workspace = true }
-forge-cli = { workspace = true }
+forge-os-core = { workspace = true }
+forge-os-adapters = { workspace = true }
+forge-os-memory = { workspace = true }
+forge-os-observe = { workspace = true }
+forge-os-cli = { workspace = true }
 forge-os = { workspace = true }
 forge-rules = { workspace = true }
-forge-mcp = { workspace = true }
+forge-os-mcp = { workspace = true }
 forge-skills = { workspace = true }
 forge-spec = { workspace = true }
 forge-review = { workspace = true }

@@ -234,15 +234,20 @@ asyncio.run(main())
 
 ## Packages
 
-Forge ships as six composable packages. Installing `forge-os` pulls all of them.
+Forge ships as eleven composable packages. Installing `forge-os` pulls the core set; optional extras add the rest.
 
 | Package | Description |
 |---------|-------------|
-| `forge-core` | Types, protocols, `MetaOrchestrator`, evolution loop + FSM |
-| `forge-memory` | Living Collaborative Memory (vector + graph + symbolic) |
-| `forge-adapters` | LangGraph, CrewAI, AutoGen, generic-callable adapters |
-| `forge-observe` | OpenTelemetry tracing, FinOps cost model, REST + SSE API |
-| `forge-cli` | The `forge` command (`wrap`, `run`, `evolve`, `memory`, `doctor`, `observe`) |
+| `forge-os-core` | Types, protocols, `MetaOrchestrator`, evolution loop + FSM |
+| `forge-os-memory` | Living Collaborative Memory (vector + graph + symbolic) |
+| `forge-os-adapters` | LangGraph, CrewAI, AutoGen, generic-callable adapters |
+| `forge-os-observe` | OpenTelemetry tracing, FinOps cost model, REST + SSE API |
+| `forge-os-cli` | The `forge` command (`wrap`, `run`, `evolve`, `memory`, `doctor`, `observe`) |
+| `forge-os-mcp` | Model Context Protocol server and client bridges |
+| `forge-rules` | Context-aware rule packs with conflict resolution |
+| `forge-skills` | Intent-based skill dispatch and SKILL.md loading |
+| `forge-spec` | Spec-driven acceptance criteria and SLSA Level 2 attestation |
+| `forge-review` | Parallel review agents and severity-based policy gates |
 | `forge-os` | Meta-package: installs everything |
 
 ---
