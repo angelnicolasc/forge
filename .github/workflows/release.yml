@@ -23,7 +23,7 @@ jobs:
           ROOT=$(pwd)
           mkdir -p "$ROOT/dist"
           for pkg in packages/*/; do
-            name=$(python3 -c "import tomllib; d=tomllib.load(open('${pkg}pyproject.toml','rb')); print(d['project']['name'])")
+            name=$(grep -m1 '^name = ' "${pkg}pyproject.toml" | sed 's/name = "\(.*\)"/\1/')
             echo "Building $name..."
             uv build --package "$name" --out-dir "$ROOT/dist"
           done
