@@ -23,7 +23,9 @@ jobs:
           ROOT=$(pwd)
           mkdir -p "$ROOT/dist"
           for pkg in packages/*/; do
-            uv build --directory "$pkg" --out-dir "$ROOT/dist"
+            name=$(python3 -c "import tomllib; d=tomllib.load(open('${pkg}pyproject.toml','rb')); print(d['project']['name'])")
+            echo "Building $name..."
+            uv build --package "$name" --out-dir "$ROOT/dist"
           done
 
       - name: Generate SBOM
