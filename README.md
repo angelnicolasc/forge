@@ -431,10 +431,10 @@ Forge ships as eleven composable packages. Installing `forge-os` pulls the core 
 | `forge-os-observe` | [![PyPI](https://img.shields.io/pypi/v/forge-os-observe.svg)](https://pypi.org/project/forge-os-observe/) | OpenTelemetry tracing, three-tier FinOps cost model, REST + SSE API |
 | `forge-os-cli` | [![PyPI](https://img.shields.io/pypi/v/forge-os-cli.svg)](https://pypi.org/project/forge-os-cli/) | `forge` command — 10 command groups, 30+ subcommands |
 | `forge-os-mcp` | [![PyPI](https://img.shields.io/pypi/v/forge-os-mcp.svg)](https://pypi.org/project/forge-os-mcp/) | MCP meta-orchestrator with 8-layer governance pipeline |
-| `forge-rules` | [![PyPI](https://img.shields.io/pypi/v/forge-rules.svg)](https://pypi.org/project/forge-rules/) | Context-aware rule packs — Deny/Require/Suggest with conflict resolution |
-| `forge-skills` | [![PyPI](https://img.shields.io/pypi/v/forge-skills.svg)](https://pypi.org/project/forge-skills/) | Intent-based skill dispatch and SKILL.md loading |
-| `forge-spec` | [![PyPI](https://img.shields.io/pypi/v/forge-spec.svg)](https://pypi.org/project/forge-spec/) | Spec-driven acceptance criteria and SLSA Level 2 attestation |
-| `forge-review` | [![PyPI](https://img.shields.io/pypi/v/forge-review.svg)](https://pypi.org/project/forge-review/) | Parallel review agents with P0–P3 severity and cascading policy gates |
+| `forge-rules` | *coming soon* | Context-aware rule packs — Deny/Require/Suggest with conflict resolution |
+| `forge-skills` | *coming soon* | Intent-based skill dispatch and SKILL.md loading |
+| `forge-spec` | *coming soon* | Spec-driven acceptance criteria and SLSA Level 2 attestation |
+| `forge-review` | *coming soon* | Parallel review agents with P0–P3 severity and cascading policy gates |
 | `forge-os` | [![PyPI](https://img.shields.io/pypi/v/forge-os.svg)](https://pypi.org/project/forge-os/) | Meta-package — installs core, CLI, adapters, memory, and observe |
 
 <br/>
