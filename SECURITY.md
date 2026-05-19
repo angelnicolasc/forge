@@ -13,7 +13,7 @@
 Report privately via GitHub Security Advisories:
 <https://github.com/angelnicolasc/forge/security/advisories/new>
 
-Or email the maintainer: **angelnicolascorzo@gmail.com** (PGP key available on
+Or email the maintainer: **nick.dicerutti@gmail.com** (PGP key available on
 request).
 
 Include:
