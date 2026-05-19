@@ -109,9 +109,12 @@ jobs:
       - name: Build all packages
         run: |
           set -e
+          ROOT=$(pwd)
+          mkdir -p "$ROOT/dist"
           for pkg in packages/*/; do
-            echo "Building $pkg..."
-            uv build --package $(basename $pkg) --out-dir dist/
+            name=$(grep -m1 '^name = ' "${pkg}pyproject.toml" | sed 's/name = "\(.*\)"/\1/')
+            echo "Building $name..."
+            uv build --package "$name" --out-dir "$ROOT/dist"
           done
 
       - name: Upload build artifacts
@@ -146,12 +149,12 @@ jobs:
           # use our locally-built wheels (not any same-named package on PyPI).
           # External runtime deps (pydantic, typer, rich, …) resolve from PyPI.
           /tmp/smoke/bin/pip install \
-            dist/forge_core-*.whl \
-            dist/forge_adapters-*.whl \
-            dist/forge_memory-*.whl \
-            dist/forge_observe-*.whl \
-            dist/forge_cli-*.whl \
-            dist/forge_os-*.whl
+            dist/forge_os_core-*.whl \
+            dist/forge_os_adapters-*.whl \
+            dist/forge_os_memory-*.whl \
+            dist/forge_os_observe-*.whl \
+            dist/forge_os_cli-*.whl \
+            dist/forge_os-0*.whl
 
       - name: Verify CLI + import
         run: |
