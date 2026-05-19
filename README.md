@@ -19,11 +19,7 @@
 
 ---
 
-<br/>
-
-<h2 align="center">What is Forge?</h2>
-
-<br/>
+## What is Forge?
 
 Forge is an **open-source, enterprise-grade agent harness** that wraps any multi-agent flow and gives it real-time cost tracking, cross-run memory, OpenTelemetry tracing, spec-driven governance, and an opt-in self-evolution loop — in one command.
 
@@ -60,15 +56,9 @@ Running task_id=a3f8b2c1...
 ╰─────────────────────────────────────────────────╯
 ```
 
-<br/>
-
 ---
 
-<br/>
-
-<h2 align="center">Why Forge?</h2>
-
-<br/>
+## Why Forge?
 
 | | Build from scratch | Forge |
 |---|:---:|:---:|
@@ -81,23 +71,15 @@ Running task_id=a3f8b2c1...
 | Audit trail | ✗ Log files | ✓ Full provenance chain |
 | Production-ready | ✗ Weeks | ✓ Day 1 |
 
-<br/>
-
 ---
 
-<br/>
+## Features
 
-<h2 align="center">Features</h2>
-
-<br/>
-
-<h3 align="center">🎯 Universal Drop-in Adapter</h3>
+### 🎯 Universal Drop-in Adapter
 
 Wraps **LangGraph**, **CrewAI**, **AutoGen**, or any async callable. No migration required. Framework is auto-detected from imports.
 
-<br/>
-
-<h3 align="center">🧬 Self-Evolution Loop</h3>
+### 🧬 Self-Evolution Loop
 
 Every run generates telemetry. The evolution loop analyzes it and proposes (or auto-applies) mutations:
 - **Prompt rewrites** — fix recurring error patterns via LLM-structured output (`PromptRewriteMutator`)
@@ -116,9 +98,7 @@ forge evolve status          # read the journal
 forge evolve resume my_flow.py   # re-arm the breaker
 ```
 
-<br/>
-
-<h3 align="center">🧠 Living Collaborative Memory</h3>
+### 🧠 Living Collaborative Memory
 
 A hybrid knowledge base that accumulates and retrieves knowledge across runs:
 - **Vector layer** (ChromaDB + sentence-transformers): semantic search over all agent outputs
@@ -134,9 +114,7 @@ forge memory ingest my_document.txt --tag topic=RAG
 forge memory status
 ```
 
-<br/>
-
-<h3 align="center">📊 Observability + FinOps</h3>
+### 📊 Observability + FinOps
 
 - OpenTelemetry tracing with per-agent spans — wire to any OTLP-compatible collector (Grafana Tempo, Datadog, Jaeger)
 - Real-time cost breakdown by agent and model — thinking tokens and cached input tokens tracked separately
@@ -150,9 +128,7 @@ forge doctor                   # diagnose your installation
 forge doctor update-pricing    # refresh the local pricing cache
 ```
 
-<br/>
-
-<h3 align="center">🔧 MCP Meta-Orchestrator</h3>
+### 🔧 MCP Meta-Orchestrator
 
 Routes, secures, and budgets all Model Context Protocol tool calls through an 8-layer governance pipeline:
 1. Tool routing (O(1) bidirectional index)
@@ -171,9 +147,7 @@ forge mcp serve                # expose Forge memory + evolution as MCP tools
 forge mcp status               # inspect budget and cache state
 ```
 
-<br/>
-
-<h3 align="center">📋 Rules Engine</h3>
+### 📋 Rules Engine
 
 Context-aware rule packs with a fixed precedence lattice and compile-time scope analysis:
 - **Deny > Require > Suggest** — precedence enforced at merge time, not at inference
@@ -188,9 +162,7 @@ forge rules explain --path "src/**"  # show which rules apply
 forge rules diff v1.yaml v2.yaml
 ```
 
-<br/>
-
-<h3 align="center">🎓 Skills Runtime</h3>
+### 🎓 Skills Runtime
 
 Intent-based skill dispatch with structured SKILL.md loading:
 - **SKILL.md format**: YAML frontmatter with name, description, examples, parameters, tools, timeout, budget, tags — compatible with Claude Code skill ecosystem
@@ -204,9 +176,7 @@ forge skills explain <name>    # describe parameters and examples
 forge skills run <name> <args> # invoke a skill
 ```
 
-<br/>
-
-<h3 align="center">📐 Spec-Driven Development</h3>
+### 📐 Spec-Driven Development
 
 Structured acceptance criteria, deterministic attestation, and evolution guardrails:
 - **SpecVerifier**: ASSERTION, REGEX, CONTAINS checks with per-criterion weighting
@@ -220,9 +190,7 @@ forge spec verify --spec my_feature.yaml --result run.json
 forge spec attest --spec my_feature.yaml   # generate provenance
 ```
 
-<br/>
-
-<h3 align="center">🔍 Review Agents & Policy Gates</h3>
+### 🔍 Review Agents & Policy Gates
 
 Parallel review pipeline with severity-based blocking:
 - **P0** — blocks unconditionally (security, data loss)
@@ -237,21 +205,13 @@ forge review run --context run.json
 forge review show --id <review_id>
 ```
 
-<br/>
-
-<h3 align="center">🩺 forge doctor</h3>
+### 🩺 forge doctor
 
 Diagnose a local install in one command: Python version, installed adapter extras, active memory backends, environment variable state, and optional network egress (`--network`).
 
-<br/>
-
 ---
 
-<br/>
-
-<h2 align="center">Architecture</h2>
-
-<br/>
+## Architecture
 
 ```
 ┌───────────────────────────────────────────────────────────────────────┐
@@ -301,15 +261,9 @@ Diagnose a local install in one command: Python version, installed adapter extra
 
 Full write-up in [docs/architecture.md](docs/architecture.md).
 
-<br/>
-
 ---
 
-<br/>
-
-<h2 align="center">Installation</h2>
-
-<br/>
+## Installation
 
 ```bash
 # Core harness + CLI (LangGraph, CrewAI, AutoGen adapters require extras)
@@ -331,17 +285,11 @@ pip install 'forge-os[review]'     # review agents + policy gates
 
 **Requirements**: Python 3.11+. No Docker required for local development.
 
-<br/>
-
 ---
 
-<br/>
+## Quickstart
 
-<h2 align="center">Quickstart</h2>
-
-<br/>
-
-<h3 align="center">1. Wrap an existing flow</h3>
+### 1. Wrap an existing flow
 
 ```python
 # my_flow.py
@@ -366,9 +314,7 @@ app = graph.compile()
 forge wrap my_flow.py --input '{"query": "What is RAG?"}'
 ```
 
-<br/>
-
-<h3 align="center">2. Enable memory and evolution</h3>
+### 2. Enable memory and evolution
 
 ```bash
 forge wrap my_flow.py \
@@ -376,9 +322,7 @@ forge wrap my_flow.py \
   --evolution
 ```
 
-<br/>
-
-<h3 align="center">3. Use the Python SDK</h3>
+### 3. Use the Python SDK
 
 ```python
 import asyncio
@@ -399,9 +343,7 @@ async def main():
 asyncio.run(main())
 ```
 
-<br/>
-
-<h3 align="center">4. Add a spec and enforce it through evolution</h3>
+### 4. Add a spec and enforce it through evolution
 
 ```bash
 forge spec init acceptance.yaml
@@ -411,15 +353,9 @@ forge wrap my_flow.py --spec acceptance.yaml --evolution
 # SpecConstraintGuard now blocks any mutation that would violate the spec
 ```
 
-<br/>
-
 ---
 
-<br/>
-
-<h2 align="center">Packages</h2>
-
-<br/>
+## Packages
 
 Forge ships as eleven composable packages. Installing `forge-os` pulls the core set; optional extras add the governance and tooling layers.
 
@@ -437,15 +373,9 @@ Forge ships as eleven composable packages. Installing `forge-os` pulls the core 
 | `forge-review` | *coming soon* | Parallel review agents with P0–P3 severity and cascading policy gates |
 | `forge-os` | [![PyPI](https://img.shields.io/pypi/v/forge-os.svg)](https://pypi.org/project/forge-os/) | Meta-package — installs core, CLI, adapters, memory, and observe |
 
-<br/>
-
 ---
 
-<br/>
-
-<h2 align="center">Environment Variables</h2>
-
-<br/>
+## Environment Variables
 
 | Variable | Default | Description |
 |---|---|---|
@@ -463,15 +393,9 @@ Forge ships as eleven composable packages. Installing `forge-os` pulls the core 
 | `FORGE_PRICING_TABLE_URL` | *(configured)* | URL used by `forge doctor update-pricing` to refresh the local pricing cache. |
 | `FORGE_OBSERVE_AGENT_BASE_URL` | *(empty)* | Base URL published in the A2A Agent Card at `/.well-known/agent.json`. |
 
-<br/>
-
 ---
 
-<br/>
-
-<h2 align="center">Roadmap</h2>
-
-<br/>
+## Roadmap
 
 **v0.2.0 is live** — the full governance platform (forge-spec, forge-review, forge-rules, forge-skills, forge-os-mcp) ships in this release alongside the core harness, adapters, memory, and observability stack.
 
@@ -485,28 +409,16 @@ Planned for upcoming releases:
 
 Anything that graduates to shipped must land with a row in [docs/feature-map.md](docs/feature-map.md).
 
-<br/>
-
 ---
 
-<br/>
-
-<h2 align="center">Contributing</h2>
-
-<br/>
+## Contributing
 
 Issues, bug reports, and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and open an issue at [github.com/angelnicolasc/forge/issues](https://github.com/angelnicolasc/forge/issues).
 
 Security reports: please read [SECURITY.md](SECURITY.md).
 
-<br/>
-
 ---
 
-<br/>
-
-<h2 align="center">License</h2>
-
-<br/>
+## License
 
 Apache 2.0 — enterprise-friendly, commercial use allowed. See [LICENSE](LICENSE).
