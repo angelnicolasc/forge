@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "forge-os-check"
+version = "0.1.0"
+description = "Compare saved agent results against a business rule in CI."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+dependencies = []
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3 :: Only",
+    "Environment :: Console",
+]
+
+[project.scripts]
+forge = "forge_check.cli:main"
+
+[project.urls]
+Repository = "https://github.com/angelnicolasc/forge"
+Documentation = "https://github.com/angelnicolasc/forge/blob/main/docs/check.md"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/forge_check"]
