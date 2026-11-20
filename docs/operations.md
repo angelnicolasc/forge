@@ -19,6 +19,19 @@ Shadow records candidate selection without dispatching candidate work. Check the
 
 `rollout-stop` changes future assignments. Use `forge rollback` to reverse a promotion at the current generation. Use `forge revision-revoke --event ID --revision DIGEST` to block new dispatch intents under an unsafe revision. An intent already recorded at the time of revocation can still reach the destination. Reconcile it by attempt ID. The ticket system retains prior effects and controls any compensation. `forge verify` reports observed traffic. `rollout-status` gives the observed eligible root count for the configured source.
 
+### Read the traffic counters
+
+In builds that include `traffic_by_cohort`, `forge rollout-status` returns one row per observed cohort. A rollout starts with an empty list. The counters cover its lifetime, including activity from existing roots after assignment stops. Each child belongs to its root's cohort.
+
+| Field | Meaning |
+| --- | --- |
+| `allocated_roots` | Distinct roots assigned to this cohort, including roots with no calls. |
+| `roots_with_dispatch_intent` | Roots for which the binding recorded at least one dispatch intent. |
+| `dispatch_intents` | Distinct attempts that reached the dispatch boundary. A replay or cache hit introduces no additional intent. |
+| `roots_pending_confirmation` | Roots with a dispatch in flight, an uncertain outcome, or missing confirmation of its outcome or charge. A reservation awaiting its first dispatch intent appears in the root's budget. |
+
+An intent records a local decision to send. Use the destination journal to confirm arrival. A `shadow` row counts traffic served by the stable revision. The rollout's `exposure_microusd` covers canary roots. A root can have several attempts and contributes at most one to each root count. In 0.4.0, use the allocation report, binding receipts and destination journal to establish these counts.
+
 ## Alias leases and dispatch authority
 
 Get a short actor-scoped lease with `forge alias-lease --lease lease-1 --ttl-seconds 15`. Pass its ID with `forge wrap --alias-lease lease-1` when the alias reader is unavailable. The writer checks the lease and its expiry, along with current dispatch permissions and budget. Alias changes or revision revocation can invalidate it. A host with an independent ledger can attest only its own spending and traffic.

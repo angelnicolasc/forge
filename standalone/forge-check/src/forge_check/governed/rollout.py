@@ -256,6 +256,23 @@ def rollout_view(conn: Connection, row: Row, now: int) -> dict[str, Any]:
             (row["id"],),
         )
     )
+    # Join on the root so child attempts contribute to their assigned cohort.
+    traffic = conn.execute(
+        """WITH per_root AS (
+               SELECT a.cohort, a.root_id, COUNT(t.dispatched_at) AS intents,
+                      MAX(CASE WHEN t.dispatched_at IS NOT NULL AND
+                          (t.status IN ('dispatching', 'uncertain') OR
+                           t.confirmation != 'verified' OR t.charge_microusd IS NULL)
+                          THEN 1 ELSE 0 END) AS pending
+                 FROM rollout_allocations a LEFT JOIN attempts t ON t.root_id = a.root_id
+                WHERE a.rollout_id = ? GROUP BY a.cohort, a.root_id
+           )
+           SELECT cohort, COUNT(*) AS allocated_roots,
+                  SUM(intents > 0) AS roots_with_dispatch_intent,
+                  SUM(intents) AS dispatch_intents, SUM(pending) AS roots_pending_confirmation
+             FROM per_root GROUP BY cohort ORDER BY cohort""",
+        (row["id"],),
+    )
     state = "open"
     if row["stopped_at"] is not None:
         state = "stopped"
@@ -270,5 +287,6 @@ def rollout_view(conn: Connection, row: Row, now: int) -> dict[str, Any]:
         exposure_microusd=exposure,
         eligible_observed_roots=sum(int(item["roots"]) for item in grouped),
         allocations=[dict(item) for item in grouped],
+        traffic_by_cohort=[dict(item) for item in traffic],
     )
     return view

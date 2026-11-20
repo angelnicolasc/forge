@@ -1,97 +1,21 @@
-# Forge
+# Forge Check
 
-**Universal Agent Harness — Drop your agents. Watch them evolve, remember and win.**
+Use Forge Check to decide whether an agent change is safe to promote under a rule your team owns. Start with saved results in CI. Add a governed binding when you also need to authorize a call, reserve its budget and record what happened.
 
----
+## Get your first verdict
 
-!!! tip "2026 is not the year of models. It's the year of harnesses."
-    Models are commodity. The harness is the new moat.
+The support example follows 24 synthetic tickets. An independent read of the queue finds that two tickets marked complete still needed a human. The example runs on the base `forge-os-check` wheel using Python 3.11 or newer. It requires no model credentials. [Install 0.4.0 and run the support example](check.md#try-the-support-example)
 
-## What is Forge?
+| What you need to do | Where to start |
+|---|---|
+| Compare a candidate against a baseline in your own CI | [Export a case and interpret exit codes](check.md#supply-a-case-from-your-own-agent) |
+| Authorize a tool call and inspect its receipt | [Run a governed binding on one host](governed.md) |
+| Decide whether a conditional step was skipped | [Read the inventory evidence and the Gate's verdict](conditional-evidence.md) |
+| Compose multiple approved reads in one program | [Enable the experimental Linux x86_64 Code Mode extra](code-mode.md) |
+| Limit a rollout, stop future dispatches or restore the ledger | [Operate a canary and recover](operations.md) |
 
-Forge is the **first open-source, enterprise-grade harness** that:
+A **revision** fixes the manifest a task runs under. A **receipt** records a binding decision and the associated call. The **Gate** evaluates the evidence tied to a proposed revision and produces the verdict an operator needs before promotion. [Design decisions](decisions/index.md)
 
-- **Wraps any framework** (LangGraph, CrewAI, AutoGen, or any async callable) in a single command
-- **Self-evolves** — rewrites prompts, swaps models, culls dead agents, and optimizes topology automatically
-- **Remembers everything** — Living Collaborative Memory (vector + graph + symbolic) persists knowledge across runs, projects, and teams
-- **Ships production-ready** — OpenTelemetry tracing, per-agent FinOps cost tracking, provenance-backed audit trails
+## Earlier Forge harness
 
-## Quickstart
-
-```bash
-pip install forge-os
-forge wrap my_langgraph_flow.py --input '{"query": "What is RAG?"}'
-```
-
-A few seconds later you'll see:
-
-```
-⚡ FORGE — Universal Agent Harness
-
-✓ Detected: langgraph  (12ms)
-
-Running task_id=a3f8b2c1...
-
-╭─ Run Info ────────────────────────────────╮
-│ Status   ✓ COMPLETED                      │
-│ Duration 4.2s                             │
-╰───────────────────────────────────────────╯
-
-╭─ Cost Breakdown ──────────────────────────╮
-│ agent: researcher   $0.00420              │
-│ agent: writer       $0.00180              │
-│ TOTAL               $0.00600             │
-╰───────────────────────────────────────────╯
-
-╭─ Agent Topology ──────────────────────────╮
-│ ⚙ [orchestrator] Supervisor              │
-│ ├── [research] Researcher (claude-sonnet) │
-│ └── [writing]  Writer (claude-haiku)      │
-╰───────────────────────────────────────────╯
-```
-
-## Why Forge?
-
-| | Build from scratch | Forge |
-|---|---|---|
-| Multi-framework support | ✗ Manual | ✓ Drop-in |
-| Cost tracking | ✗ Manual | ✓ Real-time |
-| Self-optimization | ✗ You | ✓ Autonomous |
-| Cross-run memory | ✗ None | ✓ Hybrid KB |
-| Enterprise audit trail | ✗ Logs | ✓ Provenance |
-| Production-ready | ✗ Weeks | ✓ Day 1 |
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    forge wrap my_flow.py                │
-└────────────────────────┬────────────────────────────────┘
-                         │
-              ┌──────────▼──────────┐
-              │   MetaOrchestrator  │  (forge-core)
-              │   Auto-detects and  │
-              │   instruments flow  │
-              └──┬──────────────────┘
-                 │
-    ┌────────────┼────────────────────────┐
-    │            │                        │
-┌───▼───┐  ┌────▼────┐  ┌───────────────▼─────────────┐
-│Adapter│  │Observe  │  │  Living Collaborative Memory │
-│       │  │OTel +   │  │  Vector + Graph + Symbolic   │
-│Lang   │  │FinOps   │  │  Versioned + Provenance      │
-│Graph/ │  │Dashboard│  └─────────────────────────────┘
-│CrewAI/│  └─────────┘
-│AutoGen│       │
-└───────┘  ┌────▼────────────────────┐
-           │   Evolution Loop        │
-           │   Observe → Hypothesize │
-           │   → Mutate → Evaluate   │
-           │   → Commit / Rollback   │
-           └─────────────────────────┘
-```
-
-## Community
-
-- **GitHub**: [github.com/angelnicolasc/forge](https://github.com/angelnicolasc/forge)
-- **Issues & feature requests**: [github.com/angelnicolasc/forge/issues](https://github.com/angelnicolasc/forge/issues)
+The multi-package harness has its own CLI, framework adapters, memory and tracing. Give it a separate environment from Forge Check because both CLIs use the executable name `forge`. [Harness quickstart](quickstart.md) · [Architecture](architecture.md) · [Feature map](feature-map.md)
