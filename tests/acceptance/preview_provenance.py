@@ -13,9 +13,11 @@ import subprocess
 import sys
 import tempfile
 import zipfile
+from collections import deque
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
-from urllib import request
+from urllib import error, request
 
 
 def digest(data: bytes) -> str:
@@ -86,70 +88,176 @@ def altered_bundle(original: dict, case: str, output: Path) -> str:
 
 
 def index_probes(verifier: Path, manifest: dict, wheel: bytes) -> dict:
-    check_index = runpy.run_path(str(verifier))["check_index"]
+    main = runpy.run_path(str(verifier))["main"]
     version, filename = manifest["version"], manifest["wheel"]
     expected = digest(wheel)
 
     class Index:
-        def __init__(self, responses: dict[str, bytes]) -> None:
-            self.responses = responses
-            self.requests: list[str] = []
+        def __init__(self, responses: list[tuple[str, bytes | int]]) -> None:
+            self.responses = deque(responses)
 
         def open(self, url: str, *, timeout: int) -> io.BytesIO:
-            self.requests.append(url)
-            return io.BytesIO(self.responses[url])
+            if not self.responses:
+                raise RuntimeError(f"Unexpected index request: {url}")
+            expected_url, response = self.responses.popleft()
+            if url != expected_url:
+                raise RuntimeError(f"Expected {expected_url}, got {url}")
+            if isinstance(response, int):
+                raise error.HTTPError(url, response, "synthetic response", {}, None)
+            return io.BytesIO(response)
 
-    fixtures = {}
+    def invoke(
+        index: str, responses: list[tuple[str, bytes | int]], *, probe=True, release=version
+    ):
+        origin = Index(responses)
+        argv = [
+            str(verifier),
+            "verify-index",
+            "--index",
+            index,
+            "--version",
+            release,
+            "--wheel-sha256",
+            expected,
+        ]
+        if probe:
+            argv.append("--probe")
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with (
+            patch.object(request, "build_opener", return_value=origin),
+            patch("time.sleep"),
+            patch.object(sys, "argv", argv),
+            redirect_stdout(stdout),
+            redirect_stderr(stderr),
+        ):
+            status = main()
+        if origin.responses:
+            raise RuntimeError(f"Verifier did not complete its expected requests to {index}")
+        output = stdout.getvalue()
+        return status, json.loads(output) if output else None, stderr.getvalue()
+
+    def rejects(index, responses, reason, **options):
+        status, output, diagnostic = invoke(index, responses, **options)
+        if status != 1 or output is not None or reason not in diagnostic:
+            raise RuntimeError(f"Incorrect index rejection for {index}: {status} {diagnostic}")
+
+    results = {}
     for index, metadata_host, file_host in (
         ("testpypi", "test.pypi.org", "test-files.pythonhosted.org"),
         ("pypi", "pypi.org", "files.pythonhosted.org"),
     ):
         metadata_url = f"https://{metadata_host}/pypi/forge-os-check/{version}/json"
         wheel_url = f"https://{file_host}/packages/{filename}"
-        metadata = {
-            "info": {"name": "forge-os-check", "version": version},
-            "urls": [{"filename": filename, "url": wheel_url, "digests": {"sha256": expected}}],
+        item = {
+            "filename": filename,
+            "url": wheel_url,
+            "digests": {"sha256": expected},
+            "yanked": False,
         }
-        fixtures[index] = (metadata_url, wheel_url, metadata)
+        metadata = {"info": {"name": "forge-os-check", "version": version}, "urls": [item]}
+        expected_receipt = {
+            "index": index,
+            "version": version,
+            "wheel_sha256": expected,
+            "bytes": len(wheel),
+        }
+        status, absent, diagnostic = invoke(index, [(metadata_url, 404)])
+        if status != 0 or absent != {"index": index, "version": version, "state": "absent"}:
+            raise RuntimeError(f"Index did not identify a release 404: {diagnostic}")
+        live = [(metadata_url, encode(metadata)), (wheel_url, wheel)]
+        status, present, diagnostic = invoke(index, live)
+        if status != 0 or present != {**expected_receipt, "state": "verified"}:
+            raise RuntimeError(f"Index did not verify the exact published bytes: {diagnostic}")
 
-    results = {}
-    for index, (metadata_url, wheel_url, metadata) in fixtures.items():
-        args = argparse.Namespace(index=index, version=version, wheel_sha256=expected)
-        origin = Index({metadata_url: encode(metadata), wheel_url: wheel})
-        with patch.object(request, "build_opener", return_value=origin):
-            approval = check_index(args)
-        if (
-            approval["index"] != index
-            or approval["wheel_sha256"] != expected
-            or origin.requests != [metadata_url, wheel_url]
-        ):
-            raise RuntimeError(f"Verifier did not read the approved bytes from {index}")
-        results[index] = approval
+        # Read-back allows an index to start propagating after the uploader completes.
+        delayed = [(metadata_url, 404), (metadata_url, encode({**metadata, "urls": []}))]
+        status, receipt, diagnostic = invoke(index, [*delayed, *live], probe=False)
+        if status != 0 or receipt != expected_receipt:
+            raise RuntimeError(f"Read-back changed its retry behavior or receipt: {diagnostic}")
 
-    def rejects(args: argparse.Namespace, index: Index, reason: str) -> None:
-        with patch.object(request, "build_opener", return_value=index):
-            try:
-                check_index(args)
-            except ValueError as error:
-                if reason in str(error):
-                    return
-                raise RuntimeError(f"Wrong index rejection: {error}") from error
-        raise RuntimeError("Production verification approved unexpected index evidence")
+        cases = {
+            "missing_wheel": (
+                {**metadata, "urls": []},
+                "Expected exactly one published wheel",
+            ),
+            "alternate_section": (
+                {**metadata, "urls": [], "releases": {version: [item]}},
+                "Expected exactly one published wheel",
+            ),
+            "alternate_distribution": (
+                {**metadata, "urls": [{**item, "filename": "forge_os_check-0.4.0.tar.gz"}]},
+                "Expected exactly one published wheel",
+            ),
+            "extra_distribution": (
+                {**metadata, "urls": [item, {**item, "filename": "alternate.tar.gz"}]},
+                "Index contains an unapproved distribution",
+            ),
+            "alternate_release": (
+                {**metadata, "info": {**metadata["info"], "version": "0.4.0rc3"}},
+                "Index metadata does not identify the approved release",
+            ),
+            "malformed_files": (
+                {**metadata, "urls": "not an array"},
+                "Index metadata must provide a list",
+            ),
+            "metadata_digest_mismatch": (
+                {**metadata, "urls": [{**item, "digests": {"sha256": "0" * 64}}]},
+                "Index reports a different wheel digest",
+            ),
+            "yanked_exact": (
+                {**metadata, "urls": [{**item, "yanked": True}]},
+                "Approved wheel is yanked",
+            ),
+            "untyped_yank_flag": (
+                {**metadata, "urls": [{**item, "yanked": 0}]},
+                "Approved wheel is yanked",
+            ),
+            "missing_yank_flag": (
+                {
+                    **metadata,
+                    "urls": [{key: value for key, value in item.items() if key != "yanked"}],
+                },
+                "Approved wheel is yanked",
+            ),
+            "wrong_wheel_host": (
+                {**metadata, "urls": [{**item, "url": f"https://example.invalid/{filename}"}]},
+                "Unexpected wheel origin",
+            ),
+        }
+        for document, reason in cases.values():
+            rejects(index, [(metadata_url, encode(document))], reason)
+        rejects(
+            index,
+            [(metadata_url, encode({**metadata, "urls": [{**item, "yanked": True}]}))],
+            "Approved wheel is yanked",
+            probe=False,
+        )
+        rejects(
+            index,
+            [(metadata_url, encode(metadata)), (wheel_url, wheel + b"altered")],
+            "Published file bytes differ",
+        )
+        rejects(index, [(metadata_url, b"{")], "Preview artifact rejected")
+        rejects(index, [(metadata_url, 503)], "Preview transfer failed")
+        rejects(
+            index, [(metadata_url, encode(metadata)), (wheel_url, 404)], "Preview transfer failed"
+        )
+        results[index] = {
+            "absent": absent,
+            "present": present,
+            "read_back": receipt,
+            "rejected": [
+                *cases,
+                "altered_bytes",
+                "malformed_json",
+                "metadata_service_unavailable",
+                "wheel_download_404",
+                "yanked_read_back",
+            ],
+        }
 
-    production = argparse.Namespace(index="pypi", version=version, wheel_sha256=expected)
-    metadata_url, wheel_url, metadata = fixtures["pypi"]
-    altered = Index({metadata_url: encode(metadata), wheel_url: wheel + b"altered"})
-    rejects(production, altered, "Published file bytes differ")
-    if altered.requests != [metadata_url, wheel_url]:
-        raise RuntimeError("Byte mismatch probe did not reach the expected PyPI wheel URL")
-    metadata["urls"][0]["url"] = f"https://test-files.pythonhosted.org/packages/{filename}"
-    wrong_host = Index({metadata_url: encode(metadata)})
-    rejects(production, wrong_host, "Unexpected wheel origin")
-    if wrong_host.requests != [metadata_url]:
-        raise RuntimeError("Production verification attempted to fetch from a different index")
-    preview = argparse.Namespace(index="pypi", version="0.4.0rc3", wheel_sha256=expected)
-    rejects(preview, Index({}), "Production requires a final version")
-    results["negative"] = ["altered_bytes", "wrong_wheel_host", "prerelease_to_production"]
+    rejects("pypi", [], "Production requires a final version", release="0.4.0rc3")
+    results["production_prerelease_rejected"] = True
     return results
 
 

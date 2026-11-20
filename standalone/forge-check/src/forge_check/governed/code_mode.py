@@ -542,7 +542,7 @@ class CodeMode:
             )
         except (LedgerError, StoreError, sqlite3.Error, PermissionError):
             raise _ProgramAbortError("subcall_unresolved") from None
-        if response.attempt.get("status") in ("uncertain", "dispatching", "reserved"):
+        if response.requires_reconciliation:
             raise _ProgramAbortError("subcall_unresolved")
         if response.attempt.get("reason") == "invalid_binding_input":
             raise _ProgramAbortError("invalid_arguments")

@@ -112,4 +112,20 @@ Review the sealed ZIP for public disclosure before running intake. The TestPyPI 
 3. Invoke **Promote standalone stable to PyPI** with the same four approvals and the approved TestPyPI run ID and attempt. The read-only job re-verifies the sealed bundle, checks the TestPyPI receipt, and downloads and hashes the wheel again from TestPyPI. Keep the PyPI deployment approval pending until the reviewer has checked the Vast consumer evidence and recorded the go/no-go.
 4. Compare the published PyPI receipt with the approved wheel digest. Keep the separate TestPyPI and PyPI receipts with the Vast evidence. Investigate any post-upload failure before attempting the same version again.
 
+## Recover an ambiguous upload
+
+Before sending a wheel, the publisher checks the selected index. It uploads only when the version is absent. If the official index already has the exact, unyanked wheel, the workflow skips upload and checks the bytes again. A mismatched digest, unexpected distribution or failed index lookup stops the upload.
+
+Every publication receipt records the preflight state, the upload step's raw outcome and the result of reading back the official index.
+
+| Receipt state | Meaning |
+|---|---|
+| `trusted-upload-verified` | The version was absent, the Trusted Publishing action reported success, and the exact approved wheel was read back. |
+| `recovered-index-verified` | The exact approved wheel is available. The upload step failed or was skipped because those bytes already existed. This receipt does not establish which publisher uploaded them. |
+| `index-unverified` | The official read-back did not confirm the wheel. The workflow fails and retains its diagnostic receipt. |
+
+Preserve the run ID, attempt, receipt and original evidence outside GitHub before the Actions artifacts expire. After a failure, inspect the official index for the approved version and digest before deciding whether to rerun. A stable rerun uses **Re-run all jobs** to regenerate the artifacts for that attempt. Keep `skip-existing: false`.
+
+Production accepts a `trusted-upload-verified` TestPyPI receipt by default. For a `recovered-index-verified` receipt, the maintainer must record the recovery decision for that exact attempt, dispatch with `allow_recovered_testpypi: true` and approve the production environment. The production receipt preserves the TestPyPI state. The normal Vast consumer and rollback checks still apply.
+
 [GitHub PR trigger security](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request_target) · [Trusted Publishing](https://docs.pypi.org/trusted-publishers/using-a-publisher/)

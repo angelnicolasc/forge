@@ -17,7 +17,7 @@ PRIVATE_OUTPUT = "FORGE_SYNTHETIC_PRIVATE_OUTPUT"
 @dataclass(frozen=True)
 class Behavior:
     mode: str = "ok"
-    charge: int = 13_000
+    charge: int | None = 13_000
     outcome: str = "succeeded"
     confirmation: str = "verified"
 
@@ -100,7 +100,7 @@ class Oracle(ThreadingHTTPServer):
                 "confirmation": behavior.confirmation,
                 "charge_microusd": behavior.charge,
                 "provider_ref": effect_id or f"ref-{attempt_id}",
-                "charge_ref": f"charge-{attempt_id}",
+                "charge_ref": f"charge-{attempt_id}" if behavior.charge is not None else None,
                 "upstream_status": 200,
                 "result": {"ticket_id": ticket, "label": "human"},
             }

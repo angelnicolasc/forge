@@ -31,6 +31,18 @@ class Invocation:
     attempt: dict[str, object]
     result: dict[str, object] | None = None
 
+    @property
+    def requires_reconciliation(self) -> bool:
+        """Whether the provider outcome or final charge is still unresolved."""
+        status = self.attempt.get("status")
+        return status in ("reserved", "dispatching", "uncertain") or (
+            status == "succeeded"
+            and (
+                self.attempt.get("confirmation") != "verified"
+                or self.attempt.get("charge_microusd") is None
+            )
+        )
+
 
 @dataclass(frozen=True)
 class StreamEvent:
@@ -166,7 +178,7 @@ class Host:
                 result = legacy_result
             elif observation.outcome == "succeeded":
                 result = _legacy_agent_result(admission, legacy_result)
-        elif observation.outcome == "succeeded":
+        elif observation.outcome == "succeeded" and observation.confirmation == "verified":
             try:
                 result = contract.project(raw)
             except ValueError:
@@ -182,6 +194,9 @@ class Host:
         except LedgerError as exc:
             raise TransportError("Provider observation could not be applied") from exc
         disposition = "invalid_result" if result_projection == "rejected" else "dispatch"
+        invocation = Invocation(disposition, attempt)
+        if invocation.requires_reconciliation:
+            return invocation
         return Invocation(disposition, attempt, result)
 
     def _interrupted(self, attempt_id: str, *, cancelled: bool = False) -> Invocation:

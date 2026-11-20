@@ -654,16 +654,22 @@ def check_index(args: argparse.Namespace) -> dict[str, Any]:
     metadata_origin, wheel_origins = _INDEXES[args.index]
     url = f"https://{metadata_origin}/pypi/{_PROJECT}/{args.version}/json"
     opener = request.build_opener(request.ProxyHandler({}), _NoRedirect())
+    identity = {"index": args.index, "version": args.version}
     for retry in range(7):
         try:
             with opener.open(url, timeout=20) as response:
                 metadata = report(read_limited(response, _MAX_MEMBER))
-            file = [entry for entry in metadata["urls"] if entry["filename"] == filename]
-            if file:
-                break
         except error.HTTPError as exception:
             if exception.code != 404:
                 raise
+            if args.probe:
+                return {**identity, "state": "absent"}
+        else:
+            files = metadata["urls"]
+            require(isinstance(files, list), "Index metadata must provide a list of release files")
+            matches = [entry for entry in files if entry["filename"] == filename]
+            if args.probe or matches:
+                break
         if retry == 6:
             raise ValueError(f"Published wheel never appeared on {metadata_origin}")
         time.sleep(10)
@@ -671,10 +677,11 @@ def check_index(args: argparse.Namespace) -> dict[str, Any]:
         metadata["info"]["name"] == _PROJECT and metadata["info"]["version"] == args.version,
         "Index metadata does not identify the approved release",
     )
-    require(len(file) == 1, "Expected exactly one published wheel")
-    if final:
-        require(len(metadata["urls"]) == 1, "Stable index contains an unapproved distribution")
-    item = file[0]
+    require(len(matches) == 1, "Expected exactly one published wheel")
+    if args.probe or final:
+        require(len(files) == 1, "Index contains an unapproved distribution")
+    item = matches[0]
+    require(item.get("yanked") is False, "Approved wheel is yanked or its status is missing")
     require(
         item["digests"]["sha256"] == args.wheel_sha256, "Index reports a different wheel digest"
     )
@@ -690,12 +697,10 @@ def check_index(args: argparse.Namespace) -> dict[str, Any]:
     with opener.open(item["url"], timeout=30) as response:
         wheel = read_limited(response, _MAX_MEMBER)
     require(hmac.compare_digest(digest(wheel), args.wheel_sha256), "Published file bytes differ")
-    return {
-        "index": args.index,
-        "version": args.version,
-        "wheel_sha256": args.wheel_sha256,
-        "bytes": len(wheel),
-    }
+    receipt = {**identity, "wheel_sha256": args.wheel_sha256, "bytes": len(wheel)}
+    if args.probe:
+        receipt["state"] = "verified"
+    return receipt
 
 
 def main() -> int:
@@ -734,6 +739,7 @@ def main() -> int:
     transfer.add_argument("--output", type=Path, required=True)
     index = actions.add_parser("verify-index")
     index.add_argument("--index", choices=tuple(_INDEXES), default="testpypi")
+    index.add_argument("--probe", action="store_true", help="Check whether the exact wheel exists")
     index.add_argument("--version", required=True)
     index.add_argument("--wheel-sha256", required=True)
     args = parser.parse_args()

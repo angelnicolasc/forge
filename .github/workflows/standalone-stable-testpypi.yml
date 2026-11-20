@@ -168,29 +168,65 @@ jobs:
           [[ ${#files[@]} -eq 1 && "${files[0]-}" == "$wheel" && -f "$wheel" && ! -L "$wheel" ]]
           printf '%s  %s\n' "$WHEEL_SHA" "$wheel" | sha256sum --check --strict
 
+      - name: Probe the approved version on TestPyPI
+        id: probe
+        run: |
+          set -euo pipefail
+          python3 .github/standalone/preview_artifact.py verify-index --index testpypi --probe \
+            --version "$RELEASE_VERSION" --wheel-sha256 "$WHEEL_SHA" > "$RUNNER_TEMP/index-probe.json"
+          state="$(jq -er '.state | select(. == "absent" or . == "verified")' "$RUNNER_TEMP/index-probe.json")"
+          printf 'state=%s\n' "$state" >> "$GITHUB_OUTPUT"
+
       - name: Publish the approved wheel to TestPyPI
+        id: upload
+        if: steps.probe.outputs.state == 'absent'
+        continue-on-error: true
         uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # v1.13.0
         with:
           repository-url: https://test.pypi.org/legacy/
           packages-dir: .standalone-publish/
           skip-existing: false
 
-      - name: Verify the published bytes and record the exact attempt
+      - name: Read back the exact index bytes and record the upload outcome
+        id: readback
+        if: ${{ !cancelled() && steps.probe.outcome == 'success' }}
+        env:
+          INDEX_BEFORE: ${{ steps.probe.outputs.state }}
+          UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
         run: |
           set -euo pipefail
-          python3 .github/standalone/preview_artifact.py verify-index --index testpypi \
-            --version "$RELEASE_VERSION" --wheel-sha256 "$WHEEL_SHA" > "$RUNNER_TEMP/index.json"
-          jq --arg commit "$CANDIDATE_SHA" --arg bundle "$BUNDLE_SHA" --arg vast "$VAST_ID" \
+          case "$INDEX_BEFORE:$UPLOAD_OUTCOME" in
+            absent:success) publication_state=trusted-upload-verified ;;
+            absent:failure|verified:skipped) publication_state=recovered-index-verified ;;
+            *) echo "Index probe and upload outcomes disagree" >&2; exit 1 ;;
+          esac
+          if python3 .github/standalone/preview_artifact.py verify-index --index testpypi \
+            --version "$RELEASE_VERSION" --wheel-sha256 "$WHEEL_SHA" > "$RUNNER_TEMP/index.json" &&
+            bytes="$(jq -er '.bytes | select(type == "number" and . > 0)' "$RUNNER_TEMP/index.json")"; then
+            :
+          else
+            bytes=null
+            publication_state=index-unverified
+          fi
+          jq -n --arg index "testpypi" --arg version "$RELEASE_VERSION" --arg digest "$WHEEL_SHA" \
+            --arg commit "$CANDIDATE_SHA" --arg bundle "$BUNDLE_SHA" --arg vast "$VAST_ID" \
+            --arg index_before "$INDEX_BEFORE" --arg upload_outcome "$UPLOAD_OUTCOME" \
+            --arg publication_state "$publication_state" --argjson bytes "$bytes" \
             --argjson run "$GITHUB_RUN_ID" --argjson attempt "$GITHUB_RUN_ATTEMPT" \
-            '{schema: 1, index: "testpypi", commit: $commit, bundle_sha256: $bundle,
-              vast_lab_id: $vast, workflow_run: $run, workflow_attempt: $attempt,
-              version, wheel_sha256, bytes}' \
-            "$RUNNER_TEMP/index.json" > "$RUNNER_TEMP/testpypi-receipt.json"
+            '{schema: 2, index: $index, version: $version, wheel_sha256: $digest,
+              commit: $commit, bundle_sha256: $bundle, vast_lab_id: $vast, bytes: $bytes,
+              workflow_run: $run, workflow_attempt: $attempt, index_before: $index_before,
+              upload_outcome: $upload_outcome, publication_state: $publication_state}' \
+            > "$RUNNER_TEMP/testpypi-receipt.json"
+          [[ "$publication_state" != index-unverified ]]
 
-      - name: Preserve the TestPyPI receipt
+      - name: Preserve publication evidence
+        if: ${{ !cancelled() && (steps.readback.outcome == 'success' || steps.readback.outcome == 'failure') }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: standalone-stable-testpypi-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/testpypi-receipt.json
+          path: |
+            ${{ runner.temp }}/testpypi-receipt.json
+            ${{ runner.temp }}/index-probe.json
           if-no-files-found: error
           retention-days: 30

@@ -356,6 +356,54 @@ def verify_p05(oracle: Oracle) -> dict:
     return {"model": model, "tool": ticket, "receipts": receipts}
 
 
+def _provisional_successes(world: World, oracle: Oracle) -> list[dict]:
+    common = ("--db", str(world.db), "--provider", oracle.origin)
+    observations = []
+    for name, behavior, pending in (
+        ("P06-ACK", Behavior(confirmation="acknowledged"), 0),
+        ("P06-NO-CHARGE", Behavior(charge=None), 50_000),
+    ):
+        oracle.arrange(name, behavior)
+        provisional = world.cli(
+            "wrap",
+            *common,
+            "--actor",
+            OPERATOR,
+            "--task",
+            name,
+            "--worker",
+            "worker-A",
+            "--binding",
+            TICKET,
+            "--operation",
+            name,
+            "--attempt",
+            name,
+            "--input",
+            json.dumps({"ticket_id": name}),
+            status=2,
+        )
+        attempt = latest(provisional)
+        require(attempt["status"] == "succeeded", "Provider outcome disappeared from evidence")
+        require(provisional["result"] is None, "Provisional success exposed a result")
+        require(world.ledger.balance(name)["pending_microusd"] == pending, "Wrong pending charge")
+        with oracle.changed:
+            key = (attempt["operation_key"], name)
+            oracle.outcomes[key] = {
+                **oracle.outcomes[key],
+                "observation_id": f"final-{name}",
+                "confirmation": "verified",
+                "charge_microusd": 13_000,
+                "charge_ref": f"charge-{name}",
+            }
+        settled = world.cli("reconcile", *common, "--actor", OWNER, "--attempt", name)
+        require(latest(settled)["confirmation"] == "verified", "Final observation was not verified")
+        require(world.ledger.balance(name)["pending_microusd"] == 0, "Final charge did not settle")
+        require(len(oracle.dispatches(name)) == 1, "Reconciliation resent the operation")
+        observations.append({"provisional": provisional, "settled": settled})
+    return observations
+
+
 def verify_p06(oracle: Oracle) -> dict:
     restricted = World("P06-policy", oracle, manifest(allowed=(MODEL,)))
     restricted.task("P06-policy-root")
@@ -423,6 +471,7 @@ def verify_p06(oracle: Oracle) -> dict:
         len(dispatches) == 1 and dispatches[0]["effect_created"],
         "Acknowledgement replay duplicated effect",
     )
+    provisional = _provisional_successes(world, oracle)
     world.task("P06-revocation-root")
     preflight = world.ledger.admit(
         request("P06-revocation-root", "P06-revocation", "P06-revocation")
@@ -444,6 +493,7 @@ def verify_p06(oracle: Oracle) -> dict:
         "denials": [latest(policy), latest(principal), latest(override)],
         "initial": latest(ambiguous),
         "foreign_observation": latest(mismatched),
+        "provisional_successes": provisional,
         "confirmed": latest(confirmed),
         "destination": dispatches,
         "revoked_after_admission": revoked,
