@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import selectors
 import signal
@@ -11,9 +12,11 @@ import subprocess
 import sys
 import time
 from dataclasses import asdict, dataclass
+from importlib.util import find_spec
 from threading import Event, Timer
 from typing import TYPE_CHECKING, Literal
 
+from forge_check.governed import rollout
 from forge_check.governed._code_wire import (
     MAX_ARGUMENT_BYTES,
     MAX_FRAME_BYTES,
@@ -24,16 +27,21 @@ from forge_check.governed._code_wire import (
     encode,
     write_frame,
 )
+from forge_check.governed.binding_contract import (
+    normalize_schema,
+    operation_contract,
+    validate_instance,
+)
 from forge_check.governed.control import now_micros, require_role
-from forge_check.governed.db import StoreError
+from forge_check.governed.db import StoreError, require_dispatch_authority
 from forge_check.governed.ledger import LedgerError, Request
 from forge_check.governed.revision import Revision, identifier
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-    from typing import IO
+    from typing import IO, Any
 
-    from forge_check.governed.host import Host, Invocation
+    from forge_check.governed.host import Host
 
 SCHEMA = (
     """CREATE TABLE code_programs (
@@ -45,16 +53,54 @@ SCHEMA = (
 )
 
 _WORKER = "forge_check.governed._code_worker"
+_MODEL_REPLY_BYTES = MAX_SOURCE_BYTES * 2
 _WORKER_REASONS = frozenset(
     {
         "runtime_unavailable",
         "wall_limit",
         "memory_limit",
         "output_limit",
+        "compilation_error",
+        "output_serialization",
         "program_error",
         "worker_error",
     }
 )
+
+
+def model_program_schema() -> dict[str, object]:
+    """Return the JSON envelope schema for a model-generated JavaScript program."""
+    return {
+        "type": "object",
+        "properties": {
+            "schema_version": {"type": "integer", "enum": [1]},
+            "source": {"type": "string", "minLength": 1},
+        },
+        "required": ["schema_version", "source"],
+        "additionalProperties": False,
+    }
+
+
+def parse_model_program(completion: str) -> str:
+    """Accept a single versioned JSON object without extracting or repairing text."""
+    try:
+        if not isinstance(completion, str) or len(completion.encode()) > _MODEL_REPLY_BYTES:
+            raise WireError("Invalid completion size")
+        payload = document(completion)
+        version, source = payload.get("schema_version"), payload.get("source")
+        if (
+            set(payload) != {"schema_version", "source"}
+            or type(version) is not int
+            or version != 1
+            or not isinstance(source, str)
+            or not source.strip()
+        ):
+            raise WireError("Invalid program envelope")
+        source.encode()
+        encode(source, MAX_SOURCE_BYTES)
+        return source
+    except (WireError, UnicodeError) as exc:
+        raise WireError("Expected one version 1 program JSON object") from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,6 +134,25 @@ class CodeRun:
     calls: int = 0
     attempt_ids: tuple[str, ...] = ()
 
+    @property
+    def failure_phase(
+        self,
+    ) -> Literal["format", "compilation", "output_contract", "runtime"] | None:
+        if self.reason is None:
+            return None
+        if self.reason == "invalid_model_program":
+            return "format"
+        if self.reason == "compilation_error":
+            return "compilation"
+        if self.reason in {
+            "invalid_program_output",
+            "subcall_output_contract",
+            "output_serialization",
+            "output_limit",
+        }:
+            return "output_contract"
+        return "runtime"
+
 
 class _ProgramAbortError(Exception):
     """Internal fixed reason returned when a program must stop."""
@@ -97,20 +162,21 @@ def _prefix(task_id: str, program_id: str) -> str:
     return "program." + hashlib.sha256(f"{task_id}\0{program_id}".encode()).hexdigest()
 
 
-def _allowed_result(invocation: Invocation, requested_ticket: str) -> dict[str, object]:
-    status = invocation.attempt.get("status", "denied")
-    confirmation = invocation.attempt.get("confirmation", "none")
-    projection: dict[str, str] | None = None
-    result = invocation.result
-    if result is not None and status in ("succeeded", "cached"):
-        try:
-            ticket_id = identifier(result.get("ticket_id"), "ticket ID")
-            label = identifier(result.get("label"), "ticket label")
-            if ticket_id == requested_ticket:
-                projection = {"ticket_id": ticket_id, "label": label}
-        except ValueError:
-            pass
-    return {"status": status, "confirmation": confirmation, "result": projection}
+def _read_pinned(
+    connection: sqlite3.Connection, actor: str, task_id: str
+) -> tuple[sqlite3.Row, Revision, sqlite3.Row]:
+    principal = require_role(connection, actor, "invoke")
+    row = connection.execute(
+        """SELECT t.actor, t.source, t.root_id, t.revision, r.canonical
+           FROM tasks t JOIN revisions r ON r.digest = t.revision WHERE t.id = ?""",
+        (task_id,),
+    ).fetchone()
+    if row is None or row["actor"] != actor or row["source"] != "code_mode":
+        raise PermissionError("Code Mode requires a task owned by that actor and source")
+    revision = Revision.from_canonical(bytes(row["canonical"]))
+    if revision.digest != row["revision"]:
+        raise StoreError("Pinned revision digest mismatch")
+    return row, revision, principal
 
 
 class _Worker:
@@ -183,6 +249,89 @@ class CodeMode:
         self.enabled = enabled
         self.bindings = frozenset(identifier(binding, "binding") for binding in bindings)
 
+    def _read_bindings(self, revision: Revision) -> dict[str, dict[str, Any]]:
+        return {
+            binding: entry
+            for binding, entry in revision.document["bindings"].items()
+            if binding in self.bindings and entry["kind"] == "tool" and entry["effect"] == "read"
+        }
+
+    def _discover_bindings(
+        self, connection: sqlite3.Connection, revision: Revision, principal: sqlite3.Row
+    ) -> dict[str, dict[str, Any]]:
+        permitted = set(revision.document["policy"]["allowed_bindings"]) & set(
+            json.loads(principal["bindings"])
+        )
+        permitted.difference_update(
+            row[0] for row in connection.execute("SELECT binding_id FROM binding_suspensions")
+        )
+        return {
+            binding: entry
+            for binding, entry in self._read_bindings(revision).items()
+            if binding in permitted and entry["reserve_microusd"] is not None
+        }
+
+    def capabilities(self, actor: str, task_id: str) -> dict[str, object]:
+        """Describe this task's effective read operations without taking a reservation."""
+        info: dict[str, object] = {
+            "available": False,
+            "reason": None,
+            "bindings": {},
+            "model_program_schema": model_program_schema(),
+            "limits": asdict(CodeLimits()),
+        }
+        if not self.enabled:
+            return {**info, "reason": "disabled"}
+        identifier(actor, "actor")
+        identifier(task_id, "task ID")
+        with self.host.store.read() as connection:
+            task, revision, principal = _read_pinned(connection, actor, task_id)
+            info["revision"] = revision.digest
+            if sys.platform != "linux" or not find_spec("quickjs_rs") or not find_spec("wasmtime"):
+                return {**info, "reason": "runtime_unavailable"}
+            try:
+                require_dispatch_authority(connection)
+            except StoreError:
+                return {**info, "reason": "dispatch_fenced"}
+            if block := rollout.dispatch_block(connection, task, now_micros()):
+                return {**info, "reason": block}
+            advertised = {}
+            version = revision.document["schema_version"]
+            for binding, entry in self._discover_bindings(connection, revision, principal).items():
+                contract = operation_contract(version, entry)
+                advertised[binding] = {
+                    "input_schema": contract.input_schema,
+                    "output_schema": contract.output_schema,
+                }
+            return {**info, "available": True, "bindings": advertised}
+
+    def run_model(
+        self,
+        actor: str,
+        task_id: str,
+        program_id: str,
+        completion: str,
+        *,
+        inputs: object = None,
+        output_schema: object = None,
+        limits: CodeLimits | None = None,
+    ) -> CodeRun:
+        """Validate the model's envelope, then run its source under the same host policy."""
+        try:
+            source = parse_model_program(completion)
+        except WireError:
+            return CodeRun("aborted", "invalid_model_program")
+        return self._run(
+            actor,
+            task_id,
+            program_id,
+            source,
+            inputs=inputs,
+            output_schema=output_schema,
+            limits=limits,
+            discover_only=True,
+        )
+
     def run(
         self,
         actor: str,
@@ -191,7 +340,32 @@ class CodeMode:
         source: str,
         *,
         inputs: object = None,
+        output_schema: object = None,
         limits: CodeLimits | None = None,
+    ) -> CodeRun:
+        """Run an explicitly supplied JavaScript function body."""
+        return self._run(
+            actor,
+            task_id,
+            program_id,
+            source,
+            inputs=inputs,
+            output_schema=output_schema,
+            limits=limits,
+            discover_only=False,
+        )
+
+    def _run(
+        self,
+        actor: str,
+        task_id: str,
+        program_id: str,
+        source: str,
+        *,
+        inputs: object,
+        output_schema: object,
+        limits: CodeLimits | None,
+        discover_only: bool,
     ) -> CodeRun:
         if not self.enabled:
             return CodeRun("aborted", "disabled")
@@ -204,12 +378,13 @@ class CodeMode:
             raise ValueError("Expected a JavaScript function body")
         encode(source, MAX_SOURCE_BYTES)
         encode(inputs, MAX_INPUT_BYTES)
+        schema = None if output_schema is None else normalize_schema(output_schema)
         configured = CodeLimits() if limits is None else limits
         prefix = _prefix(task_id, program_id)
-        claim = self._claim(actor, task_id, program_id, prefix)
+        claim = self._claim(actor, task_id, program_id, prefix, discover_only=discover_only)
         if isinstance(claim, CodeRun):
             return claim
-        result = self._run_worker(actor, task_id, prefix, source, inputs, configured, claim)
+        result = self._run_worker(actor, task_id, prefix, source, inputs, configured, claim, schema)
         with self.host.store.write() as connection:
             connection.execute(
                 """UPDATE code_programs SET status = ?, reason = ?, finished_at = ?, calls = ?
@@ -224,18 +399,11 @@ class CodeMode:
         task_id: str,
         program_id: str,
         prefix: str,
+        *,
+        discover_only: bool,
     ) -> list[str] | CodeRun:
-        from forge_check.governed.db import require_dispatch_authority
-
         with self.host.store.write() as connection:
-            require_role(connection, actor, "invoke")
-            row = connection.execute(
-                """SELECT t.actor, t.source, t.revision, r.canonical
-                   FROM tasks t JOIN revisions r ON r.digest = t.revision WHERE t.id = ?""",
-                (task_id,),
-            ).fetchone()
-            if row is None or row["actor"] != actor or row["source"] != "code_mode":
-                raise PermissionError("Code Mode requires a task owned by that actor and source")
+            task, revision, principal = _read_pinned(connection, actor, task_id)
             current = connection.execute(
                 "SELECT task_id, actor, status, reason, calls FROM code_programs WHERE id = ?",
                 (program_id,),
@@ -256,22 +424,19 @@ class CodeMode:
                 )
 
             require_dispatch_authority(connection)
-            revision = Revision.from_canonical(bytes(row["canonical"]))
-            if revision.digest != row["revision"]:
-                raise StoreError("Pinned revision digest mismatch")
-            methods = [
-                binding
-                for binding, entry in revision.document["bindings"].items()
-                if binding in self.bindings
-                and entry["kind"] == "tool"
-                and entry["effect"] == "read"
-            ]
+            if discover_only and (block := rollout.dispatch_block(connection, task, now_micros())):
+                return CodeRun("aborted", block)
+            bindings = (
+                self._discover_bindings(connection, revision, principal)
+                if discover_only
+                else self._read_bindings(revision)
+            )
             connection.execute(
                 """INSERT INTO code_programs(id, task_id, actor, started_at, status)
                    VALUES (?, ?, ?, ?, 'running')""",
                 (program_id, task_id, actor, now_micros()),
             )
-            return sorted(methods)
+            return sorted(bindings)
 
     def _run_worker(
         self,
@@ -282,6 +447,7 @@ class CodeMode:
         inputs: object,
         limits: CodeLimits,
         bindings: list[str],
+        schema: dict[str, Any] | None,
     ) -> CodeRun:
         started = time.monotonic()
         calls = 0
@@ -314,6 +480,11 @@ class CodeMode:
                         tag = frame.get("type")
                         if tag == "result" and set(frame) == {"type", "value"}:
                             encode(frame["value"], limits.output_bytes)
+                            if schema is not None:
+                                try:
+                                    validate_instance(frame["value"], schema)
+                                except ValueError:
+                                    raise _ProgramAbortError("invalid_program_output") from None
                             return CodeRun(
                                 "completed",
                                 output=frame["value"],
@@ -361,19 +532,26 @@ class CodeMode:
         if not isinstance(arguments, dict):
             raise _ProgramAbortError("invalid_arguments")
         encode(arguments, MAX_ARGUMENT_BYTES)
-        try:
-            ticket = identifier(arguments.get("ticket_id"), "ticket ID")
-        except ValueError:
-            raise _ProgramAbortError("invalid_arguments") from None
         # Keep the full bounded input for the host's validation. The worker never receives
         # the admission snapshot or full provider response.
         attempts.append(operation_id)
         try:
             response = self.host.invoke(
-                Request(task_id, actor, operation_id, operation_id, binding, arguments)
+                Request(task_id, actor, operation_id, operation_id, binding, arguments),
+                agent_view=True,
             )
         except (LedgerError, StoreError, sqlite3.Error, PermissionError):
             raise _ProgramAbortError("subcall_unresolved") from None
         if response.attempt.get("status") in ("uncertain", "dispatching", "reserved"):
             raise _ProgramAbortError("subcall_unresolved")
-        worker.send(_allowed_result(response, ticket))
+        if response.attempt.get("reason") == "invalid_binding_input":
+            raise _ProgramAbortError("invalid_arguments")
+        if response.disposition == "invalid_result":
+            raise _ProgramAbortError("subcall_output_contract")
+        worker.send(
+            {
+                "status": response.attempt.get("status", "denied"),
+                "confirmation": response.attempt.get("confirmation", "none"),
+                "result": response.result,
+            }
+        )

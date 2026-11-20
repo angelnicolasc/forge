@@ -1,0 +1,119 @@
+name: Publish standalone preview to TestPyPI
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_run:
+        description: Successful standalone candidate workflow run ID
+        type: string
+        required: true
+      candidate_attempt:
+        description: Approved attempt number within that run
+        type: string
+        required: true
+      candidate_sha:
+        description: Exact source SHA approved for this preview
+        type: string
+        required: true
+      vast_id:
+        description: Approved Vast instance ID
+        type: string
+        required: true
+      bundle_sha256:
+        description: Approved evidence bundle SHA-256
+        type: string
+        required: true
+      wheel_sha256:
+        description: Approved wheel SHA-256
+        type: string
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: standalone-preview-testpypi
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'angelnicolasc/forge' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: standalone-preview-testpypi
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    env:
+      CANDIDATE_RUN: ${{ inputs.candidate_run }}
+      CANDIDATE_ATTEMPT: ${{ inputs.candidate_attempt }}
+      CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+      VAST_ID: ${{ inputs.vast_id }}
+      BUNDLE_SHA: ${{ inputs.bundle_sha256 }}
+      WHEEL_SHA: ${{ inputs.wheel_sha256 }}
+      BASELINE_SHA: ${{ vars.STANDALONE_BASELINE_SHA256 }}
+    steps:
+      - name: Check out publisher from protected main
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Authenticate the candidate workflow run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$CANDIDATE_RUN" =~ ^[1-9][0-9]*$ ]]
+          [[ "$CANDIDATE_ATTEMPT" =~ ^[1-9][0-9]*$ ]]
+          workflow_id="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/standalone-preview-candidate.yml" --jq .id)"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${CANDIDATE_RUN}" | jq -e \
+            --argjson workflow "$workflow_id" --argjson attempt "$CANDIDATE_ATTEMPT" \
+            --arg repository "$GITHUB_REPOSITORY" '
+              .workflow_id == $workflow and .event == "workflow_dispatch" and
+              .status == "completed" and .conclusion == "success" and
+              .head_branch == "main" and .run_attempt == $attempt and
+              .head_repository.full_name == $repository
+            ' > /dev/null
+
+      - name: Download the approved immutable candidate
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: standalone-preview-${{ inputs.candidate_attempt }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.candidate_run }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/approved-preview
+
+      - name: Stage exactly the approved wheel
+        run: |
+          set -euo pipefail
+          python3 .github/standalone/preview_artifact.py verify \
+            --bundle "$RUNNER_TEMP/approved-preview/standalone-preview.zip" \
+            --bundle-sha256 "$BUNDLE_SHA" --commit "$CANDIDATE_SHA" --wheel-sha256 "$WHEEL_SHA" \
+            --baseline-sha256 "$BASELINE_SHA" --vast-id "$VAST_ID" --stage .standalone-publish \
+            > "$RUNNER_TEMP/preview-approval.json"
+
+      - name: Publish approved bytes to TestPyPI
+        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # v1.13.0
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: .standalone-publish/
+          skip-existing: false
+
+      - name: Download and verify the published wheel bytes
+        run: |
+          set -euo pipefail
+          version="$(jq -er .version "$RUNNER_TEMP/preview-approval.json")"
+          python3 .github/standalone/preview_artifact.py verify-index \
+            --version "$version" --wheel-sha256 "$WHEEL_SHA" > "$RUNNER_TEMP/published-wheel.json"
+
+      - name: Preserve publication verification
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: standalone-preview-publication
+          path: |
+            ${{ runner.temp }}/preview-approval.json
+            ${{ runner.temp }}/published-wheel.json
+          if-no-files-found: error
+          retention-days: 30

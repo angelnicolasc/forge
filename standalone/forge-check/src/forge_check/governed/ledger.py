@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 from uuid import uuid4
 
 from forge_check.governed import rollout
+from forge_check.governed.binding_contract import operation_contract
 from forge_check.governed.db import require_dispatch_authority
 from forge_check.governed.revision import (
     MAX_SAFE_INTEGER,
@@ -22,6 +23,7 @@ from forge_check.governed.revision import (
 if TYPE_CHECKING:
     from sqlite3 import Connection, Row
 
+    from forge_check.governed.binding_contract import OperationContract
     from forge_check.governed.db import Store
 
 SCHEMA = (
@@ -95,7 +97,8 @@ SCHEMA = (
 
 Outcome = Literal["succeeded", "failed", "uncertain", "cancelled", "not_sent"]
 Confirmation = Literal["none", "acknowledged", "verified"]
-Disposition = Literal["dispatch", "cached", "replay", "denied"]
+Disposition = Literal["dispatch", "cached", "replay", "denied", "invalid_result"]
+ResultProjection = Literal["accepted", "rejected"]
 _CONFIRMATION_RANK = {"none": 0, "acknowledged": 1, "verified": 2}
 _TERMINAL = {"succeeded", "failed", "cancelled", "not_sent"}
 _RETRYABLE = {"failed", "cancelled", "uncertain", "not_sent"}
@@ -143,6 +146,7 @@ class Admission:
     effective: dict[str, Any] | None
     attempt: dict[str, Any]
     result: dict[str, object] | None = None
+    contract: OperationContract | None = None
 
 
 def _utc() -> int:
@@ -355,17 +359,27 @@ def _cache_row(conn: Connection, cache_key: str | None) -> Row | None:
     )
 
 
-def _fits_reference_binding(payload: dict[str, object], *, kind: str) -> bool:
+def _arguments_valid(payload: dict[str, object], contract: OperationContract) -> bool:
     try:
-        identifier(payload.get("ticket_id"), "ticket")
+        contract.validate_arguments(payload)
     except ValueError:
         return False
-    if kind == "tool":
-        return set(payload) == {"ticket_id"}
-    text = payload.get("text")
-    return (
-        set(payload) == {"ticket_id", "text"} and isinstance(text, str) and 0 < len(text) <= 20_000
-    )
+    return True
+
+
+def _result_projection(
+    conn: Connection, attempt: Row, observation_id: str | None = None
+) -> ResultProjection | None:
+    event = conn.execute(
+        """SELECT json_extract(body, '$.evidence.result_projection')
+           FROM receipts WHERE task_id = ? AND attempt_id = ?
+             AND phase IN ('observation', 'result_projection')
+             AND json_extract(body, '$.evidence.result_projection') IS NOT NULL
+             AND (? IS NULL OR json_extract(body, '$.evidence.observation_id') = ?)
+           ORDER BY seq DESC LIMIT 1""",
+        (attempt["task_id"], attempt["id"], observation_id, observation_id),
+    ).fetchone()
+    return cast("ResultProjection", event[0]) if event else None
 
 
 def _shadow_preview(conn: Connection, task: Row, request: Request) -> dict[str, Any] | None:
@@ -383,7 +397,9 @@ def _shadow_preview(conn: Connection, task: Row, request: Request) -> dict[str, 
         reason = "principal_denied"
     elif binding is None or request.binding_id not in document["policy"]["allowed_bindings"]:
         reason = "policy_denied"
-    elif not _fits_reference_binding(request.payload, kind=binding["kind"]):
+    elif not _arguments_valid(
+        request.payload, operation_contract(document["schema_version"], binding)
+    ):
         reason = "invalid_binding_input"
     elif binding["reserve_microusd"] is None:
         reason = "price_unknown"
@@ -450,9 +466,19 @@ class Ledger:
                     return Admission("denied", existing["reason"], request, None, view)
                 if not _has_grant(conn, request.principal, request.binding_id):
                     return Admission("denied", "principal_denied", request, None, {})
+                if (
+                    existing["status"] == "succeeded"
+                    and _result_projection(conn, existing) == "rejected"
+                ):
+                    return Admission(
+                        "invalid_result", "invalid_binding_output", request, None, view
+                    )
                 return Admission("replay", "attempt_exists", request, None, view)
 
             require_dispatch_authority(conn)
+            contract = (
+                operation_contract(document["schema_version"], effective) if effective else None
+            )
             operation_key = self._mac(
                 "operation-v1",
                 scope,
@@ -468,7 +494,9 @@ class Ledger:
                 "AND status != 'denied' ORDER BY rowid DESC LIMIT 1",
                 (request.task_id, request.operation_id),
             ).fetchone()
-            denial = self._denial(conn, task, request, document, effective, previous, operation_key)
+            denial = self._denial(
+                conn, task, request, document, effective, contract, previous, operation_key
+            )
             cap = effective["reserve_microusd"] if effective else None
             ttl = (
                 effective["cache_ttl_seconds"]
@@ -488,6 +516,16 @@ class Ledger:
                 else None
             )
             cached = _cache_row(conn, cache_key) if not denial else None
+            cached_result: dict[str, object] | None = None
+            if cached is not None:
+                try:
+                    stored = json.loads(cached["result"])
+                    cached_result = (
+                        contract.project(stored) if contract and not contract.legacy else stored
+                    )
+                except ValueError:
+                    conn.execute("DELETE FROM read_cache WHERE cache_key = ?", (cache_key,))
+                    cached = None
             if not denial and cached is None and cap is not None:
                 balance = _balance(conn, task["root_id"], document["budget_microusd"])
                 if cap > balance["available_microusd"] or balance["over_limit_microusd"] > 0:
@@ -556,10 +594,8 @@ class Ledger:
                         "valid_until": cached["expires_at"],
                     },
                 )
-                return Admission(
-                    "cached", None, request, effective, view, json.loads(cached["result"])
-                )
-            return Admission("dispatch", None, request, effective, view)
+                return Admission("cached", None, request, effective, view, cached_result, contract)
+            return Admission("dispatch", None, request, effective, view, contract=contract)
 
     @staticmethod
     def _denial(
@@ -568,6 +604,7 @@ class Ledger:
         request: Request,
         document: dict[str, Any],
         binding: dict[str, Any] | None,
+        contract: OperationContract | None,
         previous: Row | None,
         operation_key: str,
     ) -> str | None:
@@ -579,7 +616,7 @@ class Ledger:
             return block
         if binding is None or request.binding_id not in document["policy"]["allowed_bindings"]:
             return "policy_denied"
-        if not _fits_reference_binding(request.payload, kind=binding["kind"]):
+        if contract is None or not _arguments_valid(request.payload, contract):
             return "invalid_binding_input"
         if binding["reserve_microusd"] is None:
             return "price_unknown"
@@ -637,7 +674,12 @@ class Ledger:
             return reason is None
 
     def settle(
-        self, attempt_id: str, observation: Observation, *, result: dict[str, object] | None = None
+        self,
+        attempt_id: str,
+        observation: Observation,
+        *,
+        result: dict[str, object] | None = None,
+        result_projection: ResultProjection | None = None,
     ) -> dict[str, Any]:
         """Record upstream evidence and an optional host-approved read-cache projection."""
         _validate_observation(observation)
@@ -653,16 +695,39 @@ class Ledger:
             if prior:
                 if not hmac.compare_digest(prior["fingerprint"], fingerprint):
                     raise LedgerConflictError("observation ID conflicts with existing evidence")
+                if (
+                    result_projection is not None
+                    and _result_projection(conn, attempt, observation.observation_id) is None
+                ):
+                    scope = _revision(conn, task["revision"]).document["scope"]
+                    _event(
+                        conn,
+                        attempt,
+                        task,
+                        "result_projection",
+                        scope=scope,
+                        detail={
+                            "observation_id": observation.observation_id,
+                            "result_projection": result_projection,
+                        },
+                    )
                 return _attempt_view(attempt, task)
             self._check_observable(attempt, observation)
             conn.execute(
                 "INSERT INTO attempt_observations VALUES (?, ?, ?)",
                 (attempt_id, observation.observation_id, fingerprint),
             )
-            scope = _revision(conn, task["revision"]).document["scope"]
-            updated = self._apply_observation(conn, attempt, task, scope, observation)
+            document = _revision(conn, task["revision"]).document
+            updated = self._apply_observation(
+                conn,
+                attempt,
+                task,
+                document["scope"],
+                observation,
+                result_projection=result_projection,
+            )
             if attempt["status"] == "dispatching":
-                self._cache_result(conn, updated, observation, result)
+                self._cache_result(conn, updated, observation, result, document)
             return _attempt_view(updated, task)
 
     @staticmethod
@@ -675,7 +740,14 @@ class Ledger:
             raise LedgerError("attempt has no dispatch intent")
 
     def _apply_observation(
-        self, conn: Connection, attempt: Row, task: Row, scope: str, observation: Observation
+        self,
+        conn: Connection,
+        attempt: Row,
+        task: Row,
+        scope: str,
+        observation: Observation,
+        *,
+        result_projection: ResultProjection | None,
     ) -> Row:
         amount, charge_disposition = self._observe_charge(conn, attempt, observation)
         previous_status = attempt["status"]
@@ -735,6 +807,8 @@ class Ledger:
             charge_disposition=charge_disposition,
             released_microusd=released,
         )
+        if result_projection is not None:
+            detail["result_projection"] = result_projection
         _event(conn, updated, task, "observation", scope=scope, detail=detail)
         if (
             detail["outcome_conflict"]
@@ -785,7 +859,11 @@ class Ledger:
 
     @staticmethod
     def _cache_result(
-        conn: Connection, attempt: Row, observation: Observation, result: dict[str, object] | None
+        conn: Connection,
+        attempt: Row,
+        observation: Observation,
+        result: dict[str, object] | None,
+        document: dict[str, Any],
     ) -> None:
         if (
             result is None
@@ -798,8 +876,11 @@ class Ledger:
         ):
             return
         try:
-            serialized = _json_object(result, "cache result", _MAX_CACHE_BYTES)
-        except LedgerError:
+            binding = document["bindings"][attempt["binding_id"]]
+            contract = operation_contract(document["schema_version"], binding)
+            projected = result if contract.legacy else contract.project(result)
+            serialized = _json_object(projected, "cache result", _MAX_CACHE_BYTES)
+        except (LedgerError, ValueError):
             return  # An unusable optional cache entry cannot discard provider evidence.
         conn.execute("DELETE FROM read_cache WHERE expires_at <= ?", (_utc(),))
         conn.execute(

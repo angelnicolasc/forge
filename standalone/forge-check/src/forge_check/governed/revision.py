@@ -1,4 +1,4 @@
-"""Validated immutable manifest for the direct support binding."""
+"""Validated immutable manifest for explicit governed bindings."""
 
 from __future__ import annotations
 
@@ -8,7 +8,8 @@ import re
 from dataclasses import dataclass
 from typing import Any, NoReturn, cast
 
-SCHEMA_VERSION = 1
+LEGACY_SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 VERIFIER = "forge-check/1"
 MAX_SAFE_INTEGER = (1 << 53) - 1
 _MAX_DOCUMENT_BYTES = 1_048_576
@@ -138,7 +139,7 @@ def _boolean(value: object, label: str) -> bool:
     return value
 
 
-def _binding(value: object) -> dict[str, Any]:
+def _binding(value: object, schema_version: int) -> dict[str, Any]:
     item = _object(value, "Binding")
     common = {"kind", "version", "contract", "tariff", "reserve_microusd"}
     options = {"idempotency", "cache_ttl_seconds"}
@@ -160,11 +161,16 @@ def _binding(value: object) -> dict[str, Any]:
     else:
         raise ValueError("Unsupported binding kind")
 
+    contract = _object(item["contract"], "Binding contract")
+    if schema_version == SCHEMA_VERSION:
+        from forge_check.governed.binding_contract import normalize_contract
+
+        contract = normalize_contract(contract)
     reserve = item["reserve_microusd"]
     result: dict[str, Any] = {
         "kind": kind,
         "version": identifier(item["version"], "binding version"),
-        "contract": _object(item["contract"], "Binding contract"),
+        "contract": contract,
         "tariff": identifier(item["tariff"], "tariff"),
         "reserve_microusd": None if reserve is None else integer(reserve, "reservation"),
         "idempotency": _boolean(item.get("idempotency", False), "idempotency"),
@@ -217,14 +223,18 @@ class Revision:
             },
             set(),
         )
-        if type(root["schema_version"]) is not int or root["schema_version"] != SCHEMA_VERSION:
+        version = root["schema_version"]
+        if type(version) is not int or version not in (LEGACY_SCHEMA_VERSION, SCHEMA_VERSION):
             raise ValueError("Unsupported revision schema version")
         bindings = {
-            identifier(key, "binding"): _binding(value)
+            identifier(key, "binding"): _binding(value, version)
             for key, value in _object(root["bindings"], "Binding catalog").items()
         }
-        if sorted(spec["kind"] for spec in bindings.values()) != ["model", "tool"]:
-            raise ValueError("The direct profile requires one model and one tool binding")
+        if not bindings:
+            raise ValueError("A revision requires at least one binding")
+        kinds = sorted(spec["kind"] for spec in bindings.values())
+        if version == LEGACY_SCHEMA_VERSION and kinds != ["model", "tool"]:
+            raise ValueError("Revision schema 1 requires one model and one tool binding")
         policy = _shape(root["policy"], "Admission policy", {"allowed_bindings"}, set())
         allowed = string_set(policy["allowed_bindings"], "allowed bindings")
         if set(allowed) - bindings.keys():
@@ -235,7 +245,7 @@ class Revision:
 
         canonical = canonical_json(
             {
-                "schema_version": SCHEMA_VERSION,
+                "schema_version": version,
                 "scope": identifier(root["scope"], "scope"),
                 "budget_microusd": integer(root["budget_microusd"], "root budget"),
                 "policy": {"allowed_bindings": allowed},
@@ -245,7 +255,7 @@ class Revision:
         )
         rev = object.__new__(cls)
         object.__setattr__(rev, "canonical", canonical)
-        object.__setattr__(rev, "digest", document_digest("forge.revision.v1", canonical))
+        object.__setattr__(rev, "digest", document_digest(f"forge.revision.v{version}", canonical))
         return rev
 
     @classmethod

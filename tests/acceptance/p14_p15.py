@@ -25,7 +25,7 @@ _PROGRAM = """return input.tickets.map(ticket_id => tools['support.lookup']({tic
 
 
 def _trial(report: dict[str, Any]) -> None:
-    from forge_check.governed.code_mode import CodeLimits, CodeMode
+    from forge_check.governed.code_mode import CodeLimits, CodeMode, model_program_schema
     from forge_check.governed.control import Control
     from forge_check.governed.db import Store
     from forge_check.governed.host import Host, HttpProvider
@@ -85,6 +85,18 @@ def _trial(report: dict[str, Any]) -> None:
             ticket = f"test.{name}"
             task(control, "direct", source="direct")
             task(control, "program")
+            catalog = executor.capabilities(OPERATOR, "program")
+            require(catalog["available"], "Executor unavailable in the clean extra profile")
+            expected_bindings = {TICKET} if allowed and grant else set()
+            require(set(catalog["bindings"]) == expected_bindings, "Leaked a restricted binding")
+            require(catalog["model_program_schema"] == model_program_schema(), "Wrong wire schema")
+            exposed = executor.run_model(
+                OPERATOR,
+                "program",
+                "discover",
+                json.dumps({"schema_version": 1, "source": "return Object.keys(tools);"}),
+            )
+            require(exposed.output == sorted(expected_bindings), "Model sandbox leaked a binding")
             direct = host.invoke(request("direct", "direct-first", ticket))
             second = host.invoke(request("direct", "direct-second", ticket))
             outcome = executor.run(
@@ -220,6 +232,82 @@ def _trial(report: dict[str, Any]) -> None:
             "Lost hold",
         )
 
+        task(control, "model-protocol")
+        output_schema = {
+            "type": "object",
+            "properties": {"count": {"type": "integer", "minimum": 0}},
+            "required": ["count"],
+            "additionalProperties": False,
+        }
+
+        def completion(source: str) -> str:
+            return json.dumps({"schema_version": 1, "source": source})
+
+        def from_model(name: str, response: str) -> dict[str, Any]:
+            run = executor.run_model(
+                OPERATOR, "model-protocol", name, response, output_schema=output_schema
+            )
+            return {**asdict(run), "failure_phase": run.failure_phase}
+
+        before_invalid = len(provider.dispatches())
+        malformed = [
+            "return {count: 1};",
+            f"```json\n{completion('return {count: 1};')}\n```",
+            '{"schema_version":true,"source":"return 1;"}',
+            '{"schema_version":2,"source":"return 1;"}',
+            '{"schema_version":1,"source":"return 1;","source":"return 2;"}',
+            '{"schema_version":1,"source":"return 1;","output_schema":{}}',
+        ]
+        diagnostics = {
+            "format": [from_model(f"wire-{index}", value) for index, value in enumerate(malformed)],
+            "compilation": from_model("compile", completion("return {")),
+            "runtime": from_model(
+                "runtime", completion(f"throw new SyntaxError({json.dumps(MARKER)});")
+            ),
+            "serialization": from_model("serialization", completion("return {count: undefined};")),
+            "valid": from_model("valid", completion("return {count: 1};")),
+        }
+        require(
+            {record["failure_phase"] for record in diagnostics["format"]} == {"format"},
+            "Model envelope accepted raw source, fences, unknown versions, duplicate or added fields",
+        )
+        require(diagnostics["compilation"]["failure_phase"] == "compilation", "No compile phase")
+        require(diagnostics["runtime"]["failure_phase"] == "runtime", "No runtime phase")
+        require(
+            diagnostics["serialization"]["reason"] == "output_serialization",
+            "Non-JSON data was silently transformed",
+        )
+        require(
+            diagnostics["valid"]["output"] == {"count": 1}, "Typed model result was not accepted"
+        )
+        require(
+            len(provider.dispatches()) == before_invalid, "Invalid program entered the provider"
+        )
+
+        invalid_output = from_model(
+            "output-contract",
+            completion(
+                "tools['support.lookup']({ticket_id: 'test.output-contract'});"
+                "return {count: 'one'};"
+            ),
+        )
+        require(
+            invalid_output["failure_phase"] == "output_contract"
+            and invalid_output["output"] is None,
+            "Invalid result crossed the output boundary",
+        )
+        require(
+            len(provider.dispatches("test.output-contract")) == 1, "Output error erased dispatch"
+        )
+        require(
+            host.ledger.balance("model-protocol")["consumed_microusd"] == 13_000,
+            "Output error erased known charges",
+        )
+        require(
+            from_model("output-contract", completion("return {count: 1};"))["status"] == "replay",
+            "A bad result allowed re-execution of the same program",
+        )
+
         report["P15"] = {
             "limits": [wall, cpu, memory, output, calls],
             "ambient": ambient,
@@ -229,6 +317,7 @@ def _trial(report: dict[str, Any]) -> None:
             "replay": asdict(replay),
             "program_error": error,
             "disabled": asdict(disabled),
+            "model_protocol": {**diagnostics, "output_contract": invalid_output},
         }
         artifact = json.dumps(report)
         require(

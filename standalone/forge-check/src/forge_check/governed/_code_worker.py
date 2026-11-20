@@ -28,15 +28,40 @@ _EVALUATE = """(function (source, names, data, limit) {
     Reflect.deleteProperty(globalThis, '__forge_rpc');
     const parse = JSON.parse;
     const stringify = JSON.stringify;
+    const finite = Number.isFinite;
+    const getPrototype = Object.getPrototypeOf;
+    const ordinary = Object.prototype;
+    const isArray = Array.isArray;
+    const engineError = globalThis.InternalError;
     const tools = Object.create(null);
     for (const name of names) {
         tools[name] = args => parse(rpc(name, stringify(args)));
     }
-    const run = Function('tools', 'input', '"use strict";\\n' + source);
-    const value = stringify(run(Object.freeze(tools), parse(data)));
-    if (value === undefined) throw new TypeError('Expected a JSON result');
-    return value.length > limit ? null : value;
+    let run;
+    try {
+        run = Function('tools', 'input', '"use strict";\\n' + source);
+    } catch (error) {
+        if (error instanceof SyntaxError) return '!compilation_error';
+        throw error;
+    }
+    const output = run(Object.freeze(tools), parse(data));
+    try {
+        const value = stringify(output, (_, item) => {
+            const type = typeof item;
+            if (item === null || type === 'string' || type === 'boolean') return item;
+            if (type === 'number' && finite(item)) return item;
+            if (type === 'object' && (isArray(item) || getPrototype(item) === ordinary ||
+                                     getPrototype(item) === null)) return item;
+            throw new TypeError('Expected JSON data');
+        });
+        return value.length > limit ? '!output_limit' : value;
+    } catch (error) {
+        if (typeof engineError === 'function' && error instanceof engineError) throw error;
+        return '!output_serialization';
+    }
 })"""
+
+_EVALUATION_FAILURES = frozenset({"!compilation_error", "!output_limit", "!output_serialization"})
 
 
 def _read_frame(stream: BinaryIO) -> dict[str, object]:
@@ -113,6 +138,9 @@ def _execute(stream: BinaryIO, config: dict[str, object]) -> None:
     except Exception:
         # Exceptions and stacks can contain source, input values, and provider details.
         write_frame(stream, {"type": "abort", "reason": "program_error"})
+        return
+    if isinstance(serialized, str) and serialized in _EVALUATION_FAILURES:
+        write_frame(stream, {"type": "abort", "reason": serialized[1:]})
         return
     if not isinstance(serialized, str) or len(serialized.encode("utf-8")) > output:
         write_frame(stream, {"type": "abort", "reason": "output_limit"})

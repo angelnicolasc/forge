@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from threading import Event
 
     from forge_check.governed.db import Store
-    from forge_check.governed.ledger import Admission, Request
+    from forge_check.governed.ledger import Admission, Request, ResultProjection
 
 _OUTCOMES = ("succeeded", "failed", "cancelled", "uncertain")
 _CONFIRMATIONS = ("none", "acknowledged", "verified")
@@ -59,7 +59,7 @@ def _provider_observation(
     *,
     attempt_id: str,
     operation_key: str,
-) -> tuple[Observation, dict[str, object] | None]:
+) -> tuple[Observation, object]:
     if document.get("attempt_id") != attempt_id or document.get("operation_key") != operation_key:
         raise TransportError("Provider observation refers to a different attempt")
     observation_id = _label(document, "observation_id")
@@ -75,7 +75,6 @@ def _provider_observation(
         or confirmation not in _CONFIRMATIONS
         or (charge is not None and (type(charge) is not int or not 0 <= charge <= _MAX_MICROUSD))
         or (status is not None and (type(status) is not int or not 100 <= status <= 599))
-        or (result is not None and not isinstance(result, dict))
     ):
         raise TransportError("Malformed provider observation")
     return (
@@ -89,7 +88,7 @@ def _provider_observation(
             upstream_status=status,
             charge_ref=_label(document, "charge_ref"),
         ),
-        cast("dict[str, object] | None", result),
+        result,
     )
 
 
@@ -107,8 +106,14 @@ def _body(admission: Admission, stream: bool) -> dict[str, object]:
     }
 
 
-def _cache_ticket(result: dict[str, object] | None) -> dict[str, object] | None:
-    if result is None or set(result) != {"ticket_id", "label"}:
+def _cache_ticket(
+    result: dict[str, object] | None, requested_ticket: object
+) -> dict[str, object] | None:
+    if (
+        result is None
+        or set(result) != {"ticket_id", "label"}
+        or result["ticket_id"] != requested_ticket
+    ):
         return None
     try:
         if _label(result, "ticket_id") is None or _label(result, "label") is None:
@@ -118,26 +123,66 @@ def _cache_ticket(result: dict[str, object] | None) -> dict[str, object] | None:
     return result
 
 
+def _legacy_agent_result(admission: Admission, raw: object) -> dict[str, object] | None:
+    contract = admission.contract
+    if contract is None:
+        return None
+    try:
+        result = contract.project(raw)
+    except ValueError:
+        return None
+    return result if result["ticket_id"] == admission.request.payload["ticket_id"] else None
+
+
 class Host:
-    """Reserve and record before using the model or ticket API configured by the operator."""
+    """Reserve and record before using an operation configured by the operator."""
 
     def __init__(self, store: Store, *, fingerprint_key: bytes, provider: HttpProvider) -> None:
         self.store = store
         self.ledger = Ledger(store, fingerprint_key=fingerprint_key)
         self.provider = provider
 
-    def _record_response(self, admission: Admission, document: dict[str, object]) -> Invocation:
+    def _record_response(
+        self, admission: Admission, document: dict[str, object], *, agent_view: bool = False
+    ) -> Invocation:
         attempt_id = admission.request.attempt_id
-        observation, result = _provider_observation(
+        observation, raw = _provider_observation(
             document, attempt_id=attempt_id, operation_key=str(admission.attempt["operation_key"])
         )
         binding = admission.effective or {}
-        projection = _cache_ticket(result) if binding.get("effect") == "read" else None
+        contract = admission.contract
+        if contract is None:
+            raise RuntimeError("Dispatch lacks its pinned operation contract")
+        result: dict[str, object] | None = None
+        cache: dict[str, object] | None = None
+        result_projection: ResultProjection | None = None
+        if contract.legacy:
+            if raw is not None and not isinstance(raw, dict):
+                raise TransportError("Malformed legacy provider result")
+            legacy_result = cast("dict[str, object] | None", raw)
+            if binding.get("effect") == "read":
+                cache = _cache_ticket(legacy_result, admission.request.payload["ticket_id"])
+            if not agent_view:
+                result = legacy_result
+            elif observation.outcome == "succeeded":
+                result = _legacy_agent_result(admission, legacy_result)
+        elif observation.outcome == "succeeded":
+            try:
+                result = contract.project(raw)
+            except ValueError:
+                result_projection = "rejected"
+            else:
+                result_projection = "accepted"
+                if binding.get("effect") == "read":
+                    cache = result
         try:
-            attempt = self.ledger.settle(attempt_id, observation, result=projection)
+            attempt = self.ledger.settle(
+                attempt_id, observation, result=cache, result_projection=result_projection
+            )
         except LedgerError as exc:
             raise TransportError("Provider observation could not be applied") from exc
-        return Invocation("dispatch", attempt, result)
+        disposition = "invalid_result" if result_projection == "rejected" else "dispatch"
+        return Invocation(disposition, attempt, result)
 
     def _interrupted(self, attempt_id: str, *, cancelled: bool = False) -> Invocation:
         observation = Observation(
@@ -148,21 +193,26 @@ class Host:
         )
         return Invocation("dispatch", self.ledger.settle(attempt_id, observation))
 
-    def _claim(self, admission: Admission) -> Invocation | None:
+    def _claim(self, admission: Admission, *, agent_view: bool = False) -> Invocation | None:
         if admission.disposition != "dispatch":
-            return Invocation(admission.disposition, admission.attempt, admission.result)
+            result = admission.result
+            if agent_view and admission.contract is not None and admission.contract.legacy:
+                result = _legacy_agent_result(admission, result)
+            return Invocation(admission.disposition, admission.attempt, result)
         if not self.ledger.mark_dispatched(admission.request.attempt_id):
             attempt = self.ledger.attempt(admission.request.attempt_id)
             return Invocation("denied", attempt)
         return None
 
-    def invoke(self, request: Request) -> Invocation:
+    def invoke(self, request: Request, *, agent_view: bool = False) -> Invocation:
         admission = self.ledger.admit(request)
-        ready = self._claim(admission)
+        ready = self._claim(admission, agent_view=agent_view)
         if ready is not None:
             return ready
         try:
-            return self._record_response(admission, self.provider.dispatch(_body(admission, False)))
+            return self._record_response(
+                admission, self.provider.dispatch(_body(admission, False)), agent_view=agent_view
+            )
         except _UNCONFIRMED_TRANSPORT:
             return self._interrupted(request.attempt_id)
 
@@ -199,7 +249,9 @@ class Host:
                         break
                     delta = frame.get("delta")
                     if frame.get("type") == "chunk" and isinstance(delta, str):
-                        yield StreamEvent("chunk", delta=delta)
+                        # New contracts expose the projected terminal object instead of raw text.
+                        if admission.contract is not None and admission.contract.legacy:
+                            yield StreamEvent("chunk", delta=delta)
                         if cancel is not None and cancel.is_set():
                             cancelled = True
                             break

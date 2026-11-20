@@ -1,0 +1,79 @@
+name: Standalone signature policy
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions: {}
+
+jobs:
+  signed-series:
+    if: github.repository == 'angelnicolasc/forge'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: standalone-signatures
+    permissions:
+      contents: read
+      statuses: write
+    env:
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      TRUST_BASE: ${{ vars.STANDALONE_TRUST_BASE }}
+      SIGNER_LINE: ${{ vars.STANDALONE_ALLOWED_SIGNER }}
+      SIGNER_PRINCIPAL: ${{ vars.STANDALONE_SIGNER_PRINCIPAL }}
+      SIGNER_FINGERPRINT: ${{ vars.STANDALONE_SIGNER_FINGERPRINT }}
+      STATUS_CONTEXT: forge/standalone-signed-series
+    steps:
+      - name: Mark the candidate SHA pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${HEAD_SHA}" \
+            -f state=pending -f context="$STATUS_CONTEXT" \
+            -f description="Verifying the signed candidate series" > /dev/null
+
+      - name: Check out verifier from the protected base
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify candidate Git objects without checking them out
+        id: series
+        run: |
+          set -euo pipefail
+          [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]]
+          [[ "$TRUST_BASE" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$TRUST_BASE" "$BASE_SHA"
+          git fetch --no-tags origin "refs/pull/${PR_NUMBER}/head"
+          [[ "$(git rev-parse FETCH_HEAD)" == "$HEAD_SHA" ]]
+          printf '%s\n' "$SIGNER_LINE" > "$RUNNER_TEMP/standalone-allowed-signers"
+          python3 .github/standalone/verify_signatures.py \
+            --base "$TRUST_BASE" --head "$HEAD_SHA" \
+            --allowed-signers "$RUNNER_TEMP/standalone-allowed-signers" \
+            --principal "$SIGNER_PRINCIPAL" --fingerprint "$SIGNER_FINGERPRINT"
+
+      - name: Set the required status on the candidate SHA
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ steps.series.outcome }}
+        run: |
+          set -euo pipefail
+          [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          if [[ "$RESULT" == success ]]; then
+            state=success
+            description="Signed series verified against protected trust"
+          else
+            state=failure
+            description="Signed series verification failed"
+          fi
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${HEAD_SHA}" \
+            -f state="$state" -f context="$STATUS_CONTEXT" -f description="$description" \
+            -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            > /dev/null

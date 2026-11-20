@@ -43,21 +43,6 @@ Quiesce old clients before `forge migrate --backup backups/pre-upgrade.sqlite3`.
 
 ## Experimental Code Mode
 
-Install the optional `code-mode` extra for the Linux JavaScript executor. The base wheel includes the direct binding. Enable Code Mode explicitly for a read-only binding allowlist and start tasks using `Control.start_task` with `source="code_mode"`.
+The [Code Mode guide](code-mode.md) describes the optional Linux executor, task-scoped discovery, the model response format and the result boundary. Each subcall uses the active dispatch authority for its pinned task. The direct binding remains available as its own route. Reconcile unresolved work before choosing a new operation.
 
-```python
-from forge_check.governed.code_mode import CodeMode
-
-executor = CodeMode(host, enabled=True, bindings=frozenset({"support.lookup"}))
-run = executor.run(
-    actor,
-    task_id,
-    "support-read-1",
-    "return tools['support.lookup']({ticket_id: input.ticket_id}).result;",
-    inputs={"ticket_id": "S07"},
-)
-```
-
-QuickJS WebAssembly runs in a separate bounded process. The host applies the normal admission, budget and receipt path for each subcall. The worker receives explicit input and normalized responses. Limits cover CPU, wall time, memory, output and calls. A program ID is single-use across processes. The watchdog can stop the worker while an already claimed call completes under the host's provider timeout. Its receipt and reservation remain in the ledger. Reconcile uncertain work before choosing a new operation. The local executor keeps credentials and binding authority in the host. A hosted executor adds a provider and a metered runtime to the trial. [QuickJS capabilities](https://github.com/langchain-ai/quickjs-rs/tree/e086fb48f9f2b56ff1ca14de8484a32208192bba#security) · [Wasmtime security model](https://github.com/bytecodealliance/wasmtime/blob/main/docs/security.md)
-
-Code Mode stays opt-in. The synthetic comparison measures the runtime mechanism. A release decision requires held-out evidence about program generation, the paired cost and success thresholds, and the pilot's latency SLO.
+Code Mode stays opt-in. Default selection requires held-out evidence about the model and task family, the paired cost and success thresholds, and the pilot's latency SLO.

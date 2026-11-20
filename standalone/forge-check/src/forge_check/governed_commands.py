@@ -154,7 +154,7 @@ def _invoke(options: argparse.Namespace, control: Control, host: Host) -> int:
     else:
         terminal = host.invoke(request)
     _emit(asdict(terminal))
-    return _attempt_exit(terminal.attempt)
+    return 2 if terminal.disposition == "invalid_result" else _attempt_exit(terminal.attempt)
 
 
 def _attempt_exit(attempt: dict[str, object]) -> int:
