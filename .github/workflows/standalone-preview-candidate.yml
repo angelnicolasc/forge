@@ -1,0 +1,95 @@
+name: Standalone preview candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: Exact candidate Git commit SHA
+        type: string
+        required: true
+      vast_id:
+        description: Vast instance ID from the approved reservation receipt
+        type: string
+        required: true
+      bundle_sha256:
+        description: SHA-256 of the sealed Vast evidence bundle
+        type: string
+        required: true
+      wheel_sha256:
+        description: SHA-256 of the wheel validated inside that bundle
+        type: string
+        required: true
+
+permissions: {}
+
+jobs:
+  accept:
+    if: github.repository == 'angelnicolasc/forge' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: standalone-preview-intake
+    permissions:
+      contents: read
+    env:
+      CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+      VAST_ID: ${{ inputs.vast_id }}
+      BUNDLE_SHA: ${{ inputs.bundle_sha256 }}
+      WHEEL_SHA: ${{ inputs.wheel_sha256 }}
+      BASELINE_SHA: ${{ vars.STANDALONE_BASELINE_SHA256 }}
+      TRUST_BASE: ${{ vars.STANDALONE_TRUST_BASE }}
+      SIGNER_LINE: ${{ vars.STANDALONE_ALLOWED_SIGNER }}
+      SIGNER_PRINCIPAL: ${{ vars.STANDALONE_SIGNER_PRINCIPAL }}
+      SIGNER_FINGERPRINT: ${{ vars.STANDALONE_SIGNER_FINGERPRINT }}
+    steps:
+      - name: Check out tools from protected main
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify signed source objects
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$TRUST_BASE" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$TRUST_BASE" "$GITHUB_SHA"
+          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' \
+            fetch --no-tags origin "$CANDIDATE_SHA"
+          [[ "$(git rev-parse FETCH_HEAD)" == "$CANDIDATE_SHA" ]]
+          printf '%s\n' "$SIGNER_LINE" > "$RUNNER_TEMP/standalone-allowed-signers"
+          python3 .github/standalone/verify_signatures.py \
+            --base "$TRUST_BASE" --head "$CANDIDATE_SHA" \
+            --allowed-signers "$RUNNER_TEMP/standalone-allowed-signers" \
+            --principal "$SIGNER_PRINCIPAL" --fingerprint "$SIGNER_FINGERPRINT" \
+            > "$RUNNER_TEMP/signatures.json"
+
+      - name: Retrieve the approved Vast evidence
+        env:
+          STANDALONE_VAST_BUNDLE_URL: ${{ secrets.STANDALONE_VAST_BUNDLE_URL }}
+          BUNDLE_HOST: ${{ vars.STANDALONE_VAST_BUNDLE_HOST }}
+        run: |
+          set -euo pipefail
+          python3 .github/standalone/preview_artifact.py fetch --host "$BUNDLE_HOST" \
+            --bundle-sha256 "$BUNDLE_SHA" --output "$RUNNER_TEMP/standalone-preview.zip"
+
+      - name: Gate the exact wheel and compatibility evidence
+        run: |
+          set -euo pipefail
+          python3 .github/standalone/preview_artifact.py verify --repo . \
+            --bundle "$RUNNER_TEMP/standalone-preview.zip" --bundle-sha256 "$BUNDLE_SHA" \
+            --commit "$CANDIDATE_SHA" --wheel-sha256 "$WHEEL_SHA" \
+            --baseline-sha256 "$BASELINE_SHA" --vast-id "$VAST_ID"
+
+      - name: Preserve one immutable promotion candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: standalone-preview-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/standalone-preview.zip
+            ${{ runner.temp }}/signatures.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
