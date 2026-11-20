@@ -148,7 +148,8 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
             check=True,
             cwd=folder,
         )
-    wheels = list(dist.iterdir())
+    # uv creates a .gitignore beside the distribution in a fresh output directory.
+    wheels = [entry for entry in dist.iterdir() if entry.name != ".gitignore"]
     require(len(wheels) == 1, "Build must produce exactly one wheel")
     wheel = wheels[0]
     data = read_file(wheel, _MAX_MEMBER)
