@@ -11,7 +11,8 @@ python3 .github/standalone/verify_signatures.py --repo "$CHECKOUT" \
   --base "$STANDALONE_TRUST_BASE" --head "$CANDIDATE_SHA" \
   --allowed-signers "$ALLOWED_SIGNERS" --principal "$STANDALONE_SIGNER_PRINCIPAL" \
   --fingerprint "$STANDALONE_SIGNER_FINGERPRINT"
-uv build "$CHECKOUT/standalone/forge-check" --no-sources --wheel --out-dir "$DIST"
+python3 .github/standalone/preview_artifact.py build --repo "$CHECKOUT" \
+  --commit "$CANDIDATE_SHA" --dist "$DIST" --output "$OUT/build.json"
 ```
 
 Run the preview acceptance scripts against that exact wheel in the designated Vast reservation. Supply the expected baseline SHA-256 from the maintainer's approved artifact record. For the third command, install the wheel and its Code Mode extra from the approved wheelhouse in a clean Python 3.12 environment. Preserve the original reports and the Vast reservation and closure receipts outside the ZIP.
@@ -23,17 +24,37 @@ python3 tests/acceptance/preview_release.py --wheel "$WHEEL" --sha256 "$WHEEL_SH
 python3 tests/acceptance/preview_onboarding.py --wheel "$WHEEL" --out "$ONBOARDING_OUTPUT"
 "$CODE_PYTHON" tests/acceptance/preview_bindings.py --wheel "$WHEEL" --output-dir "$BINDINGS_OUTPUT"
 "$CODE_PYTHON" examples/governed_inventory.py
+"$CODE_PYTHON" "$CHECKOUT/tests/acceptance/conditional_evidence.py" \
+  --wheel "$WHEEL" --output-dir "$CONDITIONAL_OUTPUT"
+"$CODE_PYTHON" "$CHECKOUT/tests/acceptance/conditional_gate_upgrade.py" \
+  --previous-wheel "$RC2_WHEEL" --wheel "$WHEEL" --output "$OUT/gate-upgrade.json"
 ```
 
 ```bash
-python3 .github/standalone/preview_artifact.py seal \
+python3 .github/standalone/preview_artifact.py seal --repo "$CHECKOUT" \
   --commit "$CANDIDATE_SHA" --wheel "$WHEEL" --wheel-sha256 "$WHEEL_SHA256" \
   --baseline-sha256 "$BASELINE_SHA256" --p23 "$P23_REPORT" \
   --onboarding "$ONBOARDING_REPORT" --bindings "$BINDINGS_REPORT" \
+  --build-report "$OUT/build.json" --conditional "$CONDITIONAL_OUTPUT/conditional-evidence.json" \
+  --gate-upgrade "$OUT/gate-upgrade.json" \
   --output "$OUT/standalone-preview.zip"
 ```
 
-Retain the printed bundle and wheel digests in the operator's independent approval record. Use the same archive for intake. To rehearse staging offline on Vast, use `verify` with that bundle, both digests, the baseline digest, candidate SHA, Vast ID and a new `--stage` directory. Repeat with a wrong wheel digest and a wrong bundle digest. Each rejection must leave its staging directory absent.
+From 0.4.0rc3 onward, build from the exact signed commit approved for promotion. The builder exports the package from Git objects into an isolated directory. Its receipt records the enclosing Git tree, package tree and wheel digest. Intake and publication look up both trees in the approved commit. They also require the conditional matrix for both routes, linked to the same wheel and Vast instance. RC1 and RC2 bundles retain their historical checks.
+
+The dedicated Gate upgrade receipt exercises historical RC2 decisions, running canaries and shadows, and legacy scopes against the candidate on the same ledger. The P23 receipt independently covers the 0.3.0 packaging upgrade.
+
+Retain the printed bundle and wheel digests in the operator's independent approval record. Use the same archive for intake. To rehearse staging offline on Vast, use `verify --repo "$CHECKOUT"` with that bundle, both digests, the baseline digest, candidate SHA, Vast ID and a new `--stage` directory. Repeat with a wrong wheel digest and a wrong bundle digest. Each rejection must leave its staging directory absent. For new bundles also attempt to seal a matrix missing one route and a build receipt from a different commit. Each failure must leave the requested ZIP path absent.
+
+Run the publishing verifier on the valid ZIP and on deliberately altered reports with recomputed inner and outer digests. Each altered bundle must be rejected before the staging directory is created. Keep the output outside the bundle whose digest it verifies.
+
+```bash
+python3 "$CHECKOUT/tests/acceptance/preview_provenance.py" --repo "$CHECKOUT" \
+  --bundle "$OUT/standalone-preview.zip" --bundle-sha256 "$BUNDLE_SHA256" \
+  --commit "$CANDIDATE_SHA" --wheel-sha256 "$WHEEL_SHA256" \
+  --baseline-sha256 "$BASELINE_SHA256" --vast-id "$FORGE_VAST_LAB_ID" \
+  --output "$OUT/provenance-negative.json"
+```
 
 ## Configure GitHub before use
 

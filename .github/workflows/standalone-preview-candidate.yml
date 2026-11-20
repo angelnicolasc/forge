@@ -49,12 +49,15 @@ jobs:
           persist-credentials: false
 
       - name: Verify signed source objects
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           [[ "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$TRUST_BASE" =~ ^[0-9a-f]{40}$ ]]
           git merge-base --is-ancestor "$TRUST_BASE" "$GITHUB_SHA"
-          git fetch --no-tags origin "$CANDIDATE_SHA"
+          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' \
+            fetch --no-tags origin "$CANDIDATE_SHA"
           [[ "$(git rev-parse FETCH_HEAD)" == "$CANDIDATE_SHA" ]]
           printf '%s\n' "$SIGNER_LINE" > "$RUNNER_TEMP/standalone-allowed-signers"
           python3 .github/standalone/verify_signatures.py \
@@ -75,7 +78,7 @@ jobs:
       - name: Gate the exact wheel and compatibility evidence
         run: |
           set -euo pipefail
-          python3 .github/standalone/preview_artifact.py verify \
+          python3 .github/standalone/preview_artifact.py verify --repo . \
             --bundle "$RUNNER_TEMP/standalone-preview.zip" --bundle-sha256 "$BUNDLE_SHA" \
             --commit "$CANDIDATE_SHA" --wheel-sha256 "$WHEEL_SHA" \
             --baseline-sha256 "$BASELINE_SHA" --vast-id "$VAST_ID"

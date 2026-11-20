@@ -12,7 +12,10 @@ import os
 import platform
 import re
 import stat
+import subprocess
 import sys
+import tarfile
+import tempfile
 import time
 import zipfile
 from pathlib import Path
@@ -27,6 +30,8 @@ _SHA256 = re.compile(r"[0-9a-f]{64}")
 _COMMIT = re.compile(r"[0-9a-f]{40}")
 _LAB = re.compile(r"[1-9][0-9]*")
 _EVIDENCE = ("p23.json", "onboarding.json", "bindings.json")
+_ADR_EVIDENCE = ("build.json", "conditional.json", "gate-upgrade.json")
+_RC2_WHEEL_SHA256 = "da2e99069084178ca8b85ebcf9504e0ab7be8755bc92b8f355d0eddd043713ec"
 _MAX_BUNDLE = 8 * 1024 * 1024
 _MAX_MEMBER = 2 * 1024 * 1024
 
@@ -87,8 +92,197 @@ def wheel_version(name: str, data: bytes) -> str:
     return version
 
 
+def evidence_names(version: str) -> tuple[str, ...]:
+    # RC1/RC2 were sealed using the original acceptance contract.
+    numbers = tuple(int(part) for part in version.replace("rc", ".").split("."))
+    return _EVIDENCE + _ADR_EVIDENCE if numbers >= (0, 4, 0, 3) else _EVIDENCE
+
+
+def git(repo: Path, *arguments: str) -> bytes:
+    return subprocess.run(
+        ["git", "-C", str(repo), *arguments],
+        check=True,
+        capture_output=True,
+        env={**os.environ, "GIT_NO_REPLACE_OBJECTS": "1"},
+    ).stdout
+
+
+def source_trees(repo: Path | None, commit: str) -> dict[str, str]:
+    if repo is None:
+        raise ValueError("The approved source Git repository is required")
+    return {
+        "source_tree": git(repo, "rev-parse", "--verify", f"{commit}^{{tree}}").decode().strip(),
+        "package_tree": git(repo, "rev-parse", "--verify", f"{commit}:standalone/forge-check")
+        .decode()
+        .strip(),
+    }
+
+
+def build(args: argparse.Namespace) -> dict[str, Any]:
+    lab_id = os.environ.get("FORGE_VAST_LAB_ID", "")
+    require(sys.platform == "linux" and _LAB.fullmatch(lab_id), "Build on the designated Vast VM")
+    require(_COMMIT.fullmatch(args.commit), "Require the full candidate commit SHA")
+    require(not args.output.exists(), "Build receipt already exists")
+    dist = args.dist.resolve()
+    dist.mkdir(parents=True, exist_ok=True)
+    require(not any(dist.iterdir()), "Use an empty wheel output directory")
+    trees = source_trees(args.repo, args.commit)
+    with tempfile.TemporaryDirectory(prefix="forge-signed-source-") as folder:
+        package = Path(folder) / "standalone" / "forge-check"
+        archive = git(args.repo, "archive", "--format=tar", args.commit, "standalone/forge-check")
+        with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
+            require(all(m.isfile() or m.isdir() for m in tar), "Expected a regular package tree")
+            tar.extractall(folder, filter="data")
+        subprocess.run(
+            [
+                args.uv,
+                "build",
+                str(package),
+                "--no-sources",
+                "--wheel",
+                "--out-dir",
+                str(dist),
+                "--python",
+                sys.executable,
+            ],
+            check=True,
+            cwd=folder,
+        )
+    wheels = list(dist.iterdir())
+    require(len(wheels) == 1, "Build must produce exactly one wheel")
+    wheel = wheels[0]
+    data = read_file(wheel, _MAX_MEMBER)
+    version = wheel_version(wheel.name, data)
+    proof = {
+        "schema": 1,
+        "commit": args.commit,
+        **trees,
+        "version": version,
+        "wheel": wheel.name,
+        "wheel_sha256": digest(data),
+        "vast_lab_id": lab_id,
+    }
+    with args.output.open("x", encoding="utf-8") as destination:
+        destination.write(json.dumps(proof, sort_keys=True) + "\n")
+    return proof
+
+
+def conditional_evidence(proof: dict[str, Any]) -> None:
+    expected = {
+        "equal": "pass",
+        "above": "pass",
+        "complete": "pass",
+        "cached": "pass",
+        "omitted": "fail",
+        "partial": "insufficient",
+        "unknown-primary": "insufficient",
+        "unconfirmed-reserve": "insufficient",
+        "wrong-identity": "insufficient",
+        "expired-cache": "insufficient",
+    }
+    required = {(route, name) for route in ("direct", "code_mode") for name in expected}
+    seen = set()
+    for row in proof["matrix"]:
+        key = (row["route"], row["scenario"])
+        require(key not in seen, "Duplicate conditional evidence case")
+        seen.add(key)
+        if key not in required:
+            continue
+        verdict = expected[row["scenario"]]
+        before, after = row["alias_before"], row["alias_after"]
+        decision = row["decision"]
+        require(
+            row["gate"]["report"]["verdict"] == verdict
+            and row["evaluation_dispatches"] == 0
+            and row["executor"]["status"] == "completed",
+            "Incorrect conditional verdict, executor state, or verifier dispatch",
+        )
+        if verdict == "pass":
+            require(
+                decision["status"] == "applied"
+                and after["generation"] == before["generation"] + 1
+                and after["revision"] == row["gate"]["candidate_revision"],
+                "Passing conditional promotion did not activate its candidate",
+            )
+        else:
+            require(
+                decision["status"] == "rejected" and before == after,
+                "Conditional promotion must preserve the alias",
+            )
+    require(required <= seen, "Missing required conditional cases or route")
+    consistency = proof["consistency"]
+    for name, verdict in {
+        "consistent": "pass",
+        "repeat_and_permute": "pass",
+        "one_receipt_two_subjects": "insufficient",
+        "one_receipt_two_cases": "insufficient",
+        "different_reserve_quantities": "insufficient",
+        "cache_valid": "pass",
+        "cache_at_expiry": "insufficient",
+        "legacy_cache_without_expiry": "insufficient",
+        "two_hits_one_consistent_origin": "pass",
+        "conflicting_origin_for_two_hits": "insufficient",
+        "cache_receipt_as_own_origin": "insufficient",
+    }.items():
+        require(consistency.get(name) == verdict, "Missing or incorrect receipt consistency result")
+    legacy = proof["legacy"]
+    require(
+        legacy["decision"]["status"] == "applied"
+        and legacy["saved_check"]["verdict"] == "pass"
+        and legacy["gate"]["report"] == legacy["saved_check"],
+        "Legacy scope must retain the saved report and promotion behavior",
+    )
+    expired = proof["promotion_expiry"]
+    require(
+        expired["decision"]["reason"] == "evidence_expired"
+        and expired["decision"]["status"] == "rejected"
+        and expired["alias_before"] == expired["alias_after"]
+        and expired["evaluation_dispatches"] == 0,
+        "Expired evidence must leave the alias unchanged",
+    )
+
+
+def gate_upgrade(proof: dict[str, Any], version: str, sha256: str, lab_id: str) -> None:
+    require(
+        proof["status"] == "pass"
+        and proof["vast_lab_id"] == lab_id
+        and proof["rc2_sha256"] == _RC2_WHEEL_SHA256
+        and proof["wheel_sha256"] == sha256
+        and proof["candidate"] == version,
+        "Gate upgrade evidence must identify the RC2 wheel and this candidate and host",
+    )
+    results = proof["outcomes"]
+    for route, provider_calls in (("canary", 0), ("shadow", 1)):
+        observed = results[route]
+        require(
+            observed["prior_certificate"] == "forge-check/2"
+            and observed["new_certificate"] == "forge-check/2.1"
+            and observed["historical_verdict"] == observed["corrected_verdict"] == "pass"
+            and observed["reevaluated_verdict"] == "insufficient"
+            and observed["rollout_hold"] == "evidence_revalidation_required"
+            and observed["existing_root_provider_calls"] == provider_calls
+            and observed["new_generation"] == 2,
+            f"Gate upgrade failed the {route} compatibility policy",
+        )
+    require(
+        results["applied"]["historical_decision"] == "replayed"
+        and results["applied"]["rollback"] == "applied"
+        and results["legacy"]["rc2_verifier"] == "forge-check/1"
+        and results["legacy"]["legacy_promotion"] == "applied",
+        "Gate upgrade must preserve prior decisions, rollback and legacy promotions",
+    )
+
+
 def acceptance(
-    reports: dict[str, bytes], *, version: str, sha256: str, baseline: str, lab_id: str
+    reports: dict[str, bytes],
+    *,
+    version: str,
+    sha256: str,
+    baseline: str,
+    lab_id: str,
+    commit: str,
+    wheel: str,
+    repo: Path | None,
 ) -> None:
     p23 = report(reports["p23.json"])
     proof = p23.get("wheel_sha256")
@@ -154,6 +348,30 @@ def acceptance(
         ),
         "Installed binding and Code Mode evidence must identify this wheel and Vast host",
     )
+    if "build.json" in reports:
+        require(
+            report(reports["build.json"])
+            == {
+                "schema": 1,
+                "commit": commit,
+                **source_trees(repo, commit),
+                "version": version,
+                "wheel": wheel,
+                "wheel_sha256": sha256,
+                "vast_lab_id": lab_id,
+            },
+            "Build receipt must identify the approved commit, Git trees, wheel and Vast host",
+        )
+        conditional = report(reports["conditional.json"])
+        require(
+            conditional["status"] == "pass"
+            and conditional["version"] == version
+            and conditional["wheel_sha256"] == sha256
+            and conditional["vast_lab_id"] == lab_id,
+            "Conditional evidence is missing or describes a different candidate",
+        )
+        conditional_evidence(conditional)
+        gate_upgrade(report(reports["gate-upgrade.json"]), version, sha256, lab_id)
 
 
 def check_inputs(commit: str, wheel_sha: str, baseline: str, lab_id: str) -> None:
@@ -176,16 +394,29 @@ def seal(args: argparse.Namespace) -> dict[str, Any]:
     name = args.wheel.name
     version = wheel_version(name, wheel)
     require(hmac.compare_digest(digest(wheel), args.wheel_sha256), "Wheel SHA-256 mismatch")
-    reports = {
-        name: read_file(path, _MAX_MEMBER)
-        for name, path in zip(_EVIDENCE, (args.p23, args.onboarding, args.bindings), strict=True)
-    }
+    paths = dict(zip(_EVIDENCE, (args.p23, args.onboarding, args.bindings), strict=True))
+    if "build.json" in evidence_names(version):
+        require(
+            args.build_report and args.conditional and args.gate_upgrade,
+            "Require build, conditional and Gate upgrade receipts",
+        )
+        paths.update(
+            {
+                "build.json": args.build_report,
+                "conditional.json": args.conditional,
+                "gate-upgrade.json": args.gate_upgrade,
+            }
+        )
+    reports = {filename: read_file(path, _MAX_MEMBER) for filename, path in paths.items()}
     acceptance(
         reports,
         version=version,
         sha256=args.wheel_sha256,
         baseline=args.baseline_sha256,
         lab_id=lab_id,
+        commit=args.commit,
+        wheel=name,
+        repo=args.repo,
     )
     metadata = {
         "schema": 1,
@@ -220,8 +451,14 @@ def verify(args: argparse.Namespace) -> dict[str, Any]:
     )
     with zipfile.ZipFile(io.BytesIO(bundle)) as archive:
         entries = archive.infolist()
-        fixed = {"receipt.json", *_EVIDENCE}
         names = {entry.filename for entry in entries}
+        wheels = [entry.filename for entry in entries if _WHEEL.fullmatch(entry.filename)]
+        require(len(wheels) == 1, "Expected one wheel in the preview bundle")
+        name = wheels[0]
+        match = _WHEEL.fullmatch(name)
+        assert match is not None
+        evidence = evidence_names(match[1])
+        fixed = {"receipt.json", *evidence}
         require(
             len(entries) == len(names) == len(fixed) + 1
             and fixed <= names
@@ -234,10 +471,9 @@ def verify(args: argparse.Namespace) -> dict[str, Any]:
             ),
             "Preview bundle contains duplicate, unsafe, or unexpected entries",
         )
-        name = (names - fixed).pop()
         metadata = report(archive.read("receipt.json"))
         wheel = archive.read(name)
-        reports = {filename: archive.read(filename) for filename in _EVIDENCE}
+        reports = {filename: archive.read(filename) for filename in evidence}
     require(
         hmac.compare_digest(digest(wheel), args.wheel_sha256), "Approved wheel SHA-256 mismatch"
     )
@@ -260,6 +496,9 @@ def verify(args: argparse.Namespace) -> dict[str, Any]:
         sha256=args.wheel_sha256,
         baseline=args.baseline_sha256,
         lab_id=args.vast_id,
+        commit=args.commit,
+        wheel=name,
+        repo=args.repo,
     )
     if args.stage is not None:
         args.stage.mkdir(mode=0o700, exist_ok=False)
@@ -334,13 +573,23 @@ def check_index(args: argparse.Namespace) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     actions = parser.add_subparsers(dest="action", required=True)
+    building = actions.add_parser("build")
+    building.add_argument("--repo", type=Path, required=True)
+    building.add_argument("--commit", required=True)
+    building.add_argument("--uv", default="uv")
+    building.add_argument("--dist", type=Path, required=True)
+    building.add_argument("--output", type=Path, required=True)
     packing = actions.add_parser("seal")
     checking = actions.add_parser("verify")
     for command in (packing, checking):
         command.add_argument("--commit", required=True)
         command.add_argument("--wheel-sha256", required=True)
         command.add_argument("--baseline-sha256", required=True)
+        command.add_argument("--repo", type=Path)
     packing.add_argument("--wheel", type=Path, required=True)
+    packing.add_argument("--build-report", type=Path)
+    packing.add_argument("--conditional", type=Path)
+    packing.add_argument("--gate-upgrade", type=Path)
     for name in ("p23", "onboarding", "bindings", "output"):
         packing.add_argument(f"--{name}", type=Path, required=True)
     checking.add_argument("--bundle", type=Path, required=True)
@@ -356,12 +605,25 @@ def main() -> int:
     index.add_argument("--wheel-sha256", required=True)
     args = parser.parse_args()
     try:
-        operation = {"seal": seal, "verify": verify, "fetch": fetch, "verify-index": check_index}
+        operation = {
+            "build": build,
+            "seal": seal,
+            "verify": verify,
+            "fetch": fetch,
+            "verify-index": check_index,
+        }
         print(json.dumps(operation[args.action](args), sort_keys=True))
     except (error.URLError, TimeoutError):
         print("Preview transfer failed; verify the authorized origin and artifact", file=sys.stderr)
         return 1
-    except (OSError, zipfile.BadZipFile, ValueError, KeyError, TypeError) as exception:
+    except (
+        OSError,
+        subprocess.CalledProcessError,
+        zipfile.BadZipFile,
+        ValueError,
+        KeyError,
+        TypeError,
+    ) as exception:
         print(f"Preview artifact rejected: {exception}", file=sys.stderr)
         return 1
     return 0

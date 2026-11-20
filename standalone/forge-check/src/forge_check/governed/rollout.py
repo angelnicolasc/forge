@@ -6,7 +6,7 @@ import hashlib
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
-from forge_check.governed.revision import canonical_json
+from forge_check.governed.revision import canonical_json, certificate_verifier
 
 if TYPE_CHECKING:
     from sqlite3 import Connection, Row
@@ -139,6 +139,15 @@ def capacity(conn: Connection, rollout_id: str) -> tuple[int, int, int]:
     return active, consumed, exposure
 
 
+def _current_evidence(conn: Connection, evidence_id: str) -> bool:
+    row = conn.execute(
+        """SELECT e.verifier AS certificate, p.verifier AS policy FROM gate_evidence e
+           CROSS JOIN scope_policy p WHERE e.id = ? AND p.singleton = 1""",
+        (evidence_id,),
+    ).fetchone()
+    return row is not None and row["certificate"] == certificate_verifier(row["policy"])
+
+
 def plan_root(
     conn: Connection,
     *,
@@ -159,6 +168,8 @@ def plan_root(
     rollout_id = str(row["id"])
     candidate = str(row["candidate_revision"])
     selected = bucket(scope, row["seed"], root_id)
+    if not _current_evidence(conn, row["evidence_id"]):
+        return Allocation(rollout_id, stable, selected, "stable", "evidence_revalidation_required")
     if selected >= row["basis_points"]:
         return Allocation(rollout_id, stable, selected, "stable", "cohort_holdout")
     if is_revoked(conn, candidate):
@@ -185,7 +196,8 @@ def dispatch_block(conn: Connection, task: Row, now: int) -> str | None:
     ):
         return "root_finished"
     row = conn.execute(
-        """SELECT c.id, c.ends_at, c.budget_microusd, c.stop_reason FROM rollout_allocations a
+        """SELECT c.id, c.ends_at, c.budget_microusd, c.stop_reason, c.evidence_id
+             FROM rollout_allocations a
              JOIN rollouts c ON c.id = a.rollout_id WHERE a.root_id = ? AND a.cohort = 'canary'""",
         (task["root_id"],),
     ).fetchone()
@@ -193,6 +205,8 @@ def dispatch_block(conn: Connection, task: Row, now: int) -> str | None:
         return None
     if row["stop_reason"] == "recovery_fenced":
         return "canary_recovery_fenced"
+    if not _current_evidence(conn, row["evidence_id"]):
+        return "evidence_revalidation_required"
     if now >= row["ends_at"]:
         return "canary_window_expired"
     if capacity(conn, row["id"])[2] > row["budget_microusd"]:
@@ -202,13 +216,15 @@ def dispatch_block(conn: Connection, task: Row, now: int) -> str | None:
 
 def shadow_target(conn: Connection, root_id: str, now: int) -> str | None:
     row = conn.execute(
-        """SELECT c.candidate_revision FROM rollout_allocations AS a
+        """SELECT c.candidate_revision, c.evidence_id FROM rollout_allocations AS a
              JOIN rollouts AS c ON c.id = a.rollout_id
             WHERE a.root_id = ? AND a.cohort = 'shadow' AND c.stopped_at IS NULL
               AND c.created_at <= ? AND c.ends_at > ?""",
         (root_id, now, now),
     ).fetchone()
-    return None if row is None else str(row["candidate_revision"])
+    if row is None or not _current_evidence(conn, row["evidence_id"]):
+        return None
+    return str(row["candidate_revision"])
 
 
 def task_view(conn: Connection, row: Row) -> dict[str, Any]:
@@ -240,10 +256,15 @@ def rollout_view(conn: Connection, row: Row, now: int) -> dict[str, Any]:
             (row["id"],),
         )
     )
+    state = "open"
+    if row["stopped_at"] is not None:
+        state = "stopped"
+    elif now >= row["ends_at"]:
+        state = "expired"
+    elif not _current_evidence(conn, row["evidence_id"]):
+        state = "evidence_revalidation_required"
     view.update(
-        state="stopped"
-        if row["stopped_at"] is not None
-        else ("expired" if now >= row["ends_at"] else "open"),
+        state=state,
         active_roots=active,
         consumed_microusd=consumed,
         exposure_microusd=exposure,

@@ -100,6 +100,7 @@ class StockObservation(TypedDict):
     receipt: str
     origin_receipt: NotRequired[str]
     origin_observed_at: NotRequired[int]
+    cache_valid_until: NotRequired[int]
 
 
 @dataclass(frozen=True)
@@ -314,6 +315,10 @@ def _parse_stock_observation(value: object) -> StockObservation:
         observation["origin_observed_at"] = _stock_integer(
             row.get("origin_observed_at"), "cache origin time", 1
         )
+        if "cache_valid_until" in row:
+            observation["cache_valid_until"] = _stock_integer(
+                row["cache_valid_until"], "cache validity end", 1
+            )
     return observation
 
 
@@ -327,11 +332,16 @@ def _parse_stock_evidence(value: object) -> StockEvidence:
     observations = row.get("observations")
     if not isinstance(observations, list):
         raise InputError("stock_evidence observations must be an array")
+    # Exporters can return the same immutable receipts in different pages or orders.
+    unique = {}
+    for item in observations:
+        observation = _parse_stock_observation(item)
+        unique[json.dumps(observation, sort_keys=True)] = observation
     return StockEvidence(
         coverage,
         since,
         until,
-        tuple(_parse_stock_observation(item) for item in observations),
+        tuple(unique[key] for key in sorted(unique)),
     )
 
 
@@ -415,8 +425,42 @@ def _next_action(verdict: Verdict, *, has_baseline: bool, has_cases: bool) -> st
     return "The candidate satisfies the business rule across all eligible cases."
 
 
+def _conflicting_receipts(run: Run | None, source: str) -> set[str]:
+    """Check the identity of source records across all cases in one revision."""
+    conflicts: set[str] = set()
+    if run is None:
+        return conflicts
+    records: dict[str, StockObservation] = {}
+    # An original read may live outside this window and be cited by several cache hits.
+    reads: dict[str, tuple[str, int, int | None]] = {}
+    for case_id, evidence in run.stock.items():
+        if evidence.coverage == "unavailable":
+            continue
+        for observation in evidence.observations:
+            if (
+                observation["case_id"] != case_id
+                or observation["revision"] != run.revision
+                or observation["source"] != source
+            ):
+                continue
+            receipt = observation["receipt"]
+            if records.setdefault(receipt, observation) != observation:
+                conflicts.add(receipt)
+            if observation["kind"] == "cache":
+                origin = observation["origin_receipt"]
+                when = observation["origin_observed_at"]
+            else:
+                origin = receipt
+                when = observation["observed_at"]
+            facts = observation["sku"], when, observation["on_hand"]
+            if reads.setdefault(origin, facts) != facts:
+                conflicts.add(origin)
+    conflicts.update(key for key in reads if key in records and records[key]["kind"] != "read")
+    return conflicts
+
+
 def _stock_snapshot(
-    rule: StockRule, source: str, case_id: str, run: Run | None, as_of: int
+    rule: StockRule, source: str, case_id: str, run: Run | None, as_of: int, conflicts: set[str]
 ) -> StockCaseDetail:
     subjects = rule.subjects[case_id]
     primary: StockSubject = {"sku": subjects["primary"], "observation": None}
@@ -469,6 +513,8 @@ def _stock_snapshot(
         ]
         if not issues:
             matching_attempts.add(sku)
+        if observation["receipt"] in conflicts:
+            issues.append("receipt_conflicting")
         if when > as_of or as_of >= expired:
             issues.append("observation_expired" if when <= as_of else "observation_in_future")
         if observation["on_hand"] is None:
@@ -476,10 +522,15 @@ def _stock_snapshot(
         if observation["kind"] == "cache":
             origin = observation["origin_observed_at"]
             expired = min(expired, origin + max_age, origin + cache_age)
-            if origin > when or observation["origin_receipt"] == observation["receipt"]:
+            valid_until = observation.get("cache_valid_until")
+            if valid_until is not None:
+                expired = min(expired, valid_until)
+            if origin > when or observation["origin_receipt"] in conflicts:
                 issues.append("cache_provenance_invalid")
             elif cache_age == 0:
                 issues.append("cache_disabled")
+            elif valid_until is None:
+                issues.append("cache_expiry_missing")
             elif as_of >= expired:
                 issues.append("cache_expired")
         if issues or reasons:
@@ -511,6 +562,9 @@ def _stock_snapshot(
                 reasons.append("reserve_omitted")
             else:
                 reasons.append("reserve_missing")
+            return result
+        if len({observation["on_hand"] for observation, _ in confirmed}) != 1:
+            reasons.append("reserve_conflicting")
             return result
         last, reserve_expiry = max(confirmed, key=lambda item: item[1])
         reserve["observation"] = last
@@ -550,10 +604,16 @@ def compare(
                 ),
                 default=0,
             )
+        sources = [
+            (side, run, _conflicting_receipts(run, case_set.source))
+            for side, run in (("baseline", baseline), ("candidate", candidate))
+        ]
         for case in cases:
             details = {
-                side: _stock_snapshot(case_set.stock, case_set.source, case["id"], run, as_of)
-                for side, run in (("baseline", baseline), ("candidate", candidate))
+                side: _stock_snapshot(
+                    case_set.stock, case_set.source, case["id"], run, as_of, conflicts
+                )
+                for side, run, conflicts in sources
             }
             case["conditional_stock"] = details
             for side, detail in details.items():

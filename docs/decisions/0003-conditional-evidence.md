@@ -30,3 +30,11 @@ The rule covers one primary–reserve relationship per case and one threshold pe
 Keep the previous compatible revision available for `forge rollback`. It changes future starts, while existing tasks retain their original revision pins. For a deployment rollback to the RC1 wheel, use a scope initialized with the legacy verifier and case format. [Rollback commands](../conditional-evidence.md#roll-back-a-release)
 
 **Implementation evidence.** The `0.4.0rc2` wheel was built from `9bf9b396d5d2d44f79bf4aa3c94767560338888d`. Its SHA-256 is `da2e99069084178ca8b85ebcf9504e0ab7be8755bc92b8f355d0eddd043713ec`. The test driver is `tests/acceptance/conditional_evidence.py`.
+
+## RC3 amendment · Revalidate evidence when its meaning changes
+
+Two reserve receipts can disagree about the quantity available to fill an order. A cache can also expire at the host before the review window closes. RC3 treats both as operational decisions. It checks receipt identity across the cases of a run, requires consistent reserve quantities and honors the earliest actual expiry. The terminal report names the required stock location and the reason a check blocked.
+
+A certificate created by RC2 records a real decision made with the earlier rules. RC3 keeps it available for audit and requires a fresh evaluation before it grants a new promotion or canary. This preserves the operator's history and avoids applying stronger guarantees retroactively. A prepared rollout can fall back to stable during the upgrade. Supporting this boundary costs one brief writer cutover for existing conditional scopes. [Operator procedure](../conditional-evidence.md#upgrade-an-existing-rc2-conditional-scope)
+
+RC2's release tip `f695fd230a069d8023972c4f6524d96ea499d646` had the same standalone package tree as its build commit. Under RC3, the release manifest identifies a single build commit and package tree for the tested wheel and the bundle binds the conditional matrix to that wheel. The release owner can take the exact reviewed bytes into staging. The tests use synthetic inventory destinations and a real prior wheel. The preview makes no claim about adoption, live inventory accuracy or model-generated program quality.

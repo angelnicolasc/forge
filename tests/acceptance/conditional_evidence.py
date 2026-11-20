@@ -541,6 +541,7 @@ def cached_observation(execution: dict, origin: dict, case_id: str) -> dict:
         "receipt": hit["event_id"],
         "origin_receipt": origin["receipt"],
         "origin_observed_at": origin["observed_at"],
+        "cache_valid_until": hit["evidence"]["valid_until"],
     }
 
 
@@ -667,6 +668,43 @@ def exercise_candidate(root: Path, scenario: Scenario, route: str, *, demo: bool
         evaluation = forge(*evaluate_args, exit_code=EXIT[scenario.verdict])
         assert forge(*evaluate_args, exit_code=EXIT[scenario.verdict]) == evaluation
         assert evaluation["report"]["verdict"] == scenario.verdict
+        if demo:
+            cases_path = save_json(root / "cases.json", cases)
+            reference_path = root / "saved-reference.json"
+            check_path = root / "check.json"
+            forge(
+                "check",
+                "--cases",
+                cases_path,
+                "--candidate",
+                baseline_path,
+                "--output",
+                check_path,
+                "--save-reference",
+                reference_path,
+                exit_code=2,
+            )
+            check = subprocess.run(
+                [
+                    str(Path(sys.executable).with_name("forge")),
+                    "check",
+                    "--cases",
+                    cases_path,
+                    "--baseline",
+                    reference_path,
+                    "--candidate",
+                    candidate_path,
+                    "--output",
+                    check_path,
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            assert check.returncode == EXIT[scenario.verdict], (check.stdout, check.stderr)
+            assert json.loads(check_path.read_text())["verdict"] == scenario.verdict
+            if scenario.reason:
+                assert scenario.reason in check.stdout and scenario.reserve in check.stdout
         assert evaluation["report"]["cases"][0]["candidate"]["status"] == "completed"
         diagnostics = evaluation["report"]["cases"][0]["conditional_stock"]["candidate"]
         assert diagnostics["result"] == scenario.verdict
@@ -803,6 +841,9 @@ def main() -> int:
             )
             evidence = {"demo": demo, "matrix": results}
             if not options.demo:
+                from conditional_stock_consistency import check as check_stock_consistency
+
+                evidence["consistency"] = check_stock_consistency()
                 evidence["legacy"] = exercise_legacy(root / "legacy")
                 evidence["promotion_expiry"] = exercise_candidate(
                     root / "promotion-expiry", EXPIRES_BEFORE_PROMOTION, "direct"

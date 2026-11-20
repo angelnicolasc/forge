@@ -101,7 +101,7 @@ For each run, keep `schema_version: 1`, the same `rule_id` and `source`, the run
 
 The source must correlate the records with the case, revision and trial interval `[since, until)`. Mark coverage `complete` only if the trusted observation covers reads and any accepted cache uses for that trial. A destination journal alone cannot establish the absence of a cache hit when caching is enabled. Export `partial` when coverage is incomplete, and `unavailable` or omit `stock_evidence` when the source cannot attest the window. A logged attempt with an unconfirmed quantity uses `on_hand: null`.
 
-A cache observation uses `kind: "cache"`, the cache-hit receipt, and `origin_receipt` and `origin_observed_at` for the independently verified original read of the same SKU and revision. To admit cache evidence, add `"cache_max_age_seconds": 30` to `conditional_stock`. The original read must satisfy both that limit and the general freshness limit. The observer attests receipt provenance before submitting the export. Give the `evidence` role to that trusted process and keep it separate from agent execution and automatic proposals.
+A cache observation uses `kind: "cache"`, the cache-hit receipt, and `origin_receipt` and `origin_observed_at` for the independently verified original read of the same SKU and revision. To admit cache evidence, add `"cache_max_age_seconds": 30` to `conditional_stock`. For RC3, export the host's absolute expiry as `cache_valid_until` on each hit, in UTC Unix microseconds. The hit is usable strictly before the earliest of the host expiry, the age limit on cache evidence, and the general freshness deadline. If the exporter omits the host expiry, the Gate returns `insufficient` when that hit is needed. Distinct hits may refer to the same original read if their provenance agrees. The observer attests receipt provenance before submitting the export. Give the `evidence` role to that trusted process and keep it separate from agent execution and automatic proposals.
 
 ## Evaluate and promote
 
@@ -120,6 +120,25 @@ forge promote --db state/governed.sqlite3 --actor release-owner \
 In `evaluation.json`, read `report.cases[].conditional_stock.candidate` alongside the base outcome and executor status. If primary stock is at least 5, one confirmed read satisfies the requirement. Below 5, a fresh, matching reserve observation satisfies it. With complete coverage, a confirmed omission returns `fail`. Missing or unconfirmed evidence returns `insufficient` unless the candidate already has a proven violation. The report identifies the subjects, coverage, window, and discarded observations so the operator can locate the records behind the verdict.
 
 The Gate evaluates saved records without dispatching a provider call. Promotion with `fail` or `insufficient` leaves `estable` at the same revision and generation. A `pass` still requires a fresh evidence snapshot, a current alias generation and an authorized approver. The promotion window closes at the earliest applicable evidence expiry. Use `forge check` with the same cases and saved runs to review the evidence outside the ledger. [Check exit codes](check.md#add-one-step-to-your-ci)
+
+### Read the verdict in CI
+
+A candidate can return the same outcome label as its reference while skipping a required read. For the omitted-reserve demo the terminal diagnostic includes the actionable difference:
+
+```text
+candidate stock [fail] reserve_omitted | primary PRI-A4=2, threshold 5, reserve RES-K4, coverage complete
+```
+
+The JSON report preserves the supporting observations. Identical repeats of the same receipt in a paginated export are safe. The Gate discards observations whose receipt ID carries conflicting facts. An independent, consistent receipt can still establish the required read. If confirmed reserve quantities disagree, the Gate returns `insufficient`. Check the inventory journal, correct the export and evaluate it under a new evidence ID.
+
+### Upgrade an existing RC2 conditional scope
+
+1. Pause release decisions for the scope, drain pending calls and replace every RC2 writer sharing its ledger, including workers that dispatch bindings. Retain a consistent backup using the [governed recovery procedure](governed.md). Resume traffic after the writers run RC3. Legacy scopes continue to use their original verifier.
+2. Keep the protected manifest on `forge-check/2`. RC3 stamps new conditional evaluations with `forge-check/2.1`. Previous decisions remain inspectable. Replaying an old operation returns its historical result. A fresh promotion or rollout based on an RC2 conditional evaluation returns `evidence_revalidation_required`.
+3. Inspect active rollouts. New roots on an affected rollout use stable. An already pinned canary cannot start additional binding calls under the old certificate. A shadow allocation backed by that certificate stops dispatching shadow reads. Drain or stop the old rollout, then register a fresh one if needed.
+4. Obtain current evidence from the observer. Repeat `forge evaluate` with the existing protected rule, a fresh trial window and a **new evidence ID**. Use that ID, the current generation and a **new decision ID** to promote. Check the alias and inspect the recorded decision. If the Gate still reports `insufficient`, its reason identifies the observation the operator needs.
+
+A canary window ends at or before its authorizing evidence expires. The binding checks the window again before sending a reserved call. Effects already sent still need reconciliation. An alias promoted before the upgrade retains its revision until an operator rolls it back or promotes another revision. Switching binaries alone cannot reverse a completed dispatch. Retain RC2 for recovery on a compatible, isolated scope, and keep RC3 in charge of conditional scopes that require the stronger semantics.
 
 ## Roll back a release
 

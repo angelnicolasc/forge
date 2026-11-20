@@ -128,6 +128,21 @@ def _print_report(report: Report, *, reference_saved: bool) -> None:
             f"candidate {candidate_observed} ({candidate['status']}), "
             f"baseline {baseline_observed} ({baseline['status']})"
         )
+        details = case.get("conditional_stock")
+        if details is None:
+            continue
+        for side, stock in details.items():
+            if stock["result"] == "pass":
+                continue
+            primary = stock["primary"]
+            observed = primary["observation"]
+            quantity = observed["on_hand"] if observed is not None else None
+            print(
+                f"  {side} stock [{stock['result']}] {', '.join(stock['reasons'])} | "
+                f"primary {primary['sku']}={quantity if quantity is not None else 'unknown'}, "
+                f"threshold {stock['threshold']}, reserve {stock['reserve']['sku']}, "
+                f"coverage {stock['coverage']}"
+            )
     if len(actionable) > _TERMINAL_CASE_LIMIT:
         print(f"See the JSON report for {len(actionable) - _TERMINAL_CASE_LIMIT} more cases.")
     if reference_saved:

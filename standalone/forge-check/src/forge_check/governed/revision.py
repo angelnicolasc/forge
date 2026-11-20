@@ -12,10 +12,16 @@ LEGACY_SCHEMA_VERSION = 1
 SCHEMA_VERSION = 2
 VERIFIER = "forge-check/1"
 CONDITIONAL_VERIFIER = "forge-check/2"
+CONDITIONAL_CERTIFICATE = "forge-check/2.1"
 MAX_SAFE_INTEGER = (1 << 53) - 1
 _MAX_DOCUMENT_BYTES = 1_048_576
 _ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}\Z")
 _DIGEST = re.compile(r"[0-9a-f]{64}\Z")
+
+
+def certificate_verifier(scope_verifier: str) -> str:
+    """Keep manifest compatibility separate from the semantics that authorized a decision."""
+    return CONDITIONAL_CERTIFICATE if scope_verifier == CONDITIONAL_VERIFIER else scope_verifier
 
 
 def identifier(value: object, label: str) -> str:

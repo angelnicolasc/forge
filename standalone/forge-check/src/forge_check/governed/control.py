@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import time
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from forge_check.contract import compare, parse_cases, parse_run
 from forge_check.governed import rollout
@@ -15,6 +15,7 @@ from forge_check.governed.revision import (
     Revision,
     canonical_json,
     catalog_digest,
+    certificate_verifier,
     digest_id,
     document_digest,
     identifier,
@@ -26,6 +27,7 @@ from forge_check.governed.revision import (
 if TYPE_CHECKING:
     from sqlite3 import Connection, Row
 
+    from forge_check.contract import Report
     from forge_check.governed.db import Store
     from forge_check.governed.rollout import RolloutMode
 
@@ -212,16 +214,36 @@ def _evidence_view(row: Row) -> dict[str, Any]:
     return view
 
 
-def _evidence_digest(policy: Row, identity: dict[str, Any], report: object) -> str:
+def _evidence_digest(policy: Row, identity: dict[str, Any], report: object, verifier: str) -> str:
     payload = {
         "scope": policy["scope"],
         "alias": ALIAS,
         "rule_digest": policy["rule_digest"],
-        "verifier": policy["verifier"],
+        "verifier": verifier,
         "report": report,
         **identity,
     }
     return document_digest("forge.check.evidence.v1", canonical_json(payload))
+
+
+def _conditional_inputs(report: Report) -> tuple[object, ...]:
+    """Recover normalized observer inputs independently of a historical matcher's conclusions."""
+    return (
+        report["baseline_revision"],
+        report["candidate_revision"],
+        [
+            (
+                case["id"],
+                side,
+                case["baseline"] if side == "baseline" else case["candidate"],
+                detail["coverage"],
+                detail["window"],
+                frozenset(canonical_json(item) for item in detail["observations"]),
+            )
+            for case in report["cases"]
+            for side, detail in case["conditional_stock"].items()
+        ],
+    )
 
 
 class Control:
@@ -393,8 +415,15 @@ class Control:
                 "candidate_revision": target,
                 "proposal_id": proposal_id,
             }
-            snapshot = _evidence_digest(policy, identity, report)
+            verifier = certificate_verifier(policy["verifier"])
+            snapshot = _evidence_digest(policy, identity, report, verifier)
             if current is not None:
+                if current["verifier"] == policy["verifier"] == CONDITIONAL_VERIFIER:
+                    historical = read_json(current["report"])
+                    historical_inputs = _conditional_inputs(cast("Report", historical))
+                    if historical_inputs != _conditional_inputs(report):
+                        raise ValueError("Evidence ID already binds different evidence")
+                    snapshot = _evidence_digest(policy, identity, historical, current["verifier"])
                 if current["snapshot_digest"] != snapshot:
                     raise ValueError("Evidence ID already binds different evidence")
                 return _evidence_view(current)
@@ -420,7 +449,7 @@ class Control:
                     stable,
                     target,
                     policy["rule_digest"],
-                    policy["verifier"],
+                    verifier,
                     observed_at,
                     expires_at,
                     now,
@@ -573,9 +602,10 @@ class Control:
             or evidence["stable_revision"] != alias["revision"]
             or evidence["candidate_revision"] != target
             or evidence["rule_digest"] != policy["rule_digest"]
-            or evidence["verifier"] != policy["verifier"]
         ):
             return "rejected", "evidence_mismatch", target
+        if evidence["verifier"] != certificate_verifier(policy["verifier"]):
+            return "rejected", "evidence_revalidation_required", target
         if not evidence["observed_at"] <= now < evidence["expires_at"]:
             return "rejected", "evidence_expired", target
         try:
@@ -594,7 +624,8 @@ class Control:
                 "proposal_id",
             )
         }
-        if _evidence_digest(policy, identity, report) != evidence["snapshot_digest"]:
+        digest = _evidence_digest(policy, identity, report, evidence["verifier"])
+        if digest != evidence["snapshot_digest"]:
             return "rejected", "evidence_integrity_failure", target
         verdict = report["verdict"]
         if verdict != "pass":
