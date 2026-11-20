@@ -2,6 +2,8 @@
 
 Get from zero to a live, instrumented multi-agent flow in under 5 minutes.
 
+If you already have results from two agent revisions, [compare them in CI](check.md) with the standalone check.
+
 ## 1. Install
 
 ```bash

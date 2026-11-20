@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "rule_id": "support-routing-v1",
+  "source": "support-queue",
+  "cases": [
+    {"id": "S01", "expected": "human"},
+    {"id": "S02", "expected": "human"},
+    {"id": "S03", "expected": "human"},
+    {"id": "S04", "expected": "human"},
+    {"id": "S05", "expected": "human"},
+    {"id": "S06", "expected": "human"},
+    {"id": "S07", "expected": "human"},
+    {"id": "S08", "expected": "human"},
+    {"id": "S09", "expected": "self_service"},
+    {"id": "S10", "expected": "self_service"},
+    {"id": "S11", "expected": "self_service"},
+    {"id": "S12", "expected": "self_service"},
+    {"id": "S13", "expected": "self_service"},
+    {"id": "S14", "expected": "self_service"},
+    {"id": "S15", "expected": "self_service"},
+    {"id": "S16", "expected": "self_service"},
+    {"id": "S17", "expected": "self_service"},
+    {"id": "S18", "expected": "self_service"},
+    {"id": "S19", "expected": "self_service"},
+    {"id": "S20", "expected": "self_service"},
+    {"id": "S21", "expected": "self_service"},
+    {"id": "S22", "expected": "self_service"},
+    {"id": "S23", "expected": "self_service"},
+    {"id": "S24", "expected": "self_service"}
+  ]
+}

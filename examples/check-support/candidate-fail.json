@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "rule_id": "support-routing-v1",
+  "source": "support-queue",
+  "revision": "r42",
+  "cost_micro_usd": 16000,
+  "cases": [
+    {"id": "S01", "status": "completed", "observed": "human"},
+    {"id": "S02", "status": "completed", "observed": "human"},
+    {"id": "S03", "status": "completed", "observed": "human"},
+    {"id": "S04", "status": "completed", "observed": "human"},
+    {"id": "S05", "status": "completed", "observed": "human"},
+    {"id": "S06", "status": "completed", "observed": "human"},
+    {"id": "S07", "status": "completed", "observed": "self_service"},
+    {"id": "S08", "status": "completed", "observed": "self_service"},
+    {"id": "S09", "status": "completed", "observed": "self_service"},
+    {"id": "S10", "status": "completed", "observed": "self_service"},
+    {"id": "S11", "status": "completed", "observed": "self_service"},
+    {"id": "S12", "status": "completed", "observed": "self_service"},
+    {"id": "S13", "status": "completed", "observed": "self_service"},
+    {"id": "S14", "status": "completed", "observed": "self_service"},
+    {"id": "S15", "status": "completed", "observed": "self_service"},
+    {"id": "S16", "status": "completed", "observed": "self_service"},
+    {"id": "S17", "status": "completed", "observed": "self_service"},
+    {"id": "S18", "status": "completed", "observed": "self_service"},
+    {"id": "S19", "status": "completed", "observed": "self_service"},
+    {"id": "S20", "status": "completed", "observed": "self_service"},
+    {"id": "S21", "status": "completed", "observed": "self_service"},
+    {"id": "S22", "status": "completed", "observed": "self_service"},
+    {"id": "S23", "status": "completed", "observed": "self_service"},
+    {"id": "S24", "status": "completed", "observed": "self_service"}
+  ]
+}

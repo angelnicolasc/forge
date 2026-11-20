@@ -261,6 +261,8 @@ Diagnose a local install in one command: Python version, installed adapter extra
 
 Full write-up in [docs/architecture.md](docs/architecture.md).
 
+The [architecture decision records](docs/decisions/index.md) follow the standalone preview from its first inventory binding to the experiment that shaped the Code Mode default.
+
 ---
 
 ## Installation

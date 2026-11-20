@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "forge-os-check"
+version = "0.4.0rc3"
+description = "Compare agent results in CI and govern explicitly bound provider operations."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+dependencies = []
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3 :: Only",
+    "Environment :: Console",
+]
+
+[project.optional-dependencies]
+code-mode = ["quickjs-rs==0.3.0", "wasmtime==50.0.1"]
+
+[project.scripts]
+forge = "forge_check.cli:main"
+
+[project.urls]
+Repository = "https://github.com/angelnicolasc/forge"
+Documentation = "https://github.com/angelnicolasc/forge/blob/main/docs/check.md"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/forge_check"]
