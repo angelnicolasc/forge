@@ -61,6 +61,8 @@ Use publication-safe identifiers and labels of 1–128 characters. They start wi
 
 The JSON report records the verdict, the source and rule IDs, the revision IDs, coverage for both runs, and the decision and reasons for each eligible case. Review the candidate observations alongside the expected outcomes and use the source and case IDs to find the underlying records.
 
+For inventory rules that require a second read only under certain conditions, use the [conditional stock case and evidence format](conditional-evidence.md).
+
 ## Add one step to your CI
 
 After installing the wheel and exporting the three input files, add a step like this to your existing job. Collect `artifacts/forge-check.json` in the job's artifact upload step even when this step fails.

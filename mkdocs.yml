@@ -57,9 +57,15 @@ nav:
       - Check saved results in CI: check.md
       - Run a governed support binding: governed.md
       - Compose governed reads with Code Mode: code-mode.md
+      - Check conditional inventory evidence: conditional-evidence.md
       - Rollout and recovery: operations.md
   - Concepts:
       - Architecture: architecture.md
+      - Architecture decisions:
+          - Overview: decisions/index.md
+          - Tool contracts in the revision: decisions/0001-binding-contracts.md
+          - Code Mode for governed reads: decisions/0002-code-mode.md
+          - Evidence for conditional reads: decisions/0003-conditional-evidence.md
       - Feature Map: feature-map.md
 
 extra:

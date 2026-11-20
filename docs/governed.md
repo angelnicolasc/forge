@@ -112,4 +112,4 @@ forge verify --db state/governed.sqlite3 --actor release-owner --decision R42 \
 
 Use a half-open UTC window that includes the traffic under review. The report groups starts and observed tasks by revision, generation and source, with unresolved cases and the selected decision. For a coverage denominator, provide an independently attested `--roster` with `source`, `since`, `until`, and `workers` for the same window. The roster requires both `inspect` and `evidence` permissions. A silent worker has unknown effective state. Calls outside the explicit binding are unknown, and alias rollback affects future starts. The ticket system owns compensation for any prior effect.
 
-[Rollout, recovery and experimental Code Mode](operations.md)
+[Conditional inventory evidence](conditional-evidence.md) · [Rollout, recovery and experimental Code Mode](operations.md)
