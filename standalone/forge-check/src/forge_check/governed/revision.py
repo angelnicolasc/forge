@@ -11,6 +11,7 @@ from typing import Any, NoReturn, cast
 LEGACY_SCHEMA_VERSION = 1
 SCHEMA_VERSION = 2
 VERIFIER = "forge-check/1"
+CONDITIONAL_VERIFIER = "forge-check/2"
 MAX_SAFE_INTEGER = (1 << 53) - 1
 _MAX_DOCUMENT_BYTES = 1_048_576
 _ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}\Z")
@@ -240,7 +241,7 @@ class Revision:
         if set(allowed) - bindings.keys():
             raise ValueError("Admission policy names an unknown binding")
         check = _shape(root["check"], "Release check", {"rule_id", "verifier"}, set())
-        if check["verifier"] != VERIFIER:
+        if check["verifier"] not in (VERIFIER, CONDITIONAL_VERIFIER):
             raise ValueError("Unsupported release verifier")
 
         canonical = canonical_json(
@@ -249,7 +250,10 @@ class Revision:
                 "scope": identifier(root["scope"], "scope"),
                 "budget_microusd": integer(root["budget_microusd"], "root budget"),
                 "policy": {"allowed_bindings": allowed},
-                "check": {"rule_id": identifier(check["rule_id"], "rule"), "verifier": VERIFIER},
+                "check": {
+                    "rule_id": identifier(check["rule_id"], "rule"),
+                    "verifier": check["verifier"],
+                },
                 "bindings": bindings,
             }
         )

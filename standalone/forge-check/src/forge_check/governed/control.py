@@ -6,10 +6,11 @@ import json
 import time
 from typing import TYPE_CHECKING, Any, Literal
 
-from forge_check.contract import SCHEMA_VERSION, compare, parse_cases, parse_run
+from forge_check.contract import compare, parse_cases, parse_run
 from forge_check.governed import rollout
 from forge_check.governed.db import require_dispatch_authority
 from forge_check.governed.revision import (
+    CONDITIONAL_VERIFIER,
     VERIFIER,
     Revision,
     canonical_json,
@@ -243,25 +244,17 @@ class Control:
         revision = _validated_revision(initial)
         expected = parse_cases(cases)
         doc = revision.document
+        verifier = CONDITIONAL_VERIFIER if expected.stock is not None else VERIFIER
         if (
             scope != doc["scope"]
             or expected.rule_id != doc["check"]["rule_id"]
+            or doc["check"]["verifier"] != verifier
             or not expected.expected
         ):
             raise ValueError(
                 "Bootstrap requires a scoped revision and a matching protected case set"
             )
-        policy_cases = canonical_json(
-            {
-                "schema_version": SCHEMA_VERSION,
-                "rule_id": expected.rule_id,
-                "source": expected.source,
-                "cases": [
-                    {"id": key, "expected": value}
-                    for key, value in sorted(expected.expected.items())
-                ],
-            }
-        )
+        policy_cases = canonical_json(expected.document())
         grants = _grants(principals, set(doc["bindings"]))
 
         with self.store.write() as conn:
@@ -281,7 +274,7 @@ class Control:
                     scope,
                     policy_cases,
                     document_digest("forge.check.cases.v1", policy_cases),
-                    VERIFIER,
+                    verifier,
                     catalog_digest(revision),
                     ttl,
                     now,
@@ -391,7 +384,7 @@ class Control:
             later = parse_run(candidate, "candidate", case_set)
             if (prior is not None and prior.revision != stable) or later.revision != target:
                 raise ValueError("Evidence binds the wrong stable or candidate revision")
-            report = compare(case_set, prior, later)
+            report = compare(case_set, prior, later, observed_at=observed_at)
             identity = {
                 "actor": actor,
                 "observed_at": observed_at,
@@ -407,6 +400,16 @@ class Control:
                 return _evidence_view(current)
 
             require_dispatch_authority(conn)
+            expires_at = observed_at + policy["evidence_ttl_seconds"] * 1_000_000
+            if case_set.stock is not None and report["verdict"] == "pass":
+                expires_at = min(
+                    expires_at,
+                    *(
+                        details["expires_at"]
+                        for case in report["cases"]
+                        for details in case["conditional_stock"].values()
+                    ),
+                )
             conn.execute(
                 """INSERT INTO gate_evidence VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
@@ -419,7 +422,7 @@ class Control:
                     policy["rule_digest"],
                     policy["verifier"],
                     observed_at,
-                    observed_at + policy["evidence_ttl_seconds"] * 1_000_000,
+                    expires_at,
                     now,
                     snapshot,
                     canonical_json(report),

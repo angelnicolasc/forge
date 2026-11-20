@@ -27,7 +27,7 @@ def add_commands(subcommands: argparse._SubParsersAction[_Parser]) -> None:
         "bootstrap": "Initialize one governed scope from protected host configuration.",
         "register": "Register an immutable revision.",
         "propose": "Record a human or automatic proposal.",
-        "evaluate": "Evaluate protected ticket evidence against the active revision.",
+        "evaluate": "Evaluate protected case evidence against the active revision.",
         "promote": "Apply an authorized promotion at an expected alias generation.",
         "reject": "Record an explicit rejection at an expected alias generation.",
         "rollback": "Reactivate the previous revision at an expected alias generation.",
