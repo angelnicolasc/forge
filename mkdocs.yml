@@ -55,6 +55,7 @@ nav:
   - Getting Started:
       - Quickstart: quickstart.md
       - Check saved results in CI: check.md
+      - Run a governed support binding: governed.md
   - Concepts:
       - Architecture: architecture.md
       - Feature Map: feature-map.md

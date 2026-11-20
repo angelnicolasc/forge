@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "forge-os-check"
-version = "0.1.0"
-description = "Compare saved agent results against a business rule in CI."
+version = "0.2.0"
+description = "Compare agent results in CI and govern explicitly bound provider operations."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"

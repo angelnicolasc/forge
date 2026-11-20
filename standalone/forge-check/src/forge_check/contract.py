@@ -98,7 +98,7 @@ def _object(value: object, context: str) -> dict[str, object]:
     return cast("dict[str, object]", value)
 
 
-def _read(path: Path, role: str) -> dict[str, object]:
+def _read(path: Path, role: str) -> object:
     try:
         with path.open(encoding="utf-8") as stream:
             value: object = json.load(
@@ -113,6 +113,10 @@ def _read(path: Path, role: str) -> dict[str, object]:
     except (ValueError, RecursionError) as exc:
         raise InputError(f"{role} must contain valid UTF-8 JSON") from exc
 
+    return value
+
+
+def _checked_document(value: object, role: str) -> dict[str, object]:
     document = _object(value, role)
     version = document.get("schema_version")
     if type(version) is not int or version != SCHEMA_VERSION:
@@ -141,7 +145,11 @@ def _case_rows(document: dict[str, object], role: str) -> dict[str, dict[str, ob
 
 
 def load_cases(path: Path) -> CaseSet:
-    document = _read(path, "cases")
+    return parse_cases(_read(path, "cases"))
+
+
+def parse_cases(value: object) -> CaseSet:
+    document = _checked_document(value, "cases")
     return CaseSet(
         rule_id=_label(document.get("rule_id"), "cases.rule_id"),
         source=_label(document.get("source"), "cases.source"),
@@ -153,7 +161,11 @@ def load_cases(path: Path) -> CaseSet:
 
 
 def load_run(path: Path, role: str, case_set: CaseSet) -> Run:
-    document = _read(path, role)
+    return parse_run(_read(path, role), role, case_set)
+
+
+def parse_run(value: object, role: str, case_set: CaseSet) -> Run:
+    document = _checked_document(value, role)
     if document.get("rule_id") != case_set.rule_id or document.get("source") != case_set.source:
         raise InputError(f"{role} rule_id and source must match the case file")
 

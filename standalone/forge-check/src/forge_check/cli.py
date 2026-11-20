@@ -20,6 +20,7 @@ from forge_check.contract import (
     load_cases,
     load_run,
 )
+from forge_check.governed_commands import add_commands, execute
 
 if TYPE_CHECKING:
     from forge_check.contract import Report
@@ -34,6 +35,7 @@ class _Parser(argparse.ArgumentParser):
 
 
 class _Options(argparse.Namespace):
+    command: str
     cases: Path
     baseline: Path | None
     candidate: Path
@@ -57,6 +59,7 @@ def _parse_args(argv: list[str] | None) -> _Options:
     check.add_argument(
         "--save-reference", type=Path, help="New pending reference without a baseline"
     )
+    add_commands(subcommands)
     options = _Options()
     parser.parse_args(argv, namespace=options)
     return options
@@ -134,6 +137,8 @@ def _print_report(report: Report, *, reference_saved: bool) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     options = _parse_args(argv)
+    if options.command != "check":
+        return execute(options)
     protected = [options.cases, options.candidate]
     if options.baseline is not None:
         protected.append(options.baseline)
