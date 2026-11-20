@@ -94,7 +94,7 @@ jobs:
           git -c credential.helper= -c 'credential.helper=!gh auth git-credential' \
             fetch --no-tags --depth=1 origin "$CANDIDATE_SHA"
           [[ "$(git rev-parse FETCH_HEAD)" == "$CANDIDATE_SHA" ]]
-          python3 .github/standalone/preview_artifact.py verify --repo . \
+          python3 .github/standalone/preview_artifact.py verify --repo . --require-preview \
             --bundle "$RUNNER_TEMP/approved-preview/standalone-preview.zip" \
             --bundle-sha256 "$BUNDLE_SHA" --commit "$CANDIDATE_SHA" --wheel-sha256 "$WHEEL_SHA" \
             --baseline-sha256 "$BASELINE_SHA" --vast-id "$VAST_ID" --stage .standalone-publish \
