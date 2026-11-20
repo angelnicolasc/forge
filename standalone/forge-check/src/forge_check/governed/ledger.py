@@ -9,6 +9,8 @@ from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Any, Literal, cast
 from uuid import uuid4
 
+from forge_check.governed import rollout
+from forge_check.governed.db import require_dispatch_authority
 from forge_check.governed.revision import (
     MAX_SAFE_INTEGER,
     Revision,
@@ -252,7 +254,7 @@ def _attempt_view(row: Row, task: Row) -> dict[str, Any]:
     view["worker"] = task["worker"]
     view["case_id"] = task["case_id"]
     view["source"] = task["source"]
-    view["route"] = "direct"
+    view["route"] = "code_mode" if task["source"] == "code_mode" else "direct"
     view["coverage_profile"] = "governed"
     view["currency"] = "micro-USD"
     return view
@@ -366,6 +368,30 @@ def _fits_reference_binding(payload: dict[str, object], *, kind: str) -> bool:
     )
 
 
+def _shadow_preview(conn: Connection, task: Row, request: Request) -> dict[str, Any] | None:
+    target = rollout.shadow_target(conn, task["root_id"], _utc())
+    if target is None:
+        return None
+    document = _revision(conn, target).document
+    binding = document["bindings"].get(request.binding_id)
+    reason = "preflight_passed"
+    if rollout.is_revoked(conn, target):
+        reason = "revision_revoked"
+    elif task["actor"] != request.principal or not _has_grant(
+        conn, request.principal, request.binding_id
+    ):
+        reason = "principal_denied"
+    elif binding is None or request.binding_id not in document["policy"]["allowed_bindings"]:
+        reason = "policy_denied"
+    elif not _fits_reference_binding(request.payload, kind=binding["kind"]):
+        reason = "invalid_binding_input"
+    elif binding["reserve_microusd"] is None:
+        reason = "price_unknown"
+    elif binding["reserve_microusd"] > document["budget_microusd"]:
+        reason = "binding_exceeds_root_budget"
+    return {"shadow": {"revision": target, "preflight": reason, "provider_dispatched": False}}
+
+
 class Ledger:
     """Enforce transactions before I/O and retain independent observations afterward."""
 
@@ -426,6 +452,7 @@ class Ledger:
                     return Admission("denied", "principal_denied", request, None, {})
                 return Admission("replay", "attempt_exists", request, None, view)
 
+            require_dispatch_authority(conn)
             operation_key = self._mac(
                 "operation-v1",
                 scope,
@@ -506,7 +533,14 @@ class Ledger:
                 ),
             )
             attempt = _select_attempt(conn, request.attempt_id)
-            _event(conn, attempt, task, "admission", scope=scope)
+            _event(
+                conn,
+                attempt,
+                task,
+                "admission",
+                scope=scope,
+                detail=_shadow_preview(conn, task, request),
+            )
             view = _attempt_view(attempt, task)
             if denial:
                 return Admission("denied", denial, request, None, view)
@@ -541,6 +575,8 @@ class Ledger:
             conn, request.principal, request.binding_id
         ):
             return "principal_denied"
+        if block := rollout.dispatch_block(conn, task, _utc()):
+            return block
         if binding is None or request.binding_id not in document["policy"]["allowed_bindings"]:
             return "policy_denied"
         if not _fits_reference_binding(request.payload, kind=binding["kind"]):
@@ -559,18 +595,23 @@ class Ledger:
             attempt = _select_attempt(conn, attempt_id)
             if attempt["status"] != "reserved":
                 return False
+            require_dispatch_authority(conn)
             task = _task(conn, attempt["task_id"])
             document = _revision(conn, task["revision"]).document
             suspended = conn.execute(
                 "SELECT 1 FROM binding_suspensions WHERE binding_id = ?", (attempt["binding_id"],)
             ).fetchone()
-            reason = None
+            now = _utc()
+            reason = rollout.dispatch_block(conn, task, now)
             if not _has_grant(conn, attempt["principal"], attempt["binding_id"]):
                 reason = "principal_denied"
-            elif suspended:
+            elif suspended and reason is None:
                 reason = "binding_suspended"
             elif (
-                _balance(conn, task["root_id"], document["budget_microusd"])["over_limit_microusd"]
+                reason is None
+                and _balance(conn, task["root_id"], document["budget_microusd"])[
+                    "over_limit_microusd"
+                ]
                 > 0
             ):
                 reason = "budget_exceeded"
@@ -583,7 +624,7 @@ class Ledger:
             else:
                 conn.execute(
                     "UPDATE attempts SET status = 'dispatching', dispatched_at = ? WHERE id = ?",
-                    (_utc(), attempt_id),
+                    (now, attempt_id),
                 )
             _event(
                 conn,

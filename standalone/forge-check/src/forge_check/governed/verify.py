@@ -170,16 +170,20 @@ def verify(
                 raise ValueError("Unknown decision")
             decision = dict(row)
             decision["created_at"] = _stamp(int(row["created_at"]))
+        groups = _groups(connection, start, end)
+        mediated = ["direct"]
+        if any(row["source"] == "code_mode" and row["observed_tasks"] for row in groups):
+            mediated.append("code_mode")
         return {
             "schema_version": 1,
             "scope": str(scope["scope"]),
             "window": {"since": _stamp(start), "until": _stamp(end), "end_exclusive": True},
             "active_alias": dict(alias),
             "decision": decision,
-            "by_revision": _groups(connection, start, end),
+            "by_revision": groups,
             "coverage": _coverage(connection, actor, start, end, roster),
             "routes": {
-                "mediated": ["direct"],
+                "mediated": mediated,
                 "observed": [],
                 "unknown": ["outside_explicit_bindings"],
             },

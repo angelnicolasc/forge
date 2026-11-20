@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "forge-os-check"
-version = "0.2.0"
+version = "0.3.0"
 description = "Compare agent results in CI and govern explicitly bound provider operations."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -17,6 +17,9 @@ classifiers = [
     "Programming Language :: Python :: 3 :: Only",
     "Environment :: Console",
 ]
+
+[project.optional-dependencies]
+code-mode = ["quickjs-rs==0.3.0", "wasmtime==50.0.1"]
 
 [project.scripts]
 forge = "forge_check.cli:main"

@@ -10,6 +10,8 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+from forge_check.operations_commands import OPERATIONS, add_operations, run_operation
+
 if TYPE_CHECKING:
     import argparse
     from typing import TypeVar
@@ -75,6 +77,7 @@ def add_commands(subcommands: argparse._SubParsersAction[_Parser]) -> None:
             command.add_argument("--worker", required=True)
             command.add_argument("--case")
             command.add_argument("--parent")
+            command.add_argument("--alias-lease")
             command.add_argument("--binding", required=True)
             command.add_argument("--operation", required=True)
             command.add_argument("--retry-of")
@@ -87,6 +90,7 @@ def add_commands(subcommands: argparse._SubParsersAction[_Parser]) -> None:
             command.add_argument("--until", required=True)
             command.add_argument("--decision")
             command.add_argument("--roster", type=Path)
+    add_operations(subcommands)
 
 
 def _pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
@@ -127,6 +131,7 @@ def _invoke(options: argparse.Namespace, control: Control, host: Host) -> int:
         worker=options.worker,
         parent_id=options.parent,
         case_id=options.case,
+        alias_lease=options.alias_lease,
     )
     request = Request(
         task_id=options.task,
@@ -168,6 +173,9 @@ def execute(options: argparse.Namespace) -> int:
     from forge_check.governed.verify import verify
 
     try:
+        if options.command in OPERATIONS:
+            _emit(run_operation(options, _file))
+            return 0
         store = Store(options.db, create=options.command == "bootstrap")
         control = Control(store)
         result: object

@@ -1188,7 +1188,13 @@ def run_suite(output: Path) -> int:
         install_location.is_relative_to(Path(sys.prefix)),
         "Test process did not use the clean wheel",
     )
-    require(not installed.requires, "Candidate wheel declared unexpected runtime dependencies")
+    extras = {'extra == "code-mode"', "extra == 'code-mode'"}
+    base_requires = [
+        requirement
+        for requirement in installed.requires or []
+        if requirement.partition(";")[2].strip() not in extras
+    ]
+    require(not base_requires, "Candidate wheel declared unexpected base dependencies")
     results: dict[str, str] = {}
     failures: dict[str, str] = {}
     times: dict[str, float] = {}
@@ -1212,6 +1218,7 @@ def run_suite(output: Path) -> int:
         "failures": failures,
         "installed_version": installed.version,
         "runtime_requires": installed.requires or [],
+        "base_requires": base_requires,
         "install_location": str(install_location),
     }
     if failures:

@@ -7,6 +7,8 @@ import time
 from typing import TYPE_CHECKING, Any, Literal
 
 from forge_check.contract import SCHEMA_VERSION, compare, parse_cases, parse_run
+from forge_check.governed import rollout
+from forge_check.governed.db import require_dispatch_authority
 from forge_check.governed.revision import (
     VERIFIER,
     Revision,
@@ -24,6 +26,7 @@ if TYPE_CHECKING:
     from sqlite3 import Connection, Row
 
     from forge_check.governed.db import Store
+    from forge_check.governed.rollout import RolloutMode
 
 ALIAS = "estable"
 ROLES = frozenset(
@@ -267,6 +270,7 @@ class Control:
                 is not None
             ):
                 raise ValueError("Protected scope is already initialized")
+            require_dispatch_authority(conn)
             now = now_micros()
             conn.execute(
                 """INSERT INTO scope_policy (
@@ -298,6 +302,7 @@ class Control:
             roles = set(json.loads(principal(conn, actor)["roles"]))
             if not roles & {"propose", "propose_automatic"}:
                 raise PermissionError("Actor cannot register candidate revisions")
+            require_dispatch_authority(conn)
             if not _matches_revision(checked, _scope(conn)):
                 raise ValueError("Revision conflicts with protected scope, check or host catalog")
             conn.execute(
@@ -334,6 +339,7 @@ class Control:
                 ):
                     raise ValueError("Proposal ID already binds a different request")
                 return dict(previous)
+            require_dispatch_authority(conn)
             conn.execute(
                 "INSERT INTO proposals VALUES (?, ?, ?, ?, ?)",
                 (proposal_id, digest, actor, source, now_micros()),
@@ -400,6 +406,7 @@ class Control:
                     raise ValueError("Evidence ID already binds different evidence")
                 return _evidence_view(current)
 
+            require_dispatch_authority(conn)
             conn.execute(
                 """INSERT INTO gate_evidence VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
@@ -479,6 +486,7 @@ class Control:
                     raise ValueError("Decision ID already binds a different request")
                 return dict(previous)
 
+            require_dispatch_authority(conn)
             alias = _alias(conn)
             policy = _scope(conn)
             now = now_micros()
@@ -505,6 +513,8 @@ class Control:
                 )
                 if cursor.rowcount != 1:
                     raise RuntimeError("Concurrent alias change inside the writer transaction")
+                rollout.stop_open(conn, actor, now, "alias_changed")
+                rollout.invalidate_leases(conn, now)
             return dict(
                 _required(
                     conn.execute("SELECT * FROM decisions WHERE id = ?", (decision_id,)).fetchone(),
@@ -531,7 +541,10 @@ class Control:
             ).fetchone()
             if last is None or last["kind"] != "promote" or last["status"] != "applied":
                 return "rejected", "previous_revision_unavailable", None
-            return "applied", "rollback", str(last["previous_revision"])
+            previous = str(last["previous_revision"])
+            if rollout.is_revoked(conn, previous):
+                return "rejected", "revision_revoked", previous
+            return "applied", "rollback", previous
 
         proposal = conn.execute("SELECT * FROM proposals WHERE id = ?", (proposal_id,)).fetchone()
         if proposal is None:
@@ -541,6 +554,8 @@ class Control:
             return "rejected", "operator_rejected", target
         if policy["paused"]:
             return "rejected", "scope_paused", target
+        if rollout.is_revoked(conn, target):
+            return "rejected", "revision_revoked", target
         if target == alias["revision"] or not _matches_revision(_revision(conn, target), policy):
             return "rejected", "revision_preflight_failed", target
 
@@ -583,6 +598,234 @@ class Control:
             return "rejected", "gate_failed" if verdict == "fail" else "gate_insufficient", target
         return "applied", "gate_passed", target
 
+    def start_rollout(
+        self,
+        actor: str,
+        rollout_id: str,
+        proposal_id: str,
+        evidence_id: str,
+        expected_generation: int,
+        *,
+        mode: RolloutMode,
+        seed: str,
+        basis_points: int,
+        ends_at: int,
+        max_concurrent: int,
+        budget_microusd: int,
+        source: str = "direct",
+    ) -> dict[str, Any]:
+        for value, label in (
+            (rollout_id, "rollout"),
+            (proposal_id, "proposal"),
+            (evidence_id, "evidence"),
+            (seed, "rollout seed"),
+            (source, "source"),
+        ):
+            identifier(value, label)
+        if mode not in ("shadow", "canary"):
+            raise ValueError("Invalid rollout mode")
+        integer(expected_generation, "expected generation", minimum=1)
+        integer(basis_points, "cohort basis points", minimum=1, maximum=10_000)
+        integer(ends_at, "rollout end time", minimum=1)
+        integer(max_concurrent, "concurrent roots", minimum=1, maximum=10_000)
+        integer(budget_microusd, "rollout budget")
+        request = {
+            "actor": actor,
+            "mode": mode,
+            "source": source,
+            "seed": seed,
+            "basis_points": basis_points,
+            "generation": expected_generation,
+            "proposal_id": proposal_id,
+            "evidence_id": evidence_id,
+            "ends_at": ends_at,
+            "max_concurrent": max_concurrent,
+            "budget_microusd": budget_microusd,
+        }
+        with self.store.write() as conn:
+            require_role(conn, actor, "approve")
+            now = now_micros()
+            previous = conn.execute("SELECT * FROM rollouts WHERE id = ?", (rollout_id,)).fetchone()
+            if previous is not None:
+                if any(previous[key] != value for key, value in request.items()):
+                    raise ValueError("Rollout ID already binds a different request")
+                return rollout.rollout_view(conn, previous, now)
+            require_dispatch_authority(conn)
+            current = _alias(conn)
+            status, reason, candidate = self._disposition(
+                conn,
+                "promote",
+                proposal_id,
+                evidence_id,
+                expected_generation,
+                current,
+                _scope(conn),
+                now,
+            )
+            if status != "applied" or candidate is None:
+                raise ValueError(f"Rollout blocked: {reason}")
+            evidence = _required(
+                conn.execute(
+                    "SELECT expires_at FROM gate_evidence WHERE id = ?", (evidence_id,)
+                ).fetchone(),
+                "evidence",
+            )
+            if not now < ends_at <= min(evidence["expires_at"], now + rollout.MAX_ROLLOUT_MICROS):
+                raise ValueError("Rollout must end within the authorized evidence window")
+            active = conn.execute("SELECT * FROM rollouts WHERE stopped_at IS NULL").fetchone()
+            if active is not None:
+                if active["ends_at"] > now:
+                    raise ValueError("Stop the open rollout before starting another")
+                rollout.stop_open(conn, actor, now, "expired")
+            cap = int(_revision(conn, candidate).document["budget_microusd"])
+            conn.execute(
+                """INSERT INTO rollouts (
+                    id, actor, mode, source, seed, basis_points, generation, stable_revision,
+                    candidate_revision, proposal_id, evidence_id, created_at, ends_at,
+                    max_concurrent, budget_microusd, root_cap_microusd
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    rollout_id,
+                    actor,
+                    mode,
+                    source,
+                    seed,
+                    basis_points,
+                    expected_generation,
+                    current["revision"],
+                    candidate,
+                    proposal_id,
+                    evidence_id,
+                    now,
+                    ends_at,
+                    max_concurrent,
+                    budget_microusd,
+                    cap,
+                ),
+            )
+            return self._rollout_view(conn, rollout_id, now)
+
+    @staticmethod
+    def _rollout_view(conn: Connection, rollout_id: str, now: int) -> dict[str, Any]:
+        row = _required(
+            conn.execute("SELECT * FROM rollouts WHERE id = ?", (rollout_id,)).fetchone(),
+            "rollout",
+        )
+        return rollout.rollout_view(conn, row, now)
+
+    def get_rollout(self, actor: str, rollout_id: str) -> dict[str, Any]:
+        identifier(rollout_id, "rollout")
+        with self.store.read() as conn:
+            require_role(conn, actor, "inspect")
+            return self._rollout_view(conn, rollout_id, now_micros())
+
+    def stop_rollout(self, actor: str, rollout_id: str, expected_generation: int) -> dict[str, Any]:
+        identifier(rollout_id, "rollout")
+        integer(expected_generation, "expected generation", minimum=1)
+        with self.store.write() as conn:
+            require_role(conn, actor, "approve")
+            now = now_micros()
+            row = self._rollout_view(conn, rollout_id, now)
+            if row["generation"] != expected_generation:
+                raise ValueError("Stale rollout generation")
+            if row["stopped_at"] is None:
+                require_dispatch_authority(conn)
+                if _alias(conn)["generation"] != expected_generation:
+                    raise ValueError("Stale alias generation")
+                rollout.stop_open(conn, actor, now, "operator_stopped")
+                return self._rollout_view(conn, rollout_id, now)
+            return row
+
+    def issue_alias_lease(self, actor: str, lease_id: str, *, ttl_seconds: int) -> dict[str, Any]:
+        identifier(lease_id, "lease")
+        integer(ttl_seconds, "lease TTL", minimum=1, maximum=rollout.MAX_LEASE_SECONDS)
+        with self.store.write() as conn:
+            require_role(conn, actor, "invoke")
+            row = conn.execute("SELECT * FROM alias_leases WHERE id = ?", (lease_id,)).fetchone()
+            duration = ttl_seconds * 1_000_000
+            if row is not None:
+                if actor != row["actor"] or row["expires_at"] - row["issued_at"] != duration:
+                    raise ValueError("Lease ID already binds different request")
+                return dict(row)
+            require_dispatch_authority(conn)
+            current = _alias(conn)
+            if _scope(conn)["paused"] or rollout.is_revoked(conn, current["revision"]):
+                raise PermissionError("Current alias cannot issue a lease")
+            now = now_micros()
+            conn.execute(
+                "INSERT INTO alias_leases VALUES (?, ?, ?, ?, ?, ?, NULL)",
+                (lease_id, actor, current["generation"], current["revision"], now, now + duration),
+            )
+            return dict(
+                _required(
+                    conn.execute("SELECT * FROM alias_leases WHERE id = ?", (lease_id,)).fetchone(),
+                    "lease",
+                )
+            )
+
+    def revoke_revision(self, actor: str, event_id: str, digest: str) -> dict[str, Any]:
+        identifier(event_id, "event")
+        digest_id(digest)
+        with self.store.write() as conn:
+            require_role(conn, actor, "admin")
+            prior = conn.execute(
+                "SELECT * FROM revoked_revisions WHERE event_id = ? OR revision = ?",
+                (event_id, digest),
+            ).fetchone()
+            if prior is not None:
+                if (prior["event_id"], prior["revision"], prior["actor"]) != (
+                    event_id,
+                    digest,
+                    actor,
+                ):
+                    raise ValueError("Revision or revocation ID already belongs to another event")
+                return dict(prior)
+            require_dispatch_authority(conn)
+            _revision(conn, digest)
+            now = now_micros()
+            conn.execute(
+                "INSERT INTO revoked_revisions VALUES (?, ?, ?, ?)", (digest, event_id, actor, now)
+            )
+            conn.execute(
+                "UPDATE alias_leases SET invalidated_at = ? "
+                "WHERE revision = ? AND invalidated_at IS NULL",
+                (now, digest),
+            )
+            return {"revision": digest, "event_id": event_id, "actor": actor, "revoked_at": now}
+
+    def finish_task(self, actor: str, root_task_id: str) -> dict[str, Any]:
+        identifier(root_task_id, "root task")
+        with self.store.write() as conn:
+            account = principal(conn, actor)
+            task = _required(
+                conn.execute(
+                    "SELECT actor FROM tasks WHERE id = ? AND root_id = id", (root_task_id,)
+                ).fetchone(),
+                "root task",
+            )
+            roles = json.loads(account["roles"])
+            if "admin" not in roles and (task["actor"] != actor or "invoke" not in roles):
+                raise PermissionError("Actor cannot finish that root task")
+            finished = conn.execute(
+                "SELECT * FROM finished_roots WHERE root_id = ?", (root_task_id,)
+            ).fetchone()
+            if finished is not None:
+                return dict(finished)
+            require_dispatch_authority(conn)
+            unsettled = conn.execute(
+                """SELECT 1 FROM attempts WHERE root_id = ? AND (
+                   status IN ('reserved','dispatching','uncertain') OR (
+                   dispatched_at IS NOT NULL
+                   AND (confirmation != 'verified' OR charge_microusd IS NULL)
+                   )) LIMIT 1""",
+                (root_task_id,),
+            ).fetchone()
+            if unsettled is not None:
+                raise ValueError("Root has unresolved exposure or unconfirmed effects")
+            now = now_micros()
+            conn.execute("INSERT INTO finished_roots VALUES (?, ?, ?)", (root_task_id, actor, now))
+            return {"root_id": root_task_id, "actor": actor, "finished_at": now}
+
     def start_task(
         self,
         actor: str,
@@ -593,6 +836,7 @@ class Control:
         worker: str,
         case_id: str | None = None,
         source: str = "direct",
+        alias_lease: str | None = None,
     ) -> dict[str, Any]:
         identifier(task_id, "task")
         identifier(worker, "worker")
@@ -605,6 +849,10 @@ class Control:
                 raise ValueError("A task cannot parent itself")
         if case_id is not None:
             identifier(case_id, "case")
+        if alias_lease is not None:
+            identifier(alias_lease, "lease")
+            if parent_id is not None:
+                raise ValueError("A child task inherits its root's revision")
 
         with self.store.write() as conn:
             require_role(conn, actor, "invoke")
@@ -620,13 +868,34 @@ class Control:
                     existing["source"],
                 ) != (parent_id, worker, alias, case_id, source):
                     raise ValueError("Task ID already binds a different start request")
-                return dict(existing)
+                return rollout.task_view(conn, existing)
 
+            require_dispatch_authority(conn)
+            now = now_micros()
+            allocation = None
             if parent_id is None:
-                if _scope(conn)["paused"]:
+                policy = _scope(conn)
+                if policy["paused"]:
                     raise PermissionError("Scope is paused for new root tasks")
-                current = _alias(conn)
+                current = (
+                    _alias(conn)
+                    if alias_lease is None
+                    else rollout.resolve_lease(conn, actor, alias_lease, now)
+                )
                 root_id, generation, digest = task_id, current["generation"], current["revision"]
+                if rollout.is_revoked(conn, digest):
+                    raise PermissionError("Current revision was revoked")
+                allocation = rollout.plan_root(
+                    conn,
+                    scope=policy["scope"],
+                    root_id=root_id,
+                    source=source,
+                    generation=generation,
+                    stable=digest,
+                    now=now,
+                )
+                if allocation is not None:
+                    digest = allocation.revision
             else:
                 parent = _required(
                     conn.execute("SELECT * FROM tasks WHERE id = ?", (parent_id,)).fetchone(),
@@ -634,6 +903,9 @@ class Control:
                 )
                 if parent["actor"] != actor:
                     raise PermissionError("Parent task belongs to another actor")
+                block = rollout.dispatch_block(conn, parent, now)
+                if block is not None:
+                    raise PermissionError(block)
                 root_id, generation, digest = (
                     parent["root_id"],
                     parent["generation"],
@@ -650,15 +922,20 @@ class Control:
                     alias,
                     generation,
                     digest,
-                    now_micros(),
+                    now,
                     case_id,
                     source,
                 ),
             )
-            return dict(
+            if allocation is not None:
+                allocation.record(conn, root_id)
+            if alias_lease is not None:
+                conn.execute("INSERT INTO leased_roots VALUES (?, ?)", (root_id, alias_lease))
+            return rollout.task_view(
+                conn,
                 _required(
                     conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone(), "task"
-                )
+                ),
             )
 
     def get_alias(self, actor: str) -> dict[str, Any]:
@@ -716,6 +993,7 @@ class Control:
                 ):
                     raise ValueError("Control event already binds a different request")
                 return
+            require_dispatch_authority(conn)
             if action == "revoke":
                 if actor == target:
                     raise ValueError("An administrator cannot revoke its own authority")

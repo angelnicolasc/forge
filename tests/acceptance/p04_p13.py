@@ -45,7 +45,9 @@ def run(
     return result
 
 
-def install_and_probe(wheel: Path, output: Path, lab_id: str) -> dict[str, Any]:
+def install_and_probe(
+    wheel: Path, output: Path, lab_id: str, *, driver: str = "governed_trials.py"
+) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="forge-p04-p13-") as temporary:
         work = Path(temporary)
         virtualenv = work / "venv"
@@ -86,11 +88,11 @@ def install_and_probe(wheel: Path, output: Path, lab_id: str) -> dict[str, Any]:
             if name == "wheel-install":
                 installation_seconds = time.monotonic() - started
 
-        for filename in ("governed_oracle.py", "governed_trials.py"):
+        for filename in dict.fromkeys(("governed_oracle.py", "governed_trials.py", driver)):
             shutil.copyfile(Path(__file__).with_name(filename), work / filename)
         shutil.copytree(CHECKOUT / "examples/check-support", work / "support")
         result = run(
-            [python, str(work / "governed_trials.py"), str(output)],
+            [python, str(work / driver), str(output)],
             cwd=work,
             env=environment,
             output=output,
@@ -108,8 +110,8 @@ def install_and_probe(wheel: Path, output: Path, lab_id: str) -> dict[str, Any]:
         return {"installation_seconds": round(installation_seconds, 4), **data}
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+def acceptance_main(trials: tuple[str, ...], driver: str, description: str | None) -> int:
+    parser = argparse.ArgumentParser(description=description)
     parser.add_argument("--wheel", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
@@ -123,19 +125,23 @@ def main() -> int:
         "lab_id": lab_id,
         "python": sys.version,
         "wheel": wheel.name,
-        "tests": dict.fromkeys(TRIALS, "pending"),
+        "tests": dict.fromkeys(trials, "pending"),
     }
     try:
         evidence["wheel_sha256"] = hashlib.sha256(wheel.read_bytes()).hexdigest()
         evidence["wheel_bytes"] = wheel.stat().st_size
-        evidence.update(install_and_probe(wheel, destination, lab_id))
+        evidence.update(install_and_probe(wheel, destination, lab_id, driver=driver))
     except (OSError, subprocess.SubprocessError, RuntimeError, ValueError) as error:
         evidence["failure"] = str(error)
     write_json(destination / "acceptance.json", evidence)
     print(json.dumps({"tests": evidence["tests"], "failure": evidence.get("failure")}))
     return int(
-        "failure" in evidence or any(state != "pass" for state in evidence["tests"].values())
+        "failure" in evidence or any(evidence["tests"].get(trial) != "pass" for trial in trials)
     )
+
+
+def main() -> int:
+    return acceptance_main(TRIALS, "governed_trials.py", __doc__)
 
 
 if __name__ == "__main__":

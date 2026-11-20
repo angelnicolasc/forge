@@ -152,7 +152,13 @@ class Lab:
         )
         require(inspected.returncode == 0, "Could not inspect installed wheel metadata")
         metadata = json.loads(inspected.stdout)
-        require(not metadata["runtime_requires"], "Wheel declares runtime requirements")
+        extras = {'extra == "code-mode"', "extra == 'code-mode'"}
+        metadata["base_requires"] = [
+            requirement
+            for requirement in metadata["runtime_requires"]
+            if requirement.partition(";")[2].strip() not in extras
+        ]
+        require(not metadata["base_requires"], "Base wheel declares runtime requirements")
         require(
             set(metadata["installed"]) <= {"forge-os-check", "pip", "setuptools"},
             "Unexpected distribution in the clean environment",
