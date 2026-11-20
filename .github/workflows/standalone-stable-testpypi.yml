@@ -74,18 +74,22 @@ jobs:
             --principal "$SIGNER_PRINCIPAL" --fingerprint "$SIGNER_FINGERPRINT" \
             > "$RUNNER_TEMP/signatures.json"
 
-          status="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${CANDIDATE_SHA}/status" --jq \
-            '[.statuses[] | select(.context == "forge/standalone-signed-series")] | first')"
+          status="$(gh api --paginate --slurp \
+            "repos/${GITHUB_REPOSITORY}/commits/${CANDIDATE_SHA}/statuses?per_page=100" | \
+            jq -ce 'first(.[][] | select(.context == "forge/standalone-signed-series"))')"
           prefix="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/"
           run_url="$(jq -er --arg prefix "$prefix" \
             'select(.state == "success" and .creator.login == "github-actions[bot]") |
-             .target_url | select(startswith($prefix))' <<< "$status")"
+             (.target_url // "") | select(startswith($prefix))' <<< "$status")"
           run_id="${run_url#"$prefix"}"
           [[ "$run_id" =~ ^[1-9][0-9]*$ ]]
           workflow_id="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/standalone-signatures.yml" --jq .id)"
           gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" | jq -e \
-            --argjson workflow "$workflow_id" '
-              .workflow_id == $workflow and .event == "pull_request_target" and
+            --argjson run "$run_id" --argjson workflow "$workflow_id" \
+            --arg commit "$CANDIDATE_SHA" --arg repository "$GITHUB_REPOSITORY" '
+              .id == $run and .workflow_id == $workflow and .event == "pull_request_target" and
+              .head_sha == $commit and .repository.full_name == $repository and
+              .head_repository.full_name == $repository and
               .status == "completed" and .conclusion == "success"
             ' > /dev/null
 
