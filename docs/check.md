@@ -4,7 +4,17 @@ Use `forge check` to compare two recorded revisions against a rule your team def
 
 ## Try the support example
 
-Use a fresh Python 3.11+ environment on your runner and install the candidate wheel from the revision you are reviewing. The standalone `forge-os-check` wheel provides the `forge` command and has no runtime dependencies. Give it its own environment because the legacy `forge-os-cli` wheel provides the same command.
+Use a dedicated Python 3.11 or newer environment. The standalone `forge-os-check` wheel has no runtime dependencies and provides the same `forge` command name as the legacy `forge-os-cli` package.
+
+Install the stable 0.4.0 release from PyPI.
+
+```bash
+python -m venv .venv-forge-check
+source .venv-forge-check/bin/activate
+python -m pip install "forge-os-check==0.4.0"
+```
+
+For candidate review, set `FORGE_CHECK_WHEEL` to the supplied wheel's absolute path. Install it directly in the CI environment.
 
 ```bash
 python -m venv "$RUNNER_TEMP/forge-check"
@@ -12,7 +22,7 @@ source "$RUNNER_TEMP/forge-check/bin/activate"
 python -m pip install --no-index --no-deps "$FORGE_CHECK_WHEEL"
 ```
 
-Set `FORGE_CHECK_WHEEL` to the absolute path of the wheel supplied to your CI job. For a runner outside GitHub Actions, use an equivalent temporary directory in place of `RUNNER_TEMP`.
+For a runner outside GitHub Actions, use an equivalent temporary directory in place of `RUNNER_TEMP`.
 
 From the source checkout, use the [saved support fixtures](https://github.com/angelnicolasc/forge/tree/main/examples/check-support). The agent marked all 24 tickets complete. Eight required one confirmed entry in the human queue. The cheaper candidate has only six. For the other two, an independent queue read confirmed the absence of the required entry.
 

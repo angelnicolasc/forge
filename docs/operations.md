@@ -17,7 +17,7 @@ forge rollout-stop --db state/governed.sqlite3 --actor release-owner --rollout s
 
 Shadow records candidate selection without dispatching candidate work. Check the independent ticket log before starting a new rollout in `--mode canary`. The host assigns a stable bucket to each eligible root and accounts for its revision's maximum root budget. A task and its children retain their assigned revision. Use `forge task-finish --task ID` to close a root and account for resolved effects and charges. Uncertain exposure continues to occupy rollout capacity.
 
-`rollout-stop` changes future assignments. Use `forge rollback` to reverse a promotion at the current generation. Use `forge revision-revoke --event ID --revision DIGEST` to cut future dispatches under an unsafe revision. The ticket system retains prior effects and controls any compensation. `forge verify` reports observed traffic. `rollout-status` gives the observed eligible root count for the configured source.
+`rollout-stop` changes future assignments. Use `forge rollback` to reverse a promotion at the current generation. Use `forge revision-revoke --event ID --revision DIGEST` to block new dispatch intents under an unsafe revision. An intent already recorded at the time of revocation can still reach the destination. Reconcile it by attempt ID. The ticket system retains prior effects and controls any compensation. `forge verify` reports observed traffic. `rollout-status` gives the observed eligible root count for the configured source.
 
 ## Alias leases and dispatch authority
 

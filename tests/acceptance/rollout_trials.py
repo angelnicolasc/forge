@@ -283,11 +283,152 @@ def verify_lease(oracle: Oracle) -> dict:
     }
 
 
+def verify_operator_cut(oracle: Oracle) -> dict:
+    world = World("canary-cut", oracle, manifest(budget=100_000, model_reserve=40_000))
+    proposal, revision = stage(world, effect="read")
+    shadow_id, canary_id, next_id, *_ = matching_ids()
+    journal_start = len(oracle.journal)
+    operator = ("--db", str(world.db), "--actor", OWNER)
+    stable = world.base.digest
+
+    open_rollout(world, proposal, "cut-shadow", mode="shadow")
+    shadow = world.task(shadow_id)
+    require(
+        shadow["revision"] == stable and shadow["allocation"]["cohort"] == "shadow",
+        "The preflight did not select shadow without changing the effective revision",
+    )
+    shadow_read = request(shadow_id, "cut-shadow-read", "CUT-SHADOW")
+    state_matches(world.submit(shadow_read), "dispatch", "succeeded")
+    world.cli("rollout-stop", *operator, "--rollout", "cut-shadow", "--generation", "1")
+
+    active = open_rollout(world, proposal, "operator-cut", mode="canary")
+    pinned = world.task(canary_id)
+    require(
+        pinned["revision"] == revision and pinned["allocation"]["cohort"] == "canary",
+        "The read-only canary did not pin the candidate revision",
+    )
+    candidate_read = request(canary_id, "cut-canary-read", "CUT-CANARY")
+    checked = world.submit(candidate_read)
+    state_matches(checked, "dispatch", "succeeded")
+    require(
+        checked["result"] == {"ticket_id": "CUT-CANARY", "label": "human"},
+        "The candidate response failed its independent expected verdict",
+    )
+    lost = request(canary_id, "cut-response-lost", "CUT-LOST")
+    oracle.arrange("CUT-LOST", Behavior(mode="drop", charge=17_000))
+    state_matches(world.submit(lost), "dispatch", "uncertain")
+    require(
+        world.ledger.balance(canary_id)["pending_microusd"] == 50_000,
+        "Forge failed to retain the read reserve after the provider accepted the attempt",
+    )
+
+    stopped = world.cli("rollout-stop", *operator, "--rollout", "operator-cut", "--generation", "1")
+    require(
+        stopped["state"] == "stopped"
+        and stopped["stop_reason"] == "operator_stopped"
+        and stopped["exposure_microusd"] == 100_000,
+        "Stopping new assignments released existing canary exposure or left the rollout open",
+    )
+    require(expected_bucket(next_id) < _BASIS_POINTS, "The next task was a cohort holdout")
+    next_root = world.task(next_id)
+    require(
+        next_root["revision"] == stable and "allocation" not in next_root,
+        "The next eligible root did not use the stable revision after the stop",
+    )
+    stable_read = request(next_id, "cut-stable-read", "CUT-STABLE")
+    state_matches(world.submit(stable_read), "dispatch", "succeeded")
+
+    revoked = world.cli(
+        "revision-revoke", *operator, "--event", "cut-revocation", "--revision", revision
+    )
+    require(revoked["revision"] == revision, "The operator revoked an unexpected revision")
+    denied_read = request(canary_id, "cut-denied-read", "CUT-DENIED")
+    denied = world.submit(denied_read)
+    state_matches(denied, "denied", "denied")
+    require(
+        world.task(canary_id)["revision"] == revision
+        and denied["attempt"]["reason"] == "revision_revoked"
+        and not oracle.dispatches("CUT-DENIED"),
+        "The pinned task changed revision or reached the destination after revocation",
+    )
+    pending = world.ledger.balance(canary_id)
+    require(
+        pending["pending_microusd"] == 50_000,
+        "Stopping and revoking an assignment cleared its unresolved exposure",
+    )
+    physical = oracle.dispatches("CUT-LOST")
+    require(len(physical) == 1, "The dropped response did not have exactly one physical dispatch")
+    with rejects(PermissionError):
+        world.host.reconcile(OPERATOR, lost.attempt_id)
+    resolved = world.cli(
+        "reconcile", *operator, "--provider", oracle.origin, "--attempt", lost.attempt_id
+    )
+    state_matches(resolved, "reconciled", "succeeded")
+    after = world.ledger.balance(canary_id)
+    require(
+        resolved["attempt"]["confirmation"] == "verified"
+        and resolved["attempt"]["operation_key"] == physical[0]["operation_key"]
+        and resolved["attempt"]["charge_microusd"] == physical[0]["charge_microusd"]
+        and after["pending_microusd"] == 0
+        and after["consumed_microusd"] == 30_000,
+        "The provider observation did not settle exactly the held read and its verified charge",
+    )
+    world.control.finish_task(OPERATOR, canary_id)
+    settled = world.control.get_rollout(OWNER, "operator-cut")
+    require(
+        settled["active_roots"] == 0 and settled["exposure_microusd"] == 30_000,
+        "Finishing the reconciled root did not release the rest of the rollout allocation",
+    )
+    journal = oracle.journal[journal_start:]
+    dispatches = [row for row in journal if row["source"] == "dispatch"]
+    require(
+        [(row["attempt_id"], row["revision"]) for row in dispatches]
+        == [
+            (shadow_read.attempt_id, stable),
+            (candidate_read.attempt_id, revision),
+            (lost.attempt_id, revision),
+            (stable_read.attempt_id, stable),
+        ]
+        and all(not row["effect_created"] for row in dispatches),
+        "The provider did not observe the exact read-only dispatch sequence",
+    )
+    require(
+        [row for row in journal if row["source"] == "reconcile"]
+        == [
+            {
+                "source": "reconcile",
+                "operation_key": physical[0]["operation_key"],
+                "attempt_id": lost.attempt_id,
+            }
+        ],
+        "The provider did not observe exactly one authorized reconciliation",
+    )
+    return {
+        "shadow": shadow,
+        "canary": active,
+        "pinned_root": pinned,
+        "stopped": stopped,
+        "new_root": next_root,
+        "revocation": revoked,
+        "denied_attempt": denied["attempt"],
+        "before_reconciliation": pending,
+        "after_reconciliation": after,
+        "verified_attempt": resolved["attempt"],
+        "final_rollout": settled,
+        "receipts": world.ledger.receipts(canary_id),
+        "destination": journal,
+    }
+
+
 def main(output: Path) -> int:
     tests: dict[str, str] = {}
     failures: dict[str, str] = {}
     with Oracle() as oracle:
-        for name, check in (("P17", verify_rollout), ("P18", verify_lease)):
+        for name, check in (
+            ("P17", verify_rollout),
+            ("P18", verify_lease),
+            ("canary-cut", verify_operator_cut),
+        ):
             try:
                 dump(output / f"{name}.json", check(oracle))
                 tests[name] = "pass"

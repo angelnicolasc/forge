@@ -24,14 +24,27 @@ from urllib import error, parse, request
 
 _REPOSITORY = "angelnicolasc/forge"
 _PROJECT = "forge-os-check"
-_VERSION = r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)rc[1-9][0-9]*"
-_WHEEL = re.compile(rf"forge_os_check-({_VERSION})-py3-none-any\.whl")
+_VERSION_NUMBER = r"(?:0|[1-9][0-9]*)"
+_VERSION = re.compile(
+    rf"{_VERSION_NUMBER}\.{_VERSION_NUMBER}\.{_VERSION_NUMBER}(?P<rc>rc[1-9][0-9]*)?"
+)
+_WHEEL = re.compile(rf"forge_os_check-({_VERSION.pattern})-py3-none-any\.whl")
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _COMMIT = re.compile(r"[0-9a-f]{40}")
 _LAB = re.compile(r"[1-9][0-9]*")
 _EVIDENCE = ("p23.json", "onboarding.json", "bindings.json")
 _ADR_EVIDENCE = ("build.json", "conditional.json", "gate-upgrade.json")
 _RC2_WHEEL_SHA256 = "da2e99069084178ca8b85ebcf9504e0ab7be8755bc92b8f355d0eddd043713ec"
+_RC3_WHEEL_SHA256 = "866abed30badeddecbd655aa402264269b81c879ff6d6cc75acafc2bd63e2ae0"
+_LEGACY_RELEASE_CANDIDATES = {
+    "0.4.0rc1": "ac7fc305fbe5bd25b92d2edc01e64e7ceee9d9b269f1700005f3c0711993b632",
+    "0.4.0rc2": _RC2_WHEEL_SHA256,
+}
+_STABLE_EVIDENCE = ("stable-compatibility.json",)
+_INDEXES = {
+    "testpypi": ("test.pypi.org", {"test-files.pythonhosted.org", "files.pythonhosted.org"}),
+    "pypi": ("pypi.org", {"files.pythonhosted.org"}),
+}
 _MAX_BUNDLE = 8 * 1024 * 1024
 _MAX_MEMBER = 2 * 1024 * 1024
 
@@ -78,7 +91,7 @@ def report(data: bytes) -> dict[str, Any]:
 def wheel_version(name: str, data: bytes) -> str:
     match = _WHEEL.fullmatch(name)
     if not match:
-        raise ValueError("The standalone channel accepts one universal release candidate wheel")
+        raise ValueError("Expected one universal standalone final or release candidate wheel")
     version = match[1]
     expected_metadata = f"forge_os_check-{version}.dist-info/METADATA"
     with zipfile.ZipFile(io.BytesIO(data)) as wheel:
@@ -89,13 +102,28 @@ def wheel_version(name: str, data: bytes) -> str:
             metadata = email.message_from_bytes(read_limited(stream, 32_768))
         require(metadata.get_all("Name") == [_PROJECT], "Unexpected wheel metadata project")
         require(metadata.get_all("Version") == [version], "Wheel metadata version mismatch")
+        if is_stable(version):
+            require(
+                metadata.get_all("Requires-Python") == [">=3.11"],
+                "Stable Python support must match the approved 3.11 minimum",
+            )
     return version
 
 
+def is_stable(version: str) -> bool:
+    match = _VERSION.fullmatch(version)
+    if match is None:
+        raise ValueError("Expected a canonical standalone release version")
+    return match["rc"] is None
+
+
 def evidence_names(version: str) -> tuple[str, ...]:
-    # RC1/RC2 were sealed using the original acceptance contract.
-    numbers = tuple(int(part) for part in version.replace("rc", ".").split("."))
-    return _EVIDENCE + _ADR_EVIDENCE if numbers >= (0, 4, 0, 3) else _EVIDENCE
+    final = is_stable(version)
+    # Only these two already-sealed candidates predate conditional evidence.
+    if version in _LEGACY_RELEASE_CANDIDATES:
+        return _EVIDENCE
+    names = _EVIDENCE + _ADR_EVIDENCE
+    return names + _STABLE_EVIDENCE if final else names
 
 
 def git(repo: Path, *arguments: str) -> bytes:
@@ -274,6 +302,65 @@ def gate_upgrade(proof: dict[str, Any], version: str, sha256: str, lab_id: str) 
     )
 
 
+def stable_compatibility(
+    proof: dict[str, Any], *, version: str, sha256: str, lab_id: str, commit: str
+) -> None:
+    require(
+        type(proof.get("schema")) is int
+        and proof["schema"] == 1
+        and proof["status"] == "pass"
+        and proof["commit"] == commit
+        and proof["version"] == version
+        and proof["wheel_sha256"] == sha256
+        and proof["vast_lab_id"] == lab_id
+        and proof["previous_version"] == "0.4.0rc3"
+        and proof["previous_wheel_sha256"] == _RC3_WHEEL_SHA256
+        and proof["platform"] == "linux-x86_64",
+        "Stable compatibility must identify this commit, wheel, host and the approved RC3 wheel",
+    )
+    installs = proof["installs"]
+    require(set(installs) == {"3.11", "3.12"}, "Require Python 3.11 and 3.12 installs")
+    for minor, install in installs.items():
+        require(
+            re.fullmatch(rf"{re.escape(minor)}\.[0-9]+", install["python"])
+            and install["base_dependency_free"] is True
+            and install["base_verdicts"]
+            == {"pass": "pass", "fail": "fail", "insufficient": "insufficient"}
+            and install["extra_inventory"]
+            == {
+                "direct": {"on_hand": 7, "sku": "A-18"},
+                "dispatches": ["A-18", "A-18", "B-42"],
+                "program": {"total_on_hand": 9},
+            },
+            f"Stable compatibility failed the Python {minor} base or Code Mode install",
+        )
+    upgrade = proof["upgrade"]
+    observations = upgrade["destination"]
+    require(
+        upgrade["schema_before"] == upgrade["schema_after"] == 2
+        and _SHA256.fullmatch(upgrade["backup_sha256"])
+        and _SHA256.fullmatch(upgrade["historical_receipts_sha256"])
+        and upgrade["historical_receipts_sha256"] == upgrade["post_install_receipts_sha256"]
+        and type(upgrade["receipt_count_before"]) is int
+        and type(upgrade["receipt_count_after"]) is int
+        and 0 < upgrade["receipt_count_before"] < upgrade["receipt_count_after"]
+        and upgrade["alias_before"] == upgrade["alias_after"] == upgrade["alias_after_rollback"]
+        and _SHA256.fullmatch(upgrade["alias_before"]["revision"])
+        and type(upgrade["alias_before"]["generation"]) is int
+        and upgrade["alias_before"]["generation"] > 0
+        and upgrade["rollback_live_receipts_preserved"] is True
+        and [row["attempt"] for row in observations]
+        == ["before-stable", "after-stable", "after-rollback"]
+        and all(
+            row["revision"] == upgrade["alias_before"]["revision"]
+            and row["binding"] == "inventory.stock"
+            and row["input"] == {"sku": "RELEASE-SKU"}
+            for row in observations
+        ),
+        "Stable compatibility must preserve the live RC3 ledger and demonstrate rollback",
+    )
+
+
 def acceptance(
     reports: dict[str, bytes],
     *,
@@ -285,6 +372,14 @@ def acceptance(
     wheel: str,
     repo: Path | None,
 ) -> None:
+    require(
+        set(reports) == set(evidence_names(version)), "Incomplete standalone acceptance evidence"
+    )
+    if version in _LEGACY_RELEASE_CANDIDATES:
+        require(
+            sha256 == _LEGACY_RELEASE_CANDIDATES[version],
+            "Legacy evidence is valid only for the originally sealed wheel",
+        )
     p23 = report(reports["p23.json"])
     proof = p23.get("wheel_sha256")
     require(
@@ -373,6 +468,14 @@ def acceptance(
         )
         conditional_evidence(conditional)
         gate_upgrade(report(reports["gate-upgrade.json"]), version, sha256, lab_id)
+    if is_stable(version):
+        stable_compatibility(
+            report(reports["stable-compatibility.json"]),
+            version=version,
+            sha256=sha256,
+            lab_id=lab_id,
+            commit=commit,
+        )
 
 
 def check_inputs(commit: str, wheel_sha: str, baseline: str, lab_id: str) -> None:
@@ -408,6 +511,9 @@ def seal(args: argparse.Namespace) -> dict[str, Any]:
                 "gate-upgrade.json": args.gate_upgrade,
             }
         )
+    if is_stable(version):
+        require(args.stable_compatibility, "Require RC3 upgrade and stable interpreter receipts")
+        paths["stable-compatibility.json"] = args.stable_compatibility
     reports = {filename: read_file(path, _MAX_MEMBER) for filename, path in paths.items()}
     acceptance(
         reports,
@@ -458,7 +564,14 @@ def verify(args: argparse.Namespace) -> dict[str, Any]:
         name = wheels[0]
         match = _WHEEL.fullmatch(name)
         assert match is not None
-        evidence = evidence_names(match[1])
+        version = match[1]
+        final = is_stable(version)
+        require(not args.require_stable or final, "This release channel requires a final version")
+        require(
+            not args.require_preview or not final,
+            "This release channel requires a release candidate",
+        )
+        evidence = evidence_names(version)
         fixed = {"receipt.json", *evidence}
         require(
             len(entries) == len(names) == len(fixed) + 1
@@ -536,39 +649,58 @@ def fetch(args: argparse.Namespace) -> dict[str, Any]:
 def check_index(args: argparse.Namespace) -> dict[str, Any]:
     filename = f"forge_os_check-{args.version}-py3-none-any.whl"
     require(_WHEEL.fullmatch(filename) and _SHA256.fullmatch(args.wheel_sha256), "Invalid approval")
-    url = f"https://test.pypi.org/pypi/{_PROJECT}/{args.version}/json"
+    final = is_stable(args.version)
+    require(args.index != "pypi" or final, "Production requires a final version")
+    metadata_origin, wheel_origins = _INDEXES[args.index]
+    url = f"https://{metadata_origin}/pypi/{_PROJECT}/{args.version}/json"
     opener = request.build_opener(request.ProxyHandler({}), _NoRedirect())
+    identity = {"index": args.index, "version": args.version}
     for retry in range(7):
         try:
             with opener.open(url, timeout=20) as response:
                 metadata = report(read_limited(response, _MAX_MEMBER))
-            file = [entry for entry in metadata["urls"] if entry["filename"] == filename]
-            if file:
-                break
         except error.HTTPError as exception:
             if exception.code != 404:
                 raise
+            if args.probe:
+                return {**identity, "state": "absent"}
+        else:
+            files = metadata["urls"]
+            require(isinstance(files, list), "Index metadata must provide a list of release files")
+            matches = [entry for entry in files if entry["filename"] == filename]
+            if args.probe or matches:
+                break
         if retry == 6:
-            raise ValueError("Published wheel never appeared in TestPyPI")
+            raise ValueError(f"Published wheel never appeared on {metadata_origin}")
         time.sleep(10)
-    require(len(file) == 1, "Expected exactly one published wheel")
-    item = file[0]
     require(
-        item["digests"]["sha256"] == args.wheel_sha256, "TestPyPI reports a different wheel digest"
+        metadata["info"]["name"] == _PROJECT and metadata["info"]["version"] == args.version,
+        "Index metadata does not identify the approved release",
+    )
+    require(len(matches) == 1, "Expected exactly one published wheel")
+    if args.probe or final:
+        require(len(files) == 1, "Index contains an unapproved distribution")
+    item = matches[0]
+    require(item.get("yanked") is False, "Approved wheel is yanked or its status is missing")
+    require(
+        item["digests"]["sha256"] == args.wheel_sha256, "Index reports a different wheel digest"
     )
     endpoint = parse.urlsplit(item["url"])
     require(
         endpoint.scheme == "https"
-        and endpoint.netloc in {"test-files.pythonhosted.org", "files.pythonhosted.org"}
+        and endpoint.netloc in wheel_origins
         and endpoint.path.endswith(f"/{filename}")
         and not endpoint.query
         and not endpoint.fragment,
-        "Unexpected TestPyPI wheel origin",
+        "Unexpected wheel origin for the selected index",
     )
     with opener.open(item["url"], timeout=30) as response:
         wheel = read_limited(response, _MAX_MEMBER)
     require(hmac.compare_digest(digest(wheel), args.wheel_sha256), "Published file bytes differ")
-    return {"version": args.version, "wheel_sha256": args.wheel_sha256, "bytes": len(wheel)}
+    receipt = {**identity, "wheel_sha256": args.wheel_sha256, "bytes": len(wheel)}
+    if args.probe:
+        receipt["state"] = "verified"
+    return receipt
 
 
 def main() -> int:
@@ -591,17 +723,23 @@ def main() -> int:
     packing.add_argument("--build-report", type=Path)
     packing.add_argument("--conditional", type=Path)
     packing.add_argument("--gate-upgrade", type=Path)
+    packing.add_argument("--stable-compatibility", type=Path)
     for name in ("p23", "onboarding", "bindings", "output"):
         packing.add_argument(f"--{name}", type=Path, required=True)
     checking.add_argument("--bundle", type=Path, required=True)
     checking.add_argument("--bundle-sha256", required=True)
     checking.add_argument("--vast-id", required=True)
     checking.add_argument("--stage", type=Path)
+    channel = checking.add_mutually_exclusive_group()
+    channel.add_argument("--require-stable", action="store_true")
+    channel.add_argument("--require-preview", action="store_true")
     transfer = actions.add_parser("fetch")
     transfer.add_argument("--host", required=True)
     transfer.add_argument("--bundle-sha256", required=True)
     transfer.add_argument("--output", type=Path, required=True)
     index = actions.add_parser("verify-index")
+    index.add_argument("--index", choices=tuple(_INDEXES), default="testpypi")
+    index.add_argument("--probe", action="store_true", help="Check whether the exact wheel exists")
     index.add_argument("--version", required=True)
     index.add_argument("--wheel-sha256", required=True)
     args = parser.parse_args()

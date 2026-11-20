@@ -882,13 +882,39 @@ class Ledger:
             serialized = _json_object(projected, "cache result", _MAX_CACHE_BYTES)
         except (LedgerError, ValueError):
             return  # An unusable optional cache entry cannot discard provider evidence.
-        conn.execute("DELETE FROM read_cache WHERE expires_at <= ?", (_utc(),))
+        # Responses can arrive out of order. Compare the durable claim sequence, including
+        # for claims made in the same clock tick, rather than the response time.
+        order = conn.execute(
+            """SELECT incoming.seq > COALESCE((
+                   SELECT prior.seq
+                   FROM read_cache AS cached
+                   JOIN attempts AS source ON source.id = cached.source_attempt_id
+                   JOIN receipts AS prior ON prior.task_id = source.task_id
+                     AND prior.attempt_id = source.id AND prior.phase = 'dispatch_intent'
+                   WHERE cached.cache_key = ?
+               ), 0)
+               FROM receipts AS incoming
+               WHERE incoming.task_id = ? AND incoming.attempt_id = ?
+                 AND incoming.phase = 'dispatch_intent'""",
+            (attempt["cache_key"], attempt["task_id"], attempt["id"]),
+        ).fetchone()
+        if order is None or not order[0]:
+            return
+        now = _utc()
+        # An expired value cannot be read, but its source still orders same-key sends in flight.
+        conn.execute(
+            """DELETE FROM read_cache WHERE expires_at <= ? AND cache_key NOT IN (
+                   SELECT cache_key FROM attempts
+                   WHERE status = 'dispatching' AND cache_key IS NOT NULL
+               )""",
+            (now,),
+        )
         conn.execute(
             "INSERT OR REPLACE INTO read_cache VALUES (?, ?, ?, ?)",
             (
                 attempt["cache_key"],
                 attempt["id"],
-                _utc() + attempt["cache_ttl_seconds"] * 1_000_000,
+                now + attempt["cache_ttl_seconds"] * 1_000_000,
                 serialized,
             ),
         )

@@ -1,10 +1,16 @@
 # Compose governed reads with Code Mode
 
-Code Mode is an experimental Linux SDK profile for composing explicitly enabled read bindings in JavaScript. The base wheel supports governed calls through `Host.invoke`. Install the optional executor in the environment that will run programs.
+Code Mode is an experimental SDK profile for composing governed reads in JavaScript on Linux x86_64. The package requires Python 3.11 or newer. Release checks cover Python 3.11 and 3.12.
+
+Install the stable 0.4.0 extra from PyPI in a dedicated environment.
 
 ```bash
-python -m pip install "${FORGE_WHEEL}[code-mode]"
+python -m venv .venv-forge-code
+source .venv-forge-code/bin/activate
+python -m pip install "forge-os-check[code-mode]==0.4.0"
 ```
+
+When reviewing a candidate, install the extra from the supplied wheel with `python -m pip install "${FORGE_WHEEL}[code-mode]"`. The host must also explicitly enable Code Mode and allow the read binding for the actor. The base wheel supports direct governed calls through `Host.invoke`.
 
 ## Describe an inventory operation
 

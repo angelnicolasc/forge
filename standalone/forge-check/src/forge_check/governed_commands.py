@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from typing import TypeVar
 
     from forge_check.governed.control import Control
-    from forge_check.governed.host import Host
+    from forge_check.governed.host import Host, Invocation
 
     _Parser = TypeVar("_Parser", bound=argparse.ArgumentParser)
 
@@ -154,11 +154,13 @@ def _invoke(options: argparse.Namespace, control: Control, host: Host) -> int:
     else:
         terminal = host.invoke(request)
     _emit(asdict(terminal))
-    return 2 if terminal.disposition == "invalid_result" else _attempt_exit(terminal.attempt)
+    return _invocation_exit(terminal)
 
 
-def _attempt_exit(attempt: dict[str, object]) -> int:
-    status = attempt.get("status")
+def _invocation_exit(invocation: Invocation) -> int:
+    if invocation.requires_reconciliation or invocation.disposition == "invalid_result":
+        return 2
+    status = invocation.attempt.get("status")
     if status in ("cached", "succeeded"):
         return 0
     return 1 if status in ("denied", "failed", "not_sent") else 2
@@ -258,7 +260,7 @@ def execute(options: argparse.Namespace) -> int:
                     return _invoke(options, control, host)
                 reconciled = host.reconcile(options.actor, options.attempt)
                 _emit(asdict(reconciled))
-                return _attempt_exit(reconciled.attempt)
+                return _invocation_exit(reconciled)
             case "verify":
                 result = verify(
                     store,

@@ -232,6 +232,29 @@ def _trial(report: dict[str, Any]) -> None:
             "Lost hold",
         )
 
+        provisional = {}
+        for name, behavior in (
+            ("acknowledged", Behavior(confirmation="acknowledged")),
+            ("charge-pending", Behavior(charge=None)),
+        ):
+            ticket = f"test.{name}"
+            provider.arrange(ticket, behavior)
+            provisional[name] = program(
+                name,
+                f"tools['support.lookup']({{ticket_id: {json.dumps(ticket)}}});"
+                "return tools['support.lookup']({ticket_id:'test.after-provisional'});",
+            )
+            require(
+                provisional[name]["reason"] == "subcall_unresolved"
+                and provisional[name]["output"] is None,
+                "A provisional success escaped Code Mode",
+            )
+            require(len(provider.dispatches(ticket)) == 1, "Provisional call did not dispatch once")
+        require(
+            not provider.dispatches("test.after-provisional"),
+            "Program resumed before reconciliation",
+        )
+
         task(control, "model-protocol")
         output_schema = {
             "type": "object",
@@ -314,6 +337,7 @@ def _trial(report: dict[str, Any]) -> None:
             "unsupported": unsupported,
             "lost": lost,
             "pending": balance,
+            "provisional_successes": provisional,
             "replay": asdict(replay),
             "program_error": error,
             "disabled": asdict(disabled),

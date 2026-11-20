@@ -12,11 +12,13 @@ import tempfile
 import threading
 import time
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing, suppress
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.metadata import version
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 from forge_check.governed.code_mode import CodeMode
 from forge_check.governed.control import Control
@@ -440,6 +442,99 @@ def settlement_race(control: Control, host: Host, target: Destination) -> dict:
     return {"disposition": replay.disposition, "receipts": receipts}
 
 
+def cache_completion_order(work: Path, *, expire_winner: bool) -> dict:
+    sku = "CACHE-RACE"
+    sampled_earlier = threading.Event()
+    release_earlier = threading.Event()
+
+    class OrderedDestination(Destination):
+        def respond(self, envelope: dict) -> tuple[dict, bool]:
+            response, stalled = super().respond(envelope)
+            self.journal[-1]["observed_on_hand"] = response["result"]["on_hand"]
+            if envelope["attempt_id"] == "cache-earlier":
+                sampled_earlier.set()
+                require(release_earlier.wait(10), "Timed out waiting to release the earlier read")
+            return response, stalled
+
+    work.mkdir()
+    with OrderedDestination(work / "external.sqlite3") as target:
+        target.adjust(sku, 11)
+        target.adjust("CACHE-SWEEP", 2)
+        control, host, _ = start_world(work / "forge.sqlite3", target, timeout=15)
+
+        def read(task: str, subject: str = sku):
+            control.start_task(READER, task, worker="preview", source="direct")
+            return host.invoke(Request(task, READER, "read", task, STOCK, {"sku": subject}))
+
+        same_tick = time.time_ns() // 1_000
+        with (
+            patch("forge_check.governed.ledger._utc", return_value=same_tick) as clock,
+            ThreadPoolExecutor(max_workers=1) as pool,
+        ):
+            pending = pool.submit(read, "cache-earlier")
+            try:
+                require(sampled_earlier.wait(5), "The earlier read never reached the destination")
+                target.adjust(sku, -8)
+                later = read("cache-later")
+                require(
+                    later.disposition == "dispatch"
+                    and later.attempt["confirmation"] == "verified"
+                    and later.result == {"sku": sku, "on_hand": 3},
+                    "The later read did not populate the cache with the new stock",
+                )
+                if expire_winner:
+                    clock.return_value += 31_000_000
+                    # A different cache write runs the regular expiry sweep while the read waits.
+                    require(read("cache-sweep", "CACHE-SWEEP").result is not None, "Sweep failed")
+            finally:
+                release_earlier.set()
+            earlier = pending.result(timeout=5)
+            require(
+                earlier.disposition == "dispatch"
+                and earlier.attempt["confirmation"] == "verified"
+                and earlier.result == {"sku": sku, "on_hand": 11},
+                "The earlier read should still return its own verified response",
+            )
+            observed = read("cache-check")
+
+        tasks = ("cache-earlier", "cache-later", "cache-check")
+        receipts = {task: host.ledger.receipts(task) for task in tasks}
+        first_claim, second_claim = [
+            next(row for row in receipts[task] if row["phase"] == "dispatch_intent")
+            for task in tasks[:2]
+        ]
+        require(
+            first_claim["dispatched_at"] == second_claim["dispatched_at"]
+            and first_claim["sequence"] < second_claim["sequence"]
+            and receipts["cache-later"][-1]["sequence"] < receipts["cache-earlier"][-1]["sequence"],
+            "The verified provider responses did not settle in reverse durable dispatch order",
+        )
+        require(observed.result == later.result, "The older result became the current SKU value")
+        actual = [
+            (row["attempt_id"], row["observed_on_hand"])
+            for row in target.journal
+            if row["input"] == {"sku": sku}
+        ]
+        expected = [("cache-earlier", 11), ("cache-later", 3)]
+        if expire_winner:
+            expected.append(("cache-check", 3))
+            require(observed.disposition == "dispatch", "An expired cache source became reusable")
+        else:
+            hit = receipts["cache-check"][-1]
+            require(
+                observed.disposition == "cached"
+                and hit["phase"] == "cache_hit"
+                and hit["evidence"]["cached_from_attempt_id"] == "cache-later",
+                "The cache receipt did not preserve the later-dispatched source",
+            )
+        require(actual == expected, "The destination did not observe the expected reads and values")
+        return {
+            "disposition": observed.disposition,
+            "receipts": receipts,
+            "destination": target.journal,
+        }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--wheel", type=Path, required=True)
@@ -469,6 +564,12 @@ def main() -> int:
                 evidence["invalid_output_after_reconciliation"] = settlement_race(
                     control, host, target
                 )
+                evidence["cache_completion_order"] = {
+                    "live": cache_completion_order(work / "ordering-live", expire_winner=False),
+                    "expired": cache_completion_order(
+                        work / "ordering-expired", expire_winner=True
+                    ),
+                }
                 report.update(status="pass", **evidence)
             except Exception as exc:
                 report["failure"] = f"{type(exc).__name__}: {exc}"

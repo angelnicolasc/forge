@@ -74,4 +74,58 @@ Require the `forge/standalone-signed-series` status from GitHub Actions on the p
 2. Review the successful intake run and exact attempt. Invoke **Publish standalone preview to TestPyPI** from `main` with the approved run ID, attempt and the same four inputs. The publisher checks the run identity, stages one verified release-candidate wheel and submits the bytes through OIDC.
 3. Review the publication receipt. The workflow downloads the published wheel and compares its SHA-256 with the approved wheel. A post-publication failure requires investigation of the same release-candidate version. Keep the former approved artifact and use a new release-candidate version for changed bytes.
 
+## Stable release
+
+The stable lane publishes final versions of the standalone wheel. Use the reviewed commit reachable from protected `main`, with a successful `forge/standalone-signed-series` status on that exact SHA. The stable workflows dispatch only from `main`. They build no artifacts and require no release tag.
+
+### Prepare the stable evidence in Vast
+
+Build once from the approved commit and run the acceptance commands above against that wheel. Keep the 0.3.0 packaging receipt and the Gate upgrade from RC2. For the stable release, also demonstrate clean base and Code Mode installs on Linux x86_64 with both Python 3.11 and 3.12, and upgrade from the approved 0.4.0rc3 wheel on the same ledger.
+
+```bash
+"$PYTHON312" "$CHECKOUT/tests/acceptance/stable_compatibility.py" \
+  --commit "$CANDIDATE_SHA" --wheel "$WHEEL" --wheel-sha256 "$WHEEL_SHA256" \
+  --previous-wheel "$RC3_WHEEL" --wheelhouse "$WHEELHOUSE" \
+  --python311 "$PYTHON311" --python312 "$PYTHON312" \
+  --output "$OUT/stable-compatibility.json"
+```
+
+Add `--stable-compatibility "$OUT/stable-compatibility.json"` to the seal command. Rehearse staging with `verify --require-stable`. Confirm that a stable bundle missing conditional or upgrade evidence is rejected before staging.
+
+### Configure the stable environments
+
+Restrict every environment below to protected `main`. Keep independent approvals on both publication environments and enable prevention of self-review.
+
+| Environment | Owner configuration |
+|---|---|
+| `standalone-stable-intake` | Use the same signing key, trusted ancestor, and 0.3.0 baseline as preview intake. Set `STANDALONE_VAST_BUNDLE_HOST` to the approved receipt origin and store the short-lived URL in `STANDALONE_VAST_BUNDLE_URL`. |
+| `standalone-stable-testpypi` | On TestPyPI, register a Trusted Publisher for `angelnicolasc/forge`, workflow `standalone-stable-testpypi.yml`, environment `standalone-stable-testpypi`, project `forge-os-check`. |
+| `standalone-stable-promotion` | Set `STANDALONE_BASELINE_SHA256` to the approved 0.3.0 digest and copy the approved signer and trust-base variables from `standalone-stable-intake`. This environment verifies the signed source, TestPyPI attempt, and exact wheel before staging. |
+| `standalone-stable-pypi` | On PyPI, register a separate Trusted Publisher for `angelnicolasc/forge`, workflow `standalone-stable-pypi.yml`, environment `standalone-stable-pypi`, project `forge-os-check`. |
+
+Review the sealed ZIP for public disclosure before running intake. The TestPyPI workflow retains that ZIP and its signature receipt as Actions artifacts. Keep raw lab logs and operational credentials outside the ZIP.
+
+### Promote identical bytes
+
+1. Invoke **Publish standalone stable to TestPyPI** with the approved SHA, Vast ID, bundle digest and wheel digest. Review the staged wheel and approve the TestPyPI deployment. Record the successful run ID and attempt, and preserve the receipt that ties the index download to the original bundle.
+2. In a clean Vast consumer environment, download the exact version from TestPyPI and check its SHA-256 before installation. Install to a dedicated virtual environment. Record the first `forge check` verdict and explanation with the base install, the inventory demo with the Code Mode extra, and the approved rollback procedure. Record the production go/no-go against that run and evidence.
+3. Invoke **Promote standalone stable to PyPI** with the same four approvals and the approved TestPyPI run ID and attempt. The read-only job re-verifies the sealed bundle, checks the TestPyPI receipt, and downloads and hashes the wheel again from TestPyPI. Keep the PyPI deployment approval pending until the reviewer has checked the Vast consumer evidence and recorded the go/no-go.
+4. Compare the published PyPI receipt with the approved wheel digest. Keep the separate TestPyPI and PyPI receipts with the Vast evidence. Investigate any post-upload failure before attempting the same version again.
+
+## Recover an ambiguous upload
+
+Before sending a wheel, the publisher checks the selected index. It uploads only when the version is absent. If the official index already has the exact, unyanked wheel, the workflow skips upload and checks the bytes again. A mismatched digest, unexpected distribution or failed index lookup stops the upload.
+
+Every publication receipt records the preflight state, the upload step's raw outcome and the result of reading back the official index.
+
+| Receipt state | Meaning |
+|---|---|
+| `trusted-upload-verified` | The version was absent, the Trusted Publishing action reported success, and the exact approved wheel was read back. |
+| `recovered-index-verified` | The exact approved wheel is available. The upload step failed or was skipped because those bytes already existed. This receipt does not establish which publisher uploaded them. |
+| `index-unverified` | The official read-back did not confirm the wheel. The workflow fails and retains its diagnostic receipt. |
+
+Preserve the run ID, attempt, receipt and original evidence outside GitHub before the Actions artifacts expire. After a failure, inspect the official index for the approved version and digest before deciding whether to rerun. A stable rerun uses **Re-run all jobs** to regenerate the artifacts for that attempt. Keep `skip-existing: false`.
+
+Production accepts a `trusted-upload-verified` TestPyPI receipt by default. For a `recovered-index-verified` receipt, the maintainer must record the recovery decision for that exact attempt, dispatch with `allow_recovered_testpypi: true` and approve the production environment. The production receipt preserves the TestPyPI state. The normal Vast consumer and rollback checks still apply.
+
 [GitHub PR trigger security](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request_target) · [Trusted Publishing](https://docs.pypi.org/trusted-publishers/using-a-publisher/)

@@ -1,0 +1,265 @@
+name: Promote standalone stable to PyPI
+
+on:
+  workflow_dispatch:
+    inputs:
+      testpypi_run:
+        description: Successful stable TestPyPI workflow run ID
+        type: string
+        required: true
+      testpypi_attempt:
+        description: Approved attempt of the TestPyPI run
+        type: string
+        required: true
+      allow_recovered_testpypi:
+        description: Approve promotion after verifying recovered TestPyPI bytes without an upload success
+        type: boolean
+        required: false
+        default: false
+      candidate_sha:
+        description: Exact Git commit of the stable build
+        type: string
+        required: true
+      vast_id:
+        description: Vast ID from the approved evidence
+        type: string
+        required: true
+      bundle_sha256:
+        description: SHA-256 of the sealed Vast evidence
+        type: string
+        required: true
+      wheel_sha256:
+        description: SHA-256 of the approved wheel
+        type: string
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: standalone-stable-pypi
+  cancel-in-progress: false
+
+env:
+  TESTPYPI_RUN: ${{ inputs.testpypi_run }}
+  TESTPYPI_ATTEMPT: ${{ inputs.testpypi_attempt }}
+  ALLOW_RECOVERED_TESTPYPI: ${{ inputs.allow_recovered_testpypi }}
+  CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+  VAST_ID: ${{ inputs.vast_id }}
+  BUNDLE_SHA: ${{ inputs.bundle_sha256 }}
+  WHEEL_SHA: ${{ inputs.wheel_sha256 }}
+
+jobs:
+  verify:
+    if: github.repository == 'angelnicolasc/forge' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: standalone-stable-promotion
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      version: ${{ steps.approval.outputs.version }}
+      testpypi_publication_state: ${{ steps.approval.outputs.testpypi_publication_state }}
+    env:
+      BASELINE_SHA: ${{ vars.STANDALONE_BASELINE_SHA256 }}
+      TRUST_BASE: ${{ vars.STANDALONE_TRUST_BASE }}
+      SIGNER_LINE: ${{ vars.STANDALONE_ALLOWED_SIGNER }}
+      SIGNER_PRINCIPAL: ${{ vars.STANDALONE_SIGNER_PRINCIPAL }}
+      SIGNER_FINGERPRINT: ${{ vars.STANDALONE_SIGNER_FINGERPRINT }}
+    steps:
+      - name: Check out tools from protected main
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Authenticate the exact stable TestPyPI attempt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MAIN_PROTECTED: ${{ github.ref_protected }}
+        run: |
+          set -euo pipefail
+          [[ "$MAIN_PROTECTED" == true ]]
+          [[ "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$TESTPYPI_RUN" =~ ^[1-9][0-9]*$ && "$TESTPYPI_ATTEMPT" =~ ^[1-9][0-9]*$ ]]
+          git merge-base --is-ancestor "$CANDIDATE_SHA" "$GITHUB_SHA"
+          workflow_id="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/standalone-stable-testpypi.yml" --jq .id)"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${TESTPYPI_RUN}/attempts/${TESTPYPI_ATTEMPT}" | jq -e \
+            --argjson run "$TESTPYPI_RUN" --argjson attempt "$TESTPYPI_ATTEMPT" \
+            --argjson workflow "$workflow_id" --arg repository "$GITHUB_REPOSITORY" '
+              .id == $run and .run_attempt == $attempt and .workflow_id == $workflow and
+              .event == "workflow_dispatch" and .status == "completed" and .conclusion == "success" and
+              .head_branch == "main" and .head_repository.full_name == $repository
+            ' > /dev/null
+
+      - name: Verify the signed source against the production trust anchor
+        run: |
+          set -euo pipefail
+          [[ "$TRUST_BASE" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$TRUST_BASE" "$GITHUB_SHA"
+          printf '%s\n' "$SIGNER_LINE" > "$RUNNER_TEMP/stable-allowed-signers"
+          python3 .github/standalone/verify_signatures.py \
+            --base "$TRUST_BASE" --head "$CANDIDATE_SHA" \
+            --allowed-signers "$RUNNER_TEMP/stable-allowed-signers" \
+            --principal "$SIGNER_PRINCIPAL" --fingerprint "$SIGNER_FINGERPRINT"
+
+      - name: Download the sealed Vast evidence from that attempt
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: standalone-stable-evidence-${{ inputs.testpypi_attempt }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.testpypi_run }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/approved-evidence
+
+      - name: Download the TestPyPI receipt from that attempt
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: standalone-stable-testpypi-${{ inputs.testpypi_attempt }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.testpypi_run }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/approved-testpypi
+
+      - name: Match the sealed wheel, publication receipt and live TestPyPI bytes
+        id: approval
+        run: |
+          set -euo pipefail
+          python3 .github/standalone/preview_artifact.py verify --repo . --require-stable \
+            --bundle "$RUNNER_TEMP/approved-evidence/standalone-stable.zip" --bundle-sha256 "$BUNDLE_SHA" \
+            --commit "$CANDIDATE_SHA" --wheel-sha256 "$WHEEL_SHA" \
+            --baseline-sha256 "$BASELINE_SHA" --vast-id "$VAST_ID" \
+            --stage "$RUNNER_TEMP/approved-wheel" > "$RUNNER_TEMP/approval.json"
+          version="$(jq -er .version "$RUNNER_TEMP/approval.json")"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          receipt="$RUNNER_TEMP/approved-testpypi/testpypi-receipt.json"
+          jq -e --arg commit "$CANDIDATE_SHA" --arg bundle "$BUNDLE_SHA" --arg vast "$VAST_ID" \
+            --arg version "$version" --arg digest "$WHEEL_SHA" \
+            --argjson run "$TESTPYPI_RUN" --argjson attempt "$TESTPYPI_ATTEMPT" \
+            --arg allow_recovered "$ALLOW_RECOVERED_TESTPYPI" '
+              .schema == 2 and .index == "testpypi" and .commit == $commit and
+              .bundle_sha256 == $bundle and .vast_lab_id == $vast and .version == $version and
+              .wheel_sha256 == $digest and .workflow_run == $run and .workflow_attempt == $attempt and
+              ((.publication_state == "trusted-upload-verified" and
+                .index_before == "absent" and .upload_outcome == "success") or
+               ($allow_recovered == "true" and .publication_state == "recovered-index-verified" and
+                ((.index_before == "absent" and .upload_outcome == "failure") or
+                 (.index_before == "verified" and .upload_outcome == "skipped"))))
+            ' "$receipt" > /dev/null
+          python3 .github/standalone/preview_artifact.py verify-index --index testpypi \
+            --version "$version" --wheel-sha256 "$WHEEL_SHA" > "$RUNNER_TEMP/index.json"
+          diff -u <(jq -S '{version, wheel_sha256, bytes}' "$receipt") \
+            <(jq -S '{version, wheel_sha256, bytes}' "$RUNNER_TEMP/index.json")
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+          printf 'testpypi_publication_state=%s\n' "$(jq -er .publication_state "$receipt")" >> "$GITHUB_OUTPUT"
+
+      - name: Pass only the wheel to the publisher
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: standalone-stable-production-wheel-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/approved-wheel/*.whl
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: standalone-stable-pypi
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      RELEASE_VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - name: Check out index verifier from protected main
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Retrieve the verified wheel
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: standalone-stable-production-wheel-${{ github.run_attempt }}
+          path: .standalone-publish
+
+      - name: Check the staged bytes
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          shopt -s nullglob dotglob
+          files=(.standalone-publish/*)
+          wheel=".standalone-publish/forge_os_check-${RELEASE_VERSION}-py3-none-any.whl"
+          [[ ${#files[@]} -eq 1 && "${files[0]-}" == "$wheel" && -f "$wheel" && ! -L "$wheel" ]]
+          printf '%s  %s\n' "$WHEEL_SHA" "$wheel" | sha256sum --check --strict
+
+      - name: Probe the approved version on PyPI
+        id: probe
+        run: |
+          set -euo pipefail
+          python3 .github/standalone/preview_artifact.py verify-index --index pypi --probe \
+            --version "$RELEASE_VERSION" --wheel-sha256 "$WHEEL_SHA" > "$RUNNER_TEMP/index-probe.json"
+          state="$(jq -er '.state | select(. == "absent" or . == "verified")' "$RUNNER_TEMP/index-probe.json")"
+          printf 'state=%s\n' "$state" >> "$GITHUB_OUTPUT"
+
+      - name: Publish the approved wheel to PyPI
+        id: upload
+        if: steps.probe.outputs.state == 'absent'
+        continue-on-error: true
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          repository-url: https://upload.pypi.org/legacy/
+          packages-dir: .standalone-publish/
+          skip-existing: false
+
+      - name: Read back the exact index bytes and record the upload outcome
+        id: readback
+        if: ${{ !cancelled() && steps.probe.outcome == 'success' }}
+        env:
+          INDEX_BEFORE: ${{ steps.probe.outputs.state }}
+          UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
+          TESTPYPI_PUBLICATION_STATE: ${{ needs.verify.outputs.testpypi_publication_state }}
+        run: |
+          set -euo pipefail
+          case "$INDEX_BEFORE:$UPLOAD_OUTCOME" in
+            absent:success) publication_state=trusted-upload-verified ;;
+            absent:failure|verified:skipped) publication_state=recovered-index-verified ;;
+            *) echo "Index probe and upload outcomes disagree" >&2; exit 1 ;;
+          esac
+          if python3 .github/standalone/preview_artifact.py verify-index --index pypi \
+            --version "$RELEASE_VERSION" --wheel-sha256 "$WHEEL_SHA" > "$RUNNER_TEMP/index.json" &&
+            bytes="$(jq -er '.bytes | select(type == "number" and . > 0)' "$RUNNER_TEMP/index.json")"; then
+            :
+          else
+            bytes=null
+            publication_state=index-unverified
+          fi
+          jq -n --arg index "pypi" --arg version "$RELEASE_VERSION" --arg digest "$WHEEL_SHA" \
+            --arg commit "$CANDIDATE_SHA" --arg bundle "$BUNDLE_SHA" --arg vast "$VAST_ID" \
+            --arg index_before "$INDEX_BEFORE" --arg upload_outcome "$UPLOAD_OUTCOME" \
+            --arg publication_state "$publication_state" --argjson bytes "$bytes" \
+            --argjson test_run "$TESTPYPI_RUN" --argjson test_attempt "$TESTPYPI_ATTEMPT" \
+            --arg test_state "$TESTPYPI_PUBLICATION_STATE" \
+            --argjson run "$GITHUB_RUN_ID" --argjson attempt "$GITHUB_RUN_ATTEMPT" \
+            '{schema: 2, index: $index, version: $version, wheel_sha256: $digest,
+              commit: $commit, bundle_sha256: $bundle, vast_lab_id: $vast, bytes: $bytes,
+              workflow_run: $run, workflow_attempt: $attempt, index_before: $index_before,
+              upload_outcome: $upload_outcome, publication_state: $publication_state,
+              testpypi_run: $test_run, testpypi_attempt: $test_attempt,
+              testpypi_publication_state: $test_state}' \
+            > "$RUNNER_TEMP/pypi-receipt.json"
+          [[ "$publication_state" != index-unverified ]]
+
+      - name: Preserve publication evidence
+        if: ${{ !cancelled() && (steps.readback.outcome == 'success' || steps.readback.outcome == 'failure') }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: standalone-stable-pypi-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/pypi-receipt.json
+            ${{ runner.temp }}/index-probe.json
+          if-no-files-found: error
+          retention-days: 30

@@ -94,32 +94,76 @@ jobs:
           git -c credential.helper= -c 'credential.helper=!gh auth git-credential' \
             fetch --no-tags --depth=1 origin "$CANDIDATE_SHA"
           [[ "$(git rev-parse FETCH_HEAD)" == "$CANDIDATE_SHA" ]]
-          python3 .github/standalone/preview_artifact.py verify --repo . \
+          python3 .github/standalone/preview_artifact.py verify --repo . --require-preview \
             --bundle "$RUNNER_TEMP/approved-preview/standalone-preview.zip" \
             --bundle-sha256 "$BUNDLE_SHA" --commit "$CANDIDATE_SHA" --wheel-sha256 "$WHEEL_SHA" \
             --baseline-sha256 "$BASELINE_SHA" --vast-id "$VAST_ID" --stage .standalone-publish \
             > "$RUNNER_TEMP/preview-approval.json"
 
-      - name: Publish approved bytes to TestPyPI
+      - name: Probe the approved version on TestPyPI
+        id: probe
+        run: |
+          set -euo pipefail
+          RELEASE_VERSION="$(jq -er .version "$RUNNER_TEMP/preview-approval.json")"
+          python3 .github/standalone/preview_artifact.py verify-index --index testpypi --probe \
+            --version "$RELEASE_VERSION" --wheel-sha256 "$WHEEL_SHA" > "$RUNNER_TEMP/index-probe.json"
+          state="$(jq -er '.state | select(. == "absent" or . == "verified")' "$RUNNER_TEMP/index-probe.json")"
+          printf 'state=%s\n' "$state" >> "$GITHUB_OUTPUT"
+
+      - name: Publish the approved wheel to TestPyPI
+        id: upload
+        if: steps.probe.outputs.state == 'absent'
+        continue-on-error: true
         uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           repository-url: https://test.pypi.org/legacy/
           packages-dir: .standalone-publish/
           skip-existing: false
 
-      - name: Download and verify the published wheel bytes
+      - name: Read back the exact index bytes and record the upload outcome
+        id: readback
+        if: ${{ !cancelled() && steps.probe.outcome == 'success' }}
+        env:
+          INDEX_BEFORE: ${{ steps.probe.outputs.state }}
+          UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
         run: |
           set -euo pipefail
-          version="$(jq -er .version "$RUNNER_TEMP/preview-approval.json")"
-          python3 .github/standalone/preview_artifact.py verify-index \
-            --version "$version" --wheel-sha256 "$WHEEL_SHA" > "$RUNNER_TEMP/published-wheel.json"
+          RELEASE_VERSION="$(jq -er .version "$RUNNER_TEMP/preview-approval.json")"
+          case "$INDEX_BEFORE:$UPLOAD_OUTCOME" in
+            absent:success) publication_state=trusted-upload-verified ;;
+            absent:failure|verified:skipped) publication_state=recovered-index-verified ;;
+            *) echo "Index probe and upload outcomes disagree" >&2; exit 1 ;;
+          esac
+          if python3 .github/standalone/preview_artifact.py verify-index --index testpypi \
+            --version "$RELEASE_VERSION" --wheel-sha256 "$WHEEL_SHA" > "$RUNNER_TEMP/index.json" &&
+            bytes="$(jq -er '.bytes | select(type == "number" and . > 0)' "$RUNNER_TEMP/index.json")"; then
+            :
+          else
+            bytes=null
+            publication_state=index-unverified
+          fi
+          jq -n --arg index "testpypi" --arg version "$RELEASE_VERSION" --arg digest "$WHEEL_SHA" \
+            --arg commit "$CANDIDATE_SHA" --arg bundle "$BUNDLE_SHA" --arg vast "$VAST_ID" \
+            --arg index_before "$INDEX_BEFORE" --arg upload_outcome "$UPLOAD_OUTCOME" \
+            --arg publication_state "$publication_state" --argjson bytes "$bytes" \
+            --argjson candidate_run "$CANDIDATE_RUN" --argjson candidate_attempt "$CANDIDATE_ATTEMPT" \
+            --argjson run "$GITHUB_RUN_ID" --argjson attempt "$GITHUB_RUN_ATTEMPT" \
+            '{schema: 2, index: $index, version: $version, wheel_sha256: $digest,
+              commit: $commit, bundle_sha256: $bundle, vast_lab_id: $vast, bytes: $bytes,
+              workflow_run: $run, workflow_attempt: $attempt, index_before: $index_before,
+              upload_outcome: $upload_outcome, publication_state: $publication_state,
+              candidate_run: $candidate_run, candidate_attempt: $candidate_attempt}' \
+            > "$RUNNER_TEMP/published-wheel.json"
+          [[ "$publication_state" != index-unverified ]]
 
-      - name: Preserve publication verification
+      - name: Preserve publication evidence
+        if: ${{ !cancelled() && (steps.readback.outcome == 'success' || steps.readback.outcome == 'failure') }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: standalone-preview-publication
+          name: standalone-preview-publication-${{ github.run_attempt }}
           path: |
-            ${{ runner.temp }}/preview-approval.json
             ${{ runner.temp }}/published-wheel.json
+            ${{ runner.temp }}/index-probe.json
+            ${{ runner.temp }}/preview-approval.json
           if-no-files-found: error
           retention-days: 30
