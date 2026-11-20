@@ -78,7 +78,7 @@ jobs:
       - name: Gate the exact wheel and compatibility evidence
         run: |
           set -euo pipefail
-          python3 .github/standalone/preview_artifact.py verify --repo . \
+          python3 .github/standalone/preview_artifact.py verify --repo . --require-preview \
             --bundle "$RUNNER_TEMP/standalone-preview.zip" --bundle-sha256 "$BUNDLE_SHA" \
             --commit "$CANDIDATE_SHA" --wheel-sha256 "$WHEEL_SHA" \
             --baseline-sha256 "$BASELINE_SHA" --vast-id "$VAST_ID"
