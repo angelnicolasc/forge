@@ -41,6 +41,9 @@ Get a short actor-scoped lease with `forge alias-lease --lease lease-1 --ttl-sec
 Write snapshots and manifests to protected storage. The SQLite backup includes committed state from WAL. Keep the expected snapshot digest in the operator's evidence store.
 
 ```bash
+set -eC
+umask 077
+mkdir -p backups recovery
 forge backup --db state/governed.sqlite3 --actor release-owner \
   --output backups/ledger.sqlite3 > backups/ledger.manifest.json
 forge restore --db recovery/ledger.sqlite3 --snapshot backups/ledger.sqlite3 \
@@ -52,7 +55,64 @@ The restored writer starts fenced. Quiesce the previous writer. Reconcile the in
 
 `forge recovery-resume` takes a recovery ID, audit reference, covered-through UTC timestamp in microseconds, attestation that the source was quiesced, and a zero count of post-snapshot effects or control changes. Reopen one writer and check the first new provider receipt. `forge export` returns minimized evidence for inspection and retention.
 
-Quiesce old clients before `forge migrate --backup backups/pre-upgrade.sqlite3`. The migration preserves a version 1 backup and upgrades the live ledger to version 2. Older clients reject version 2. Keep the original wheel and version 1 backup for offline inspection. A client rollback that resumes writing needs a reconciled version 1 authority and a single active writer. Schema downgrade is unsupported.
+## Migrate a governed ledger
+
+Choose the wheel for the destination schema. The version in the backup manifest describes the source.
+
+| Installed wheel | New ledger | Explicit migration |
+| --- | --- | --- |
+| Published `forge-os-check==0.4.0` | v2 | v1 → v2 |
+| ADR 0005 checkout, `0.4.1.dev2` | v3, reference calculator | v1 → v3 or v2 → v3. A v1 source passes through v2 in the same transaction. |
+
+Stop admission and drain every worker with an outstanding dispatch intent. A call authorized before migration can still reach its provider. Record outstanding attempt IDs and operation keys, compare them with the destination journal, and stop all old writers and their restart supervisors. Keep the original wheel. The migration takes the SQLite writer lock, snapshots committed WAL state, and backfills capacity before committing v3.
+
+For the v3 upgrade, activate the candidate wheel's virtual environment on the trusted host. Confirm `python -m pip show forge-os-check` reports `0.4.1.dev2` and `command -v forge` points into that environment. Supply the live ledger path and the authenticated principals with `admin` and `inspect` roles. The restore below rehearses recovery in a fresh, fenced copy.
+
+```bash
+set -e
+umask 077
+LEDGER=${LEDGER:-state/governed.sqlite3}
+ADMIN=${ADMIN:-release-owner}
+INSPECTOR=${INSPECTOR:-release-owner}
+BACKUP_ROOT=${BACKUP_ROOT:-backups}
+mkdir -p "$BACKUP_ROOT"
+RUN=$(mktemp -d "$BACKUP_ROOT/migrate-XXXXXX")
+forge migrate --db "$LEDGER" --actor "$ADMIN" \
+  --backup "$RUN/before.sqlite3" > "$RUN/before.manifest.json"
+forge recovery-status --db "$LEDGER" --actor "$INSPECTOR" > "$RUN/live.json"
+forge restore --db "$RUN/drill.sqlite3" --snapshot "$RUN/before.sqlite3" \
+  --manifest "$RUN/before.manifest.json" > "$RUN/restore.json"
+forge recovery-status --db "$RUN/drill.sqlite3" --actor "$INSPECTOR" > "$RUN/drill.json"
+cat "$RUN/before.manifest.json" "$RUN/live.json" "$RUN/drill.json"
+```
+
+With the candidate, both status reports should say `schema_version: 3`. Check the scope, alias generation and receipt high-water mark against the manifest while writers are quiesced. The drill should report `fenced: true` and the manifest's SHA-256 as `snapshot_sha256`. Retain the sealed snapshot, manifest and their provenance in protected storage. Review unresolved attempts before reopening one compatible writer on the live ledger. Keep the drill fenced. For an actual restore, follow [Back up, restore and reconcile](#back-up-restore-and-reconcile).
+
+After an interrupted migration, keep writers stopped and inspect `PRAGMA user_version` through a read-only SQLite connection. An aborted backfill rolls back the live transaction but can leave a sealed snapshot behind. Use a fresh output directory for a retry from v1 or v2. If v3 committed, inspect its status and reconcile against the provider before reopening admission.
+
+### Revert the capacity calculator on v3
+
+The candidate uses canonical accounting by default. If a lab enabled the projected calculator, switch the same current ledger back to `reference` with the candidate environment and the trusted host's admin identity. This preserves receipts, in-flight tasks and current rollout state.
+
+```bash
+python - "$LEDGER" "$ADMIN" <<'PY'
+import sys
+from pathlib import Path
+
+from forge_check.governed import rollout
+from forge_check.governed.control import require_role
+from forge_check.governed.db import Store
+
+store = Store(Path(sys.argv[1]), create=False)
+with store.write() as conn:
+    require_role(conn, sys.argv[2], "admin")
+    rollout.set_capacity_mode(conn, "reference")
+PY
+```
+
+Check `forge rollout-status --db "$LEDGER" --actor "$INSPECTOR" --rollout "$ROLLOUT_ID"` for the affected rollout. Match `consumed_microusd` to the charges for all canary roots and their children. Each closed root contributes its charges to `exposure_microusd`. Each open root contributes the larger of its allocated cap and its charges.
+
+A pre-v3 wheel rejects the current v3 ledger. Keep older wheels and their matching snapshots for offline inspection. Returning to an older writer requires a separately reconciled authority at its supported schema. If post-snapshot effects, charges or control changes remain unaccounted for, keep that writer offline and recover forward on v3. [Capacity decision and lab results](decisions/0005-rollout-capacity.md)
 
 ## Experimental Code Mode
 

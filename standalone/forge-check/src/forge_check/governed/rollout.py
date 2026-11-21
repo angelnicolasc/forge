@@ -6,6 +6,7 @@ import hashlib
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
+from forge_check.governed import rollout_projection
 from forge_check.governed.revision import canonical_json, certificate_verifier
 
 if TYPE_CHECKING:
@@ -14,6 +15,12 @@ if TYPE_CHECKING:
 RolloutMode = Literal["shadow", "canary"]
 MAX_LEASE_SECONDS = 300
 MAX_ROLLOUT_MICROS = 86_400_000_000
+
+REFERENCE_CAPACITY_SQL = rollout_projection.REFERENCE_CAPACITY_SQL
+capacity = rollout_projection.capacity
+projected_capacity = rollout_projection.projected_capacity
+reference_capacity = rollout_projection.reference_capacity
+set_capacity_mode = rollout_projection.set_capacity_mode
 
 SCHEMA = (
     """CREATE TABLE rollouts (
@@ -82,6 +89,8 @@ class Allocation:
                 self.allocated_microusd,
             ),
         )
+        if self.cohort == "canary":
+            rollout_projection.record_open(conn, self.rollout_id, root_id)
 
 
 def bucket(scope: str, seed: str, task_id: str) -> int:
@@ -118,25 +127,6 @@ def stop_open(conn: Connection, actor: str | None, now: int, reason: str) -> Non
            WHERE stopped_at IS NULL""",
         (now, actor, reason),
     )
-
-
-def capacity(conn: Connection, rollout_id: str) -> tuple[int, int, int]:
-    """Return active roots, recognized charge and conservative held plus consumed exposure."""
-    rows = conn.execute(
-        """SELECT r.allocated_microusd, f.root_id IS NULL AS active,
-                  COALESCE((SELECT SUM(charge_microusd) FROM attempts a
-                            WHERE a.root_id = r.root_id), 0) AS charge
-             FROM rollout_allocations r LEFT JOIN finished_roots f ON f.root_id = r.root_id
-            WHERE r.rollout_id = ? AND r.cohort = 'canary'""",
-        (rollout_id,),
-    )
-    active = consumed = exposure = 0
-    for row in rows:
-        charge = int(row["charge"])
-        active += int(row["active"])
-        consumed += charge
-        exposure += max(int(row["allocated_microusd"]), charge) if row["active"] else charge
-    return active, consumed, exposure
 
 
 def _current_evidence(conn: Connection, evidence_id: str) -> bool:

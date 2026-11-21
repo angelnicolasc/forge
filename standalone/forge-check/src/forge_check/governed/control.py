@@ -7,7 +7,7 @@ import time
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from forge_check.contract import compare, parse_cases, parse_run
-from forge_check.governed import rollout
+from forge_check.governed import rollout, rollout_projection
 from forge_check.governed.db import require_dispatch_authority
 from forge_check.governed.revision import (
     CONDITIONAL_VERIFIER,
@@ -737,6 +737,7 @@ class Control:
                     cap,
                 ),
             )
+            rollout_projection.register_rollout(conn, rollout_id)
             return self._rollout_view(conn, rollout_id, now)
 
     @staticmethod
@@ -862,6 +863,7 @@ class Control:
                 raise ValueError("Root has unresolved exposure or unconfirmed effects")
             now = now_micros()
             conn.execute("INSERT INTO finished_roots VALUES (?, ?, ?)", (root_task_id, actor, now))
+            rollout_projection.record_finish(conn, root_task_id)
             return {"root_id": root_task_id, "actor": actor, "finished_at": now}
 
     def start_task(
