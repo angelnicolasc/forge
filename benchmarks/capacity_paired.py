@@ -518,7 +518,7 @@ def operate(path: Path, operator_index: int, arm: Arm) -> dict[str, Any]:
         if arm == "projection":
             verify(conn, totals)
     phase.update(
-        capacity=totals,
+        capacity=list(totals),
         settlement_binding=MODEL,
         traffic_by_cohort=cut["traffic_by_cohort"],
         allocations=cut["allocations"],
@@ -635,11 +635,13 @@ def reconstruct(
                     )
                 else:
                     pair[arm] = run_actions(candidate.path, operator_samples, "projection")
-            require(
-                [item["outcome"] for item in pair["reference"]["samples"]]
-                == [item["outcome"] for item in pair["projection"]["samples"]],
-                "Administrative or write outcomes differ between wheels",
-            )
+            for left, right in zip(pair["reference"]["samples"], pair["projection"]["samples"],
+                                   strict=True):
+                expected_outcome, actual_outcome = left["outcome"], right["outcome"]
+                require(
+                    expected_outcome == actual_outcome,
+                    f"Administrative or write outcomes differ: {expected_outcome=} {actual_outcome=}",
+                )
             record["operation_order"] = order
             record["operations"] = pair
         query = query_pair(
