@@ -10,6 +10,7 @@ import subprocess
 import sys
 import threading
 import time
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing, nullcontext
 from importlib.metadata import version
@@ -40,8 +41,9 @@ SECOND = 1_000_000
 T0 = 1_800_000_000_000_000
 
 
-def read(db: Path, origin: str, sku: str, action: str, clock_at: int | None) -> dict:
+def read(db: Path, origin: str, branch: str, sku: str, action: str, clock_at: int | None) -> dict:
     seed = action == "origin"
+    invocation = f"{branch}-{sku.lower()}-{action}"
     store = Store(db, create=seed)
     control = Control(store)
     if seed:
@@ -61,11 +63,12 @@ def read(db: Path, origin: str, sku: str, action: str, clock_at: int | None) -> 
                     tick.return_value = clock_at + SECOND
                 return reply
 
-        control.start_task(READER, action, worker="monitor")
+        control.start_task(READER, invocation, worker="monitor")
         host = Host(store, fingerprint_key=KEY, provider=ObservedProvider(origin, token=TOKEN))
-        value = host.invoke(Request(action, READER, "read", action, STOCK, {"sku": sku}))
-        receipts = host.ledger.receipts(action)
+        value = host.invoke(Request(invocation, READER, "read", invocation, STOCK, {"sku": sku}))
+        receipts = host.ledger.receipts(invocation)
         return {
+            "attempt_id": invocation,
             "version": version("forge-os-check"),
             "disposition": value.disposition,
             "value": value.result["on_hand"] if value.result is not None else None,
@@ -87,14 +90,14 @@ def check(old_python: Path, root: Path) -> dict:
     class ObservedDestination(Destination):
         def respond(self, envelope: dict) -> tuple[dict, bool]:
             reply, stall = super().respond(envelope)
-            if envelope["input"]["sku"] == "WALL" and envelope["attempt_id"] == "origin":
+            if envelope["attempt_id"] == "published-wall-origin":
                 ready.set()
                 require(allow.wait(10), "Held response timed out")
             return reply, stall
 
     with ObservedDestination(root / "destination.db") as dest:
 
-        def run(py: Path, db: Path, sku: str, action: str, tick: int | None) -> dict:
+        def run(py: Path, db: Path, branch: str, sku: str, action: str, tick: int | None) -> dict:
             cmd = [
                 str(py),
                 str(Path(__file__).resolve()),
@@ -104,6 +107,8 @@ def check(old_python: Path, root: Path) -> dict:
                 str(db),
                 "--origin",
                 dest.origin,
+                "--branch",
+                branch,
                 "--sku",
                 sku,
             ]
@@ -116,10 +121,10 @@ def check(old_python: Path, root: Path) -> dict:
         candidate = Path(sys.executable)
         old_db = root / "old.db"
         dest.adjust("MICRO", 11)
-        seed = run(old_python, old_db, "MICRO", "origin", T0)
+        seed = run(old_python, old_db, "published", "MICRO", "origin", T0)
         require(seed["version"] == "0.4.0" and seed["value"] == 11, "Expected original 0.4.0")
         current_db = root / "current.db"
-        seed_current = run(candidate, current_db, "MICRO", "origin", T0)
+        seed_current = run(candidate, current_db, "fresh", "MICRO", "origin", T0)
         dest.adjust("MICRO", -8)
         old_clone, upgraded = root / "baseline.db", root / "upgraded.db"
         snapshot(old_db, old_clone)
@@ -130,8 +135,8 @@ def check(old_python: Path, root: Path) -> dict:
             ("upgraded", candidate, upgraded),
             ("fresh", candidate, current_db),
         ):
-            before = run(py, db, "MICRO", "before", T0 + TTL * SECOND - 1)
-            boundary = run(py, db, "MICRO", "boundary", T0 + TTL * SECOND)
+            before = run(py, db, name, "MICRO", "before", T0 + TTL * SECOND - 1)
+            boundary = run(py, db, name, "MICRO", "boundary", T0 + TTL * SECOND)
             historical = name == "published"
             require(
                 (before["disposition"], before["value"]) == ("cached", 11),
@@ -145,7 +150,7 @@ def check(old_python: Path, root: Path) -> dict:
         dest.adjust("WALL", 11)
         warm = root / "warm.db"
         with ThreadPoolExecutor(max_workers=1) as pool:
-            task = pool.submit(run, old_python, warm, "WALL", "origin", None)
+            task = pool.submit(run, old_python, warm, "published", "WALL", "origin", None)
             try:
                 require(ready.wait(5), "No source snapshot for warm upgrade trial")
                 start = time.monotonic_ns()
@@ -158,14 +163,26 @@ def check(old_python: Path, root: Path) -> dict:
         wall_old, wall_new = root / "wall-old.db", root / "wall-new.db"
         snapshot(warm, wall_old)
         snapshot(warm, wall_new)
-        old = run(old_python, wall_old, "WALL", "after", None)
-        new = run(candidate, wall_new, "WALL", "after", None)
+        old = run(old_python, wall_old, "published", "WALL", "after", None)
+        new = run(candidate, wall_new, "upgraded", "WALL", "after", None)
         require(
             (old["disposition"], old["value"]) == ("cached", 11), "Warm control missed its window"
         )
         require((new["disposition"], new["value"]) == ("dispatch", 3), "Upgraded warm entry reused")
-        # Two seeds and two refreshes for MICRO; one seed and one refresh for WALL.
-        require(len(dest.journal) == 6, "Destination dispatch count disagrees with client results")
+        expected_dispatches = Counter(
+            {
+                ("published-micro-origin", "MICRO"): 1,
+                ("fresh-micro-origin", "MICRO"): 1,
+                ("upgraded-micro-boundary", "MICRO"): 1,
+                ("fresh-micro-boundary", "MICRO"): 1,
+                ("published-wall-origin", "WALL"): 1,
+                ("upgraded-wall-after", "WALL"): 1,
+            }
+        )
+        observed = Counter((r["attempt_id"], r["input"]["sku"]) for r in dest.journal)
+        require(observed == expected_dispatches, f"Unexpected destination journal: {observed}")
+        keys = {r["operation_key"] for r in dest.journal}
+        require(len(keys) == len(expected_dispatches), "Dispatches share an operation key")
         return {
             "status": "pass",
             "vast_lab_id": os.environ["FORGE_VAST_LAB_ID"],
@@ -184,13 +201,15 @@ def main() -> None:
     parser.add_argument("--operation")
     parser.add_argument("--db", type=Path)
     parser.add_argument("--origin")
+    parser.add_argument("--branch")
     parser.add_argument("--sku")
     parser.add_argument("--at", type=int)
     args = parser.parse_args()
     if sys.platform != "linux" or not os.environ.get("FORGE_VAST_LAB_ID", "").isdigit():
         parser.error("Run on the assigned Vast instance")
     if args.operation:
-        print(json.dumps(read(args.db, args.origin, args.sku, args.operation, args.at)))
+        outcome = read(args.db, args.origin, args.branch, args.sku, args.operation, args.at)
+        print(json.dumps(outcome))
         return
     if not args.previous_python or not args.output:
         parser.error("Pass --previous-python and --output")

@@ -95,9 +95,19 @@ attempt = host.invoke(Request("ticket-s07", actor, "lookup", "lookup-1",
 | Cache | An explicitly cacheable read can return a minimized result within its TTL and the same revision, actor, and binding scope. The TTL starts at the durable dispatch intent recorded by the host. A hit records the original attempt, its exclusive expiry and zero provider charge. |
 | Retry | Use a new attempt ID with `--retry-of` and the same logical operation and input. Forge checks eligibility and the provider's idempotency capability. Replaying an existing attempt ID returns its recorded state. |
 
-The host bounds reuse of a read using its own dispatch time. A slow verified response can still be returned to the calling task. Once the dispatch TTL has elapsed the next task reads from the provider. A source can change within the TTL or already be serving older data. Set TTL to zero when every task needs a new provider lookup, and use a source version or timestamp when the business rule requires independent freshness. When upgrading a shared ledger, drain old writers first. New readers apply the dispatch limit to existing cache entries as well.
+The host bounds reuse of a read using its own dispatch time. A slow verified response can still be returned to the calling task. Once the dispatch TTL has elapsed the next task reads from the provider. A source can change within the TTL or already be serving older data. Set TTL to zero when every task needs a new provider lookup, and use a source version or timestamp when the business rule requires independent freshness.
 
 The root budget covers recognized charges and unsettled obligations. A lost response retains its reserve. Reconciliation adds provider observations and deduplicates billing references. A reported charge above its cap is recorded and suspends the binding. Receipts record identifiers, configuration fingerprints and confirmation levels. Payloads and provider responses flow through the host and can appear on `wrap` stdout, so protect the calling process and output. A receipt can establish what the host observed. The independent ticket system establishes the business effect.
+
+### Upgrade from settlement-based cache expiry
+
+Drain old writer processes before sharing their ledger with the upgraded host. New admissions use the dispatch-time bound even for warm entries written by the old wheel. Receipts, evidence certificates and release decisions already recorded keep their original expiry or verdict. An alias change affects new tasks. Existing tasks keep their pinned revision and any effects they have already produced.
+
+Apply the following steps to scopes whose promotion or canary checks depend on the freshness of cached reads.
+
+1. Hold new promotions and canary starts while switching hosts. Stop an open canary if further allocations need fresh evidence. Track already pinned tasks to completion and reconcile pending effects by their original attempt ID.
+2. Keep pre-upgrade exports and certificates for audit. Remove them from the observer's resubmission queue and from pending approval jobs. A stored certificate can still authorize a change until its original deadline.
+3. After the upgrade, have the trusted observer corroborate the relevant reads against the independent destination. For any cache hit it exports, include the matching origin and the new receipt's `valid_until`. Evaluate fresh evidence under a **new evidence ID** for the target revisions and current generation. Resume approvals with that certificate after a fresh `pass`.
 
 ## Promote, roll back, and inspect
 
