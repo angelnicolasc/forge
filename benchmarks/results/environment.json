@@ -1,0 +1,26 @@
+{
+  "execution": "isolated Linux host, sequential, simulated loopback services",
+  "python": "3.12.16",
+  "sqlite": "3.40.1",
+  "wheel_sha256": {
+    "forge_os_check-0.4.1.dev1-py3-none-any.whl": "108c85954926f8c19b68d60ee8d2657dda14304bbc454965369c5a0f9f41c204",
+    "forge_os_check-0.4.0-py3-none-any.whl": "406e04674da9433ab3f392aaf089be78935f2bcabe39335f57c065dd2257fd3a"
+  },
+  "source_sha256": {
+    "bindings.py": "e3eef88437750b0db5587215c5d143a98e96d000377eaa9391c238d5e00c116a",
+    "capacity.py": "0f92de2f74978a234165151be1e1cb0701a1ac3afc4d9d6c7b242cd7764f5402",
+    "gate.py": "b346aefe5944e875391057c1bbc30ba738601a38cbc387808b7d8e08e43c8913",
+    "readme_table.py": "d73d625911ea0088db207f53d71c35a3f497875426a77b4723a6cbc5368a884c"
+  },
+  "receipt_sha256": {
+    "bindings-candidate.json": "c358c3018becf3618f3870c9b12b81910bf133cf59268c1c36b90a5496894c63",
+    "bindings-stable.json": "5cd060460878ede2a7e0579e5787bf2d3e471376153c315199228fb3139f6c80",
+    "gate-candidate.json": "6d7069e3d65eee9ba2402fcc594a56d42f33670f12efba3431342550d5dc2927",
+    "gate-stable.json": "26b67be27494116df9ab46f5010155c500f8c052dd9852eee3750aa485ff5b0e",
+    "capacity-stable.json": "19fa06d24c6bb7c6971e85700126d42fd649c5bd9aa350e171df1ba32b74c658",
+    "capacity-candidate.json": "8a9b0e49ffb632fcb89d6fab5f61174e9fb55a53830fbaf01eb5ca86ac18c3a5"
+  },
+  "date_utc": "2026-11-21",
+  "platform": "x86_64",
+  "cpu_quota": "1344000 100000"
+}

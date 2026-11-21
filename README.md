@@ -41,6 +41,21 @@ forge check \
 
 The second command exits with `0`. To use this in your own repo, choose a process outcome, freeze the eligible case IDs and export observations from the system that owns the outcome. Each run produces a JSON report that you can keep with the PR. [Input format and CI example](docs/check.md)
 
+## How many provider calls does Forge avoid?
+
+We sent the same inventory reads through the published `0.4.0` binding with caching off and with a five-minute TTL. The destination counted physical HTTP requests. Both settings returned identical stock values in every round.
+
+<!-- bindings-benchmark:start -->
+
+| Inventory workload | Cache off | Cache on | Fewer provider calls |
+|---|---:|---:|---:|
+| 120 reads, 8 recurring SKUs | 120 | 8 | 93.3% |
+| 120 reads, 120 different SKUs | 120 | 120 | 0% |
+
+<!-- bindings-benchmark:end -->
+
+The table shows calls per round. All three rounds returned the same counts. Stock stayed constant during the benchmark. For rules that require the latest stock, use a fresh lookup. [Commands, results and the single-ledger load limit](benchmarks/README.md)
+
 ## Govern a release
 
 When a team also needs to control the calls an agent can make, the same distribution includes a single-host runtime. A trusted host routes explicitly configured operations through bindings and stores receipts in SQLite.

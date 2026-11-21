@@ -73,6 +73,7 @@ test(core): add property-based tests for RRF fusion
 
 ## Branch Protection
 
+- Name branches for their purpose, for example `fix/cache-freshness` or `bench/binding-costs`.
 - `main` is protected. Open a PR and request review.
 - All CI checks must pass.
 - One approval required from a maintainer.

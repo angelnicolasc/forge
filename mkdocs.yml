@@ -64,6 +64,7 @@ nav:
       - Code Mode for governed reads: decisions/0002-code-mode.md
       - Evidence for conditional reads: decisions/0003-conditional-evidence.md
       - Canary traffic at the dispatch boundary: decisions/0004-rollout-traffic.md
+      - Capacity under sustained load: decisions/0005-rollout-capacity.md
   - Earlier Forge harness:
       - Harness quickstart: quickstart.md
       - Harness architecture: architecture.md
