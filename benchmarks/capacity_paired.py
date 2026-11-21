@@ -62,9 +62,7 @@ Totals = tuple[int, int, int]
 
 def save(path: Path, value: object) -> None:
     """Replace a receipt atomically after serializing it in the same directory."""
-    with NamedTemporaryFile(
-        mode="w", encoding="utf-8", dir=path.parent, delete=False
-    ) as stream:
+    with NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent, delete=False) as stream:
         staging = Path(stream.name)
         json.dump(value, stream, indent=2, sort_keys=True)
         stream.write("\n")
@@ -647,7 +645,11 @@ def reconstruct(
             record["operation_order"] = order
             record["operations"] = pair
         query = query_pair(
-            reference, candidate, expected, repetitions, bool(index % 2),
+            reference,
+            candidate,
+            expected,
+            repetitions,
+            bool(index % 2),
             fixture["attempts_per_open_root"],
         )
         fixture.pop("database")

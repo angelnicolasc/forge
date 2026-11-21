@@ -233,7 +233,8 @@ def main() -> None:
         parser.error("--history must be in [1, 100000] and --repetitions in [1, 1000]")
     if SCHEMA_VERSION != 2:
         parser.error(
-            f"This historical fixture needs ledger schema v2. The installed wheel uses v{SCHEMA_VERSION}. "
+            "This historical fixture needs ledger schema v2. "
+            f"The installed wheel uses v{SCHEMA_VERSION}. "
             "Use the stable 0.4.0 wheel or follow the schema v3 recipe for "
             "benchmarks/capacity_paired.py in benchmarks/README.md."
         )
