@@ -1,6 +1,6 @@
 # 0005 · Bound the cost of admitting a canary task
 
-**Status** The closed-charge projection is eligible for review. Canonical accounting is the default. Sustained capacity at 60 tasks/s is on hold.
+**Status** The closed-charge projection is eligible for review. Canonical accounting is the default. Sustained capacity at 60 tasks/s is on hold. [F3/F4 measurements and receipt digests](https://github.com/angelnicolasc/forge/blob/e5989b9c2bf229ab6fc1f5fd4bb2652a3b253498/benchmarks/results/adr-0005.md)
 
 ## Decision to make
 
