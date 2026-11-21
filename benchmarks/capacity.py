@@ -17,6 +17,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from time import perf_counter_ns
 
+from forge_check.governed.db import SCHEMA_VERSION
 from forge_check.governed.revision import Revision
 from forge_check.governed.rollout import bucket, capacity
 
@@ -230,6 +231,12 @@ def main() -> None:
     args = parser.parse_args()
     if not 1 <= args.history <= 100_000 or not 1 <= args.repetitions <= 1000:
         parser.error("--history must be in [1, 100000] and --repetitions in [1, 1000]")
+    if SCHEMA_VERSION != 2:
+        parser.error(
+            f"This historical fixture needs ledger schema v2. The installed wheel uses v{SCHEMA_VERSION}. "
+            "Use the stable 0.4.0 wheel or follow the schema v3 recipe for "
+            "benchmarks/capacity_paired.py in benchmarks/README.md."
+        )
     output = args.output.resolve()
     if output.exists() or not output.parent.is_dir():
         parser.error("--output must be a new file in an existing directory")

@@ -13,16 +13,21 @@ On the PyPI `0.4.0` wheel, all three rounds had the same physical call counts. E
 
 The fixture charges 4,000 µUSD per physical POST. The ledger was reconciled against the destination in every arm. The percentages on the project README describe provider requests. Real bills depend on provider pricing and the workload's reuse and freshness requirements. [Stable binding receipt](results/bindings-stable.json) · [Development wheel receipt](results/bindings-candidate.json)
 
-Run from the checkout on a Linux benchmark host with Python 3.11 or later. Install the base wheel in a dedicated environment. To measure the version in this checkout, use the following commands.
+Run the published measurements from the root of a Forge checkout on Linux with Python 3.11 or later. Keep the same shell for the stable binding, Gate and capacity examples. Each run uses a new directory for its receipts.
 
 ```sh
-python3 -m venv /tmp/forge-bench-env
-/tmp/forge-bench-env/bin/python -m pip install ./standalone/forge-check
-/tmp/forge-bench-env/bin/python -I benchmarks/bindings.py \
-  --tasks 120 --keys 8 --rounds 3 --output /tmp/forge-bindings.json
+set -eu
+RUN_DIR=$(mktemp -d)
+python3 -m venv "$RUN_DIR/stable"
+STABLE_PYTHON="$RUN_DIR/stable/bin/python"
+printf '%s\n' 'forge-os-check==0.4.0 --hash=sha256:406e04674da9433ab3f392aaf089be78935f2bcabe39335f57c065dd2257fd3a' > "$RUN_DIR/stable.txt"
+"$STABLE_PYTHON" -m pip install --index-url https://pypi.org/simple \
+  --require-hashes --only-binary=:all: --no-deps -r "$RUN_DIR/stable.txt"
+"$STABLE_PYTHON" -I benchmarks/bindings.py \
+  --tasks 120 --keys 8 --rounds 3 --output "$RUN_DIR/bindings.json"
 ```
 
-To repeat the published release measurement, install `forge-os-check==0.4.0` in that environment. Run `python -I benchmarks/readme_table.py --check` from the checkout to compare the README table with its stable receipt. The wheel and receipt digests are recorded in the [run manifest](results/environment.json).
+Run `"$STABLE_PYTHON" -I benchmarks/readme_table.py --check` from the checkout to compare the README table with its stable receipt. The wheel and receipt digests are recorded in the [run manifest](results/environment.json).
 
 The repeated-key workload cycles through eight SKUs. Its control uses a different SKU for each of the 120 tasks. The stock stays constant in both workloads. Compare physical calls and synthetic charges within the same workload and round. Both policies run through Forge, and the second invocation of a task exercises idempotent replay separately from cache reuse across tasks. [Benchmark source](bindings.py)
 
@@ -31,8 +36,8 @@ The repeated-key workload cycles through eight SKUs. Its control uses a differen
 The Gate benchmark runs the installed `forge check` CLI against three 24-ticket exports. All tickets are marked complete. An intact export, two missed human escalations and two missing observations exercise the `pass`, `fail` and `insufficient` outcomes. A control that reads only the completion status would approve all three. The benchmark includes CLI startup in its latency measurement. Run it from the same checkout and environment as the binding benchmark.
 
 ```sh
-/tmp/forge-bench-env/bin/python -I benchmarks/gate.py \
-  --rounds 20 --output /tmp/forge-gate.json
+"$STABLE_PYTHON" -I benchmarks/gate.py \
+  --rounds 20 --output "$RUN_DIR/gate.json"
 ```
 
 | Support export, 24 completed tickets each | Completion-only control | Forge verdict on `0.4.0` | CLI median / p95 |
@@ -65,9 +70,13 @@ The origin held a reply for **2.153 s** while stock fell from 11 to 3. The cache
 
 `capacity.py` times the installed calculator on two copies of the same ledger. Three canary roots stay open with charges of 0, 15,000 and 101,000 µUSD, each with an allocated cap of 100,000 µUSD. The fixture keeps 10,000 additional, closed canary roots in both copies. Only their rollout assignment changes. Every sample verifies the number of active roots, recognized charges and exposure against independent integer totals. The historical rows have no provider calls or receipts.
 
+### Historical schema v2 measurement
+
+Use the `0.4.0` PyPI environment from the first example. This fixture inserts synthetic history directly into a v2 ledger. Schema v3 protects closed roots and uses the paired benchmark below.
+
 ```sh
-/tmp/forge-bench-env/bin/python -I benchmarks/capacity.py \
-  --history 10000 --repetitions 31 --output /tmp/forge-capacity.json
+"$STABLE_PYTHON" -I benchmarks/capacity.py \
+  --history 10000 --repetitions 31 --output "$RUN_DIR/capacity-stable.json"
 ```
 
 | Placement of the 10,000 closed roots on `0.4.0` | Capacity query median | Capacity query p95 |
@@ -77,12 +86,39 @@ The origin held a reply for **2.153 s** while stock fell from 11 to 3. The cache
 
 Times cover a warm SQLite query on an already-open connection. Each arm has 31 samples ordered in alternating pairs after warm-up. The separate load drill below includes arbitration for the writer, task execution, HTTP, and queuing. Its history mixes stable and canary cohorts. [Calculator benchmark](capacity.py) · [Stable receipt](results/capacity-stable.json) · [Development receipt](results/capacity-candidate.json)
 
-To compare the projection on a leased Linux lab host, verify the wheel hashes and install the reference `0.4.1.dev1` and the candidate into separate environments. Set `FORGE_VAST_LAB_ID` to the verified lease ID and use a new receipt path.
+### Compare the v3 projection with canonical accounting
+
+On a leased Vast Linux host, run the following from the root of a checkout containing this PR and its history. Export `FORGE_VAST_LAB_ID` with the numeric ID of the lease. This builds two development wheels from the signed commits used in the ADR and installs each into its own virtual environment. The SHA-256 values printed by the command identify the artifacts used in your run.
 
 ```sh
+set -eu
+: "${FORGE_VAST_LAB_ID:?Export the numeric ID of the active Vast lease}"
+PAIR_DIR=$(mktemp -d)
+reference_sha=8c01d80430deae04e25bc3b3a0f5c46571ef58fc
+candidate_sha=30e1186254eadf70a1b77645da5511fa2d2cfc1e
+python3 -m venv "$PAIR_DIR/build"
+for sha in "$reference_sha" "$candidate_sha"; do
+  mkdir -p "$PAIR_DIR/$sha"
+  git archive "$sha" standalone/forge-check | tar -x -C "$PAIR_DIR/$sha"
+  "$PAIR_DIR/build/bin/python" -m pip wheel --no-deps \
+    --wheel-dir "$PAIR_DIR/wheels" "$PAIR_DIR/$sha/standalone/forge-check"
+done
+sha256sum "$PAIR_DIR"/wheels/*.whl > "$PAIR_DIR/wheels.sha256"
+cat "$PAIR_DIR/wheels.sha256"
+
+python3 -m venv "$PAIR_DIR/reference"
+python3 -m venv "$PAIR_DIR/candidate"
+FORGE_PYTHON="$PAIR_DIR/reference/bin/python"
+CANDIDATE_PYTHON="$PAIR_DIR/candidate/bin/python"
+"$FORGE_PYTHON" -m pip install --no-index --no-deps \
+  "$PAIR_DIR/wheels/forge_os_check-0.4.1.dev1-py3-none-any.whl"
+"$CANDIDATE_PYTHON" -m pip install --no-index --no-deps \
+  "$PAIR_DIR/wheels/forge_os_check-0.4.1.dev2-py3-none-any.whl"
 "$CANDIDATE_PYTHON" -I benchmarks/capacity_paired.py \
-  --reference-python "$FORGE_PYTHON" --output "$RUN_DIR/capacity-paired.json"
+  --reference-python "$FORGE_PYTHON" --output "$PAIR_DIR/capacity-paired.json"
 ```
+
+The original Vast run used wheel SHA-256 `108c85954926f8c19b68d60ee8d2657dda14304bbc454965369c5a0f9f41c204` for `0.4.1.dev1` and `d832660398ae7092d32579def13f525eb2e0e0fd4e7d12d777c536c9b555ed08` for `0.4.1.dev2`. Rebuild digests can differ with build tools, timestamps or source line endings. [Capacity and sustained-load results from ADR 0005](results/adr-0005.md)
 
 The reference wheel seeds and verifies all source ledgers before migration. Within each reconstruction the query arms use two copies of the same migrated ledger, with the canonical calculator and projection selected separately. Each pair varies its order and verifies exact totals outside the timing window. Actual admissions, charges, closures and operator calls use separate copies of the matching fixtures in the two installed wheels. The first cut contends with an independent SQLite writer that holds the lock for 15 ms. The receipt includes raw samples, query plans, writer wait and transaction durations, and the first admission after the cut. [Paired benchmark](capacity_paired.py)
 
