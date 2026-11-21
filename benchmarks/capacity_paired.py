@@ -635,12 +635,14 @@ def reconstruct(
                     )
                 else:
                     pair[arm] = run_actions(candidate.path, operator_samples, "projection")
-            for left, right in zip(pair["reference"]["samples"], pair["projection"]["samples"],
-                                   strict=True):
+            for left, right in zip(
+                pair["reference"]["samples"], pair["projection"]["samples"], strict=True
+            ):
                 expected_outcome, actual_outcome = left["outcome"], right["outcome"]
                 require(
                     expected_outcome == actual_outcome,
-                    f"Administrative or write outcomes differ: {expected_outcome=} {actual_outcome=}",
+                    "Administrative or write outcomes differ: "
+                    f"{expected_outcome=} {actual_outcome=}",
                 )
             record["operation_order"] = order
             record["operations"] = pair
