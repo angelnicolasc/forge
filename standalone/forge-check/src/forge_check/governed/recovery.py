@@ -22,6 +22,7 @@ from forge_check.governed.db import (
     SCHEMA_VERSION,
     StoreError,
     install_v2_schema,
+    install_v3_schema,
     ledger_identity,
     open_ledger,
     require_dispatch_authority,
@@ -81,7 +82,7 @@ def _state(connection: Connection) -> Row:
 
 def _snapshot_state(connection: Connection) -> dict[str, object]:
     app, schema = ledger_identity(connection)
-    if app != APPLICATION_ID or schema not in {1, SCHEMA_VERSION}:
+    if app != APPLICATION_ID or schema not in {1, 2, SCHEMA_VERSION}:
         raise StoreError("Unsupported ledger snapshot")
     row = connection.execute(
         """SELECT p.scope, a.generation, COALESCE((SELECT MAX(seq) FROM receipts), 0)
@@ -170,7 +171,7 @@ def _write_backup(
 
 
 def backup(store: Store, actor: str, destination: Path) -> dict[str, object]:
-    """Create a consistent, standalone backup of an authoritative v2 ledger."""
+    """Create a consistent, standalone backup of an authoritative ledger."""
     with store.read() as source:
         captured_at_us = _now()
         require_role(source, actor, "admin")
@@ -183,11 +184,12 @@ def migrate(
     actor: str,
     backup_path: Path,
 ) -> dict[str, object]:
-    """Back up a quiesced v1 writer, then commit the additive v2 schema."""
+    """Back up a quiesced ledger, then migrate it and fence older writers."""
     with closing(open_ledger(path)) as writer, writer:
         writer.execute("BEGIN IMMEDIATE")
-        if ledger_identity(writer) != (APPLICATION_ID, 1):
-            raise StoreError("Migration requires a supported v1 ledger")
+        app, schema = ledger_identity(writer)
+        if app != APPLICATION_ID or schema not in {1, 2}:
+            raise StoreError("Migration requires a supported v1 or v2 ledger")
         if writer.execute("PRAGMA journal_mode").fetchone()[0] != "wal":
             raise StoreError("Migration requires an authoritative WAL ledger")
         require_role(writer, actor, "admin")
@@ -195,7 +197,9 @@ def migrate(
             source.execute("PRAGMA query_only=ON")
             source.execute("BEGIN")
             manifest = _write_backup(source, backup_path, _now())
-        install_v2_schema(writer)
+        if schema == 1:
+            install_v2_schema(writer)
+        install_v3_schema(writer)
     return manifest
 
 
@@ -245,6 +249,10 @@ def restore(
                     install_v2_schema(connection)
                 else:
                     require_dispatch_authority(connection)
+                if snapshot_metadata["schema_version"] != SCHEMA_VERSION:
+                    install_v3_schema(connection)
+                # Projection authority is lab-only and must be explicitly re-established.
+                rollout.set_capacity_mode(connection, "reference")
                 recovered_at = _now()
                 rollout.invalidate_leases(connection, recovered_at)
                 rollout.stop_open(connection, None, recovered_at, "recovery_fenced")

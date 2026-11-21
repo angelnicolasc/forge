@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 APPLICATION_ID = 0x464F5247  # FORG
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 _BUSY_SECONDS = 5.0
 
 _RECOVERY_SCHEMA = (
@@ -39,6 +39,37 @@ class StoreError(RuntimeError):
     """The ledger could not be opened with the expected identity and schema."""
 
 
+class _ExactSum:
+    """Accumulate beyond SQLite's signed 64-bit limit and return decimal text."""
+
+    def __init__(self) -> None:
+        self.total = 0
+
+    def step(self, value: int | None) -> None:
+        if value is not None:
+            if type(value) is not int:
+                raise ValueError("Expected integer ledger amounts")
+            self.total += value
+
+    def finalize(self) -> str:
+        return str(self.total)
+
+
+def exact_sum_sql(query: str, error: sqlite3.OperationalError) -> str:
+    """Select the unbounded aggregate only after SQLite reports integer overflow."""
+    if str(error) != "integer overflow":
+        raise error
+    return query.replace("SUM(", "forge_exact_sum(")
+
+
+def exact_amount(value: object) -> int:
+    if type(value) is int:
+        return value
+    if isinstance(value, str):
+        return int(value)  # forge_exact_sum returns decimal text.
+    raise StoreError("Invalid non-integer amount in the canonical ledger")
+
+
 def open_ledger(path: Path) -> sqlite3.Connection:
     """Open an existing ledger with the writer's connection settings."""
     if path.is_symlink() or not path.is_file():
@@ -51,6 +82,8 @@ def open_ledger(path: Path) -> sqlite3.Connection:
     )
     try:
         connection.row_factory = sqlite3.Row
+        connection.create_function("forge_v3_writer", 0, lambda: 1, deterministic=True)
+        connection.create_aggregate("forge_exact_sum", 1, _ExactSum)
         connection.execute("PRAGMA foreign_keys=ON")
         connection.execute("PRAGMA synchronous=FULL")
         return connection
@@ -72,6 +105,50 @@ def install_v2_schema(connection: sqlite3.Connection) -> None:
 
     for statement in (*_RECOVERY_SCHEMA, *rollout.SCHEMA, *code_mode.SCHEMA):
         connection.execute(statement)
+    connection.execute("PRAGMA user_version=2")
+
+
+def install_v3_schema(connection: sqlite3.Connection) -> None:
+    """Backfill capacity and exclude connections whose binary predates the projection."""
+    from forge_check.governed import rollout_projection
+
+    for statement in rollout_projection.SCHEMA:
+        connection.execute(statement)
+    rollout_projection.backfill(connection)
+    # The prior Store validated the schema only when it was constructed. Gate its
+    # already-live writers at SQLite statement preparation, after they acquire the lock.
+    for table in (
+        "alias_leases",
+        "aliases",
+        "attempt_observations",
+        "attempts",
+        "binding_suspensions",
+        "charge_claims",
+        "code_programs",
+        "control_events",
+        "decisions",
+        "finished_roots",
+        "gate_evidence",
+        "leased_roots",
+        "principals",
+        "proposals",
+        "read_cache",
+        "receipts",
+        "recovery_certificates",
+        "recovery_state",
+        "revisions",
+        "revoked_revisions",
+        "rollout_allocations",
+        "rollouts",
+        "scope_policy",
+        "tasks",
+    ):
+        for operation in ("INSERT", "UPDATE", "DELETE"):
+            connection.execute(
+                f"""CREATE TRIGGER writer_v3_{table}_{operation.lower()}
+                    BEFORE {operation} ON {table} WHEN forge_v3_writer() != 1
+                    BEGIN SELECT RAISE(ABORT, 'Ledger requires a schema v3 writer'); END"""
+            )
     connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
 
 
@@ -109,8 +186,8 @@ class Store:
                 if connection.execute("PRAGMA journal_mode").fetchone()[0] != "wal":
                     raise StoreError("Restore snapshots through the fenced recovery path")
                 return
-            if identity == (APPLICATION_ID, 1):
-                raise StoreError("Schema v1 requires an explicit migration and backup")
+            if identity in {(APPLICATION_ID, 1), (APPLICATION_ID, 2)}:
+                raise StoreError(f"Schema v{identity[1]} requires an explicit migration and backup")
             if (
                 not create
                 or identity != (0, 0)
@@ -140,6 +217,7 @@ class Store:
                 connection.execute(statement)
             connection.execute(f"PRAGMA application_id={APPLICATION_ID}")
             install_v2_schema(connection)
+            install_v3_schema(connection)
 
     @contextmanager
     def write(self) -> Iterator[sqlite3.Connection]:

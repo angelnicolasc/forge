@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hmac
 import json
+import sqlite3
 import time
 from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Any, Literal, cast
@@ -11,7 +12,7 @@ from uuid import uuid4
 
 from forge_check.governed import rollout
 from forge_check.governed.binding_contract import operation_contract
-from forge_check.governed.db import require_dispatch_authority
+from forge_check.governed.db import exact_amount, exact_sum_sql, require_dispatch_authority
 from forge_check.governed.revision import (
     MAX_SAFE_INTEGER,
     Revision,
@@ -295,16 +296,17 @@ def _event(
 
 
 def _balance(conn: Connection, root_id: str, limit: int) -> dict[str, int]:
-    totals = conn.execute(
-        """SELECT COALESCE(SUM(charge_microusd), 0) AS consumed,
+    query = """SELECT COALESCE(SUM(charge_microusd), 0) AS consumed,
            COALESCE(SUM(CASE WHEN status IN ('reserved', 'dispatching')
                         THEN reserved_microusd ELSE 0 END), 0) AS reserved,
            COALESCE(SUM(CASE WHEN status NOT IN ('reserved', 'dispatching')
                         THEN reserved_microusd ELSE 0 END), 0) AS pending
-           FROM attempts WHERE root_id = ?""",
-        (root_id,),
-    ).fetchone()
-    consumed, reserved, pending = totals
+           FROM attempts WHERE root_id = ?"""
+    try:
+        totals = conn.execute(query, (root_id,)).fetchone()
+    except sqlite3.OperationalError as error:
+        totals = conn.execute(exact_sum_sql(query, error), (root_id,)).fetchone()
+    consumed, reserved, pending = map(exact_amount, totals)
     return {
         "limit_microusd": limit,
         "consumed_microusd": consumed,

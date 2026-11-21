@@ -77,6 +77,15 @@ The origin held a reply for **2.153 s** while stock fell from 11 to 3. The cache
 
 Times cover a warm SQLite query on an already-open connection. Each arm has 31 samples ordered in alternating pairs after warm-up. The separate load drill below includes arbitration for the writer, task execution, HTTP, and queuing. Its history mixes stable and canary cohorts. [Calculator benchmark](capacity.py) · [Stable receipt](results/capacity-stable.json) · [Development receipt](results/capacity-candidate.json)
 
+To compare the projection on a leased Linux lab host, verify the wheel hashes and install the reference `0.4.1.dev1` and the candidate into separate environments. Set `FORGE_VAST_LAB_ID` to the verified lease ID and use a new receipt path.
+
+```sh
+"$CANDIDATE_PYTHON" -I benchmarks/capacity_paired.py \
+  --reference-python "$FORGE_PYTHON" --output "$RUN_DIR/capacity-paired.json"
+```
+
+The reference wheel seeds and verifies all source ledgers before migration. Within each reconstruction the query arms use two copies of the same migrated ledger, with the canonical calculator and projection selected separately. Each pair varies its order and verifies exact totals outside the timing window. Actual admissions, charges, closures and operator calls use separate copies of the matching fixtures in the two installed wheels. The first cut contends with an independent SQLite writer that holds the lock for 15 ms. The receipt includes raw samples, query plans, writer wait and transaction durations, and the first admission after the cut. [Paired benchmark](capacity_paired.py)
+
 ## Where does a single ledger saturate?
 
 An open-loop run offered **60 tasks/s** to 12 workers and scheduled all 1,200 arrivals irrespective of backlog. On `0.4.1.dev1`, all 1,200 completed, including 364 cache hits and 836 provider dispatches. The run drained at **37.80 tasks/s**, with **11.08 s p95** and **11.77 s** between the last scheduled arrival and the last completion. Latency runs from each scheduled arrival through root completion. Sustained 60 tasks/s on this configuration remains an open target. [Extended burst](results/hardening-2026-11-21.json)
