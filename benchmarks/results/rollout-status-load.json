@@ -1,0 +1,478 @@
+{
+  "scope": "Complete Control.get_rollout SDK call used by rollout-status, active rollout; 3 paired artificial traffic seeds on one host. Stage checks invoke the CLI separately.",
+  "version": "0.4.1.dev2",
+  "source_commits": {
+    "base": "2755009b7135fc132fcbb32a1f4ba09fddddad9f",
+    "cand": "2afe1c7182a92dd4d157e1812f8eefb34523843f"
+  },
+  "wheel_sha256": {
+    "base": "1920053d0ddd497358f5f39be9e573fb772e7cf38cbd226a2e140a76ad5671ff",
+    "cand": "e9f06567ff5a43480694fe100b90b644fdeeb3ba88d5c4a65d6376805f497f6d"
+  },
+  "environment": {
+    "cpu": "Intel(R) Xeon(R) CPU E5-2690 v4 @ 2.60GHz",
+    "cpu_quota_max_period": "1152000 100000",
+    "kernel": "6.8.0-142-generic",
+    "python": "3.12.16",
+    "sqlite": "3.40.1"
+  },
+  "protocol": {
+    "initial_closed_roots": 10000,
+    "arrival_rate_tasks_per_s": 60,
+    "planned_seconds": 600,
+    "workers": 12,
+    "poll_hz_target": 5,
+    "canary_concurrency_limit": 4,
+    "db": "SQLite WAL, synchronous FULL, projection capacity",
+    "order": [
+      "base/cand",
+      "cand/base",
+      "base/cand"
+    ],
+    "stop": "Two consecutive 30 s checks with over 600 outstanding; up to 60 s to drain.",
+    "paired_window": "Polls started from first scheduled arrival until the earlier intake cutoff within each pair. Each duration includes the whole call. Per-arm drain excluded; no imputed polls. Paired windows match time and seed, not necessarily realized ledger contents.",
+    "p95": "Nearest rank per cell."
+  },
+  "functional_coverage": {
+    "script": "tests/acceptance/rollout_traffic.py",
+    "equal_stages": [
+      "empty",
+      "shadow",
+      "assigned",
+      "reserved_without_intent",
+      "child_replay_cache",
+      "uncertain",
+      "stopped",
+      "reconciled",
+      "previous_rollout"
+    ],
+    "results_sha256": {
+      "base": "ac5271b19567f3636b10681f650063b8ebaf0287ecd3cf0fdeac44181c38d889",
+      "cand": "ac5271b19567f3636b10681f650063b8ebaf0287ecd3cf0fdeac44181c38d889"
+    }
+  },
+  "harness_sha256": {
+    "load_capacity.py": "513908e211b44dd08c89e0e05195a8b802ceb355bce66a5b0ed86bd901a81266",
+    "queue_profile.py": "3bc82c0e9c185a01a4121e19413c23e944c47386b5f7df065916c8d85d7edcdc",
+    "audit_queue.py": "6b02a01643d6c7c1e0bf95006f91dc522575e4de7a48613259b8ef6ae127c707"
+  },
+  "pairs": [
+    {
+      "seed": "forge-capacity-adr5-0",
+      "snapshot_sha256": "4f7e0280958199f7c2135e4ee35d7d4d1a98e0de1dc444173cd6db92ffe5b331",
+      "matched_intake_seconds": 330.0,
+      "arms": {
+        "base": {
+          "matched_intake_polls": {
+            "n": 1521,
+            "p50_ms": 128.147372,
+            "p95_ms": 209.265978,
+            "p99_ms": 233.311439,
+            "observed_hz": 4.609090909090909,
+            "errors": 0
+          },
+          "whole_observation": {
+            "samples_total": 1583,
+            "intake_requests_per_s": 4.609090909090909,
+            "single_poller_busy_pct_during_intake": 61.44275677545455,
+            "latency_ms": {
+              "n": 1583,
+              "mean": 135.47262523373342,
+              "p50": 130.85215,
+              "p95": 213.458821,
+              "p99": 236.738926
+            },
+            "errors": 0,
+            "writer_transactions": 0,
+            "reader_transactions": 1583
+          },
+          "intake_seconds": 330.0,
+          "population": {
+            "requested": 36000,
+            "planned_at_stop": 19801,
+            "emitted": 19800,
+            "terminal": 19800,
+            "correct": 19800,
+            "pending": 0,
+            "aborted": true
+          },
+          "charge_and_dispatch_checks": {
+            "all_emitted_correct": true,
+            "allocation_preserved": true,
+            "charge_matches": true,
+            "charges_by_cohort": true,
+            "cohort_limit": true,
+            "evidence_and_budget_live": true,
+            "foreign_keys": true,
+            "wire_matches": true
+          },
+          "sustained_gate": {
+            "all_intended": false,
+            "accounting_and_dispatch": true,
+            "status_100ms": false,
+            "e2e_p95": false,
+            "e2e_p99": false,
+            "drain": false,
+            "useful": false,
+            "backlog": false
+          },
+          "sustained_60_with_status": false,
+          "physical_dispatches": 13323,
+          "intake_correct_per_s": 57.06363636363636,
+          "source_sha256": {
+            "cell.json": "c3cb344ad5342e79cf6cc577f50e2cec2b9886b868e16e03064c7fcb0085ec34",
+            "summary.json": "d2ae36f3865bcf7abf0da4b7bf110c9406b1ae2114929e6d6e6b56f816af19f0",
+            "poll.jsonl": "ef3bbf7e47e88f12e23d450f3a175c4229b763af8ece96eebe6abfd6c73ecb8d",
+            "queue.jsonl": "cfc2662997f362a519e9a801ff8ab75426a07d71e33f4cff7e478c8d6e683f09",
+            "roots.jsonl.gz": "98ce6ff7cd16844b5ea848288618e205cd262e056674bb2e49bf8ece6f7a36d7",
+            "destination.jsonl": "9996725b8d2d4c484a33508e5c96a8134f7a500d5429b8eacbaba0959cb5f631"
+          }
+        },
+        "cand": {
+          "matched_intake_polls": {
+            "n": 1650,
+            "p50_ms": 74.625744,
+            "p95_ms": 110.194208,
+            "p99_ms": 125.424843,
+            "observed_hz": 5.0,
+            "errors": 0
+          },
+          "whole_observation": {
+            "samples_total": 2498,
+            "intake_requests_per_s": 5.0,
+            "single_poller_busy_pct_during_intake": 45.39685844770834,
+            "latency_ms": {
+              "n": 2498,
+              "mean": 92.86120400760609,
+              "p50": 92.687036,
+              "p95": 142.818464,
+              "p99": 160.547527
+            },
+            "errors": 0,
+            "writer_transactions": 0,
+            "reader_transactions": 2498
+          },
+          "intake_seconds": 480.0,
+          "population": {
+            "requested": 36000,
+            "planned_at_stop": 28801,
+            "emitted": 28800,
+            "terminal": 28800,
+            "correct": 28800,
+            "pending": 0,
+            "aborted": true
+          },
+          "charge_and_dispatch_checks": {
+            "all_emitted_correct": true,
+            "allocation_preserved": true,
+            "charge_matches": true,
+            "charges_by_cohort": true,
+            "cohort_limit": true,
+            "evidence_and_budget_live": true,
+            "foreign_keys": true,
+            "wire_matches": true
+          },
+          "sustained_gate": {
+            "all_intended": false,
+            "accounting_and_dispatch": true,
+            "status_100ms": false,
+            "e2e_p95": false,
+            "e2e_p99": false,
+            "drain": false,
+            "useful": false,
+            "backlog": false
+          },
+          "sustained_60_with_status": false,
+          "physical_dispatches": 19224,
+          "intake_correct_per_s": 57.947916666666664,
+          "source_sha256": {
+            "cell.json": "c3cb344ad5342e79cf6cc577f50e2cec2b9886b868e16e03064c7fcb0085ec34",
+            "summary.json": "196273a54232ce0cf9b24ddc0141db8c29e1c36bc32779b5df0ccfa4dd63e84d",
+            "poll.jsonl": "73131c9dac7ff28ddfcccf5ed3b5bdc3337640b5e33287e5290479a19161e19c",
+            "queue.jsonl": "40b47b4f8ba1a7e79de394ba33eba142902b78009aeed9bee5a57cf98f0c092e",
+            "roots.jsonl.gz": "5699bdca66a9cbf7263a14354192d22365d38af3101235b03eac78428123ec26",
+            "destination.jsonl": "d0463cc016878261fa37ebe91707818829352b5d8a2bcfddd52fba508f086a96"
+          }
+        }
+      }
+    },
+    {
+      "seed": "forge-capacity-adr5-1",
+      "snapshot_sha256": "21612a6eb4088be404ed13e92fb28a1a2b300e4681a30606c9203b6be0c986b2",
+      "matched_intake_seconds": 300.0,
+      "arms": {
+        "base": {
+          "matched_intake_polls": {
+            "n": 1403,
+            "p50_ms": 129.39608,
+            "p95_ms": 204.474783,
+            "p99_ms": 226.94053,
+            "observed_hz": 4.676666666666667,
+            "errors": 0
+          },
+          "whole_observation": {
+            "samples_total": 1460,
+            "intake_requests_per_s": 4.676666666666667,
+            "single_poller_busy_pct_during_intake": 62.507176247000004,
+            "latency_ms": {
+              "n": 1460,
+              "mean": 135.72532476506848,
+              "p50": 131.222985,
+              "p95": 208.259874,
+              "p99": 232.847559
+            },
+            "errors": 0,
+            "writer_transactions": 0,
+            "reader_transactions": 1460
+          },
+          "intake_seconds": 300.0,
+          "population": {
+            "requested": 36000,
+            "planned_at_stop": 18001,
+            "emitted": 18000,
+            "terminal": 18000,
+            "correct": 18000,
+            "pending": 0,
+            "aborted": true
+          },
+          "charge_and_dispatch_checks": {
+            "all_emitted_correct": true,
+            "allocation_preserved": true,
+            "charge_matches": true,
+            "charges_by_cohort": true,
+            "cohort_limit": true,
+            "evidence_and_budget_live": true,
+            "foreign_keys": true,
+            "wire_matches": true
+          },
+          "sustained_gate": {
+            "all_intended": false,
+            "accounting_and_dispatch": true,
+            "status_100ms": false,
+            "e2e_p95": false,
+            "e2e_p99": false,
+            "drain": false,
+            "useful": false,
+            "backlog": false
+          },
+          "sustained_60_with_status": false,
+          "physical_dispatches": 12161,
+          "intake_correct_per_s": 57.1,
+          "source_sha256": {
+            "cell.json": "7d4bd69bc775d1915a151997585ae3187db47476413f7e3cfd58234f1ab24dfa",
+            "summary.json": "7e32acb9028bc988e2e86c8f6e9f66256aa389317188ad6c6741135c2d5efca0",
+            "poll.jsonl": "02257b4ef111438a054cb866b44a6eb655a7d4a4bdf8d08ab42c78919b5f6875",
+            "queue.jsonl": "d2aa3bae27fa1238361775a8a47d07d42026df69929adc9d9fe76c186c77808b",
+            "roots.jsonl.gz": "246efbbcef0b120cbc4febb2f4d9572ffe2044a209aae63795a50796055773d9",
+            "destination.jsonl": "18fe086225a7ab3232d2e5acf9c5f0b01e38a2db6a7a3ffba084f45e078f942c"
+          }
+        },
+        "cand": {
+          "matched_intake_polls": {
+            "n": 1499,
+            "p50_ms": 71.909097,
+            "p95_ms": 105.976954,
+            "p99_ms": 121.45209,
+            "observed_hz": 4.996666666666667,
+            "errors": 0
+          },
+          "whole_observation": {
+            "samples_total": 2489,
+            "intake_requests_per_s": 4.997916666666667,
+            "single_poller_busy_pct_during_intake": 45.595561592291666,
+            "latency_ms": {
+              "n": 2489,
+              "mean": 93.08225061269587,
+              "p50": 92.598523,
+              "p95": 143.651427,
+              "p99": 159.310298
+            },
+            "errors": 0,
+            "writer_transactions": 0,
+            "reader_transactions": 2489
+          },
+          "intake_seconds": 480.0,
+          "population": {
+            "requested": 36000,
+            "planned_at_stop": 28801,
+            "emitted": 28800,
+            "terminal": 28800,
+            "correct": 28800,
+            "pending": 0,
+            "aborted": true
+          },
+          "charge_and_dispatch_checks": {
+            "all_emitted_correct": true,
+            "allocation_preserved": true,
+            "charge_matches": true,
+            "charges_by_cohort": true,
+            "cohort_limit": true,
+            "evidence_and_budget_live": true,
+            "foreign_keys": true,
+            "wire_matches": true
+          },
+          "sustained_gate": {
+            "all_intended": false,
+            "accounting_and_dispatch": true,
+            "status_100ms": false,
+            "e2e_p95": false,
+            "e2e_p99": false,
+            "drain": false,
+            "useful": false,
+            "backlog": false
+          },
+          "sustained_60_with_status": false,
+          "physical_dispatches": 18973,
+          "intake_correct_per_s": 58.15625,
+          "source_sha256": {
+            "cell.json": "7d4bd69bc775d1915a151997585ae3187db47476413f7e3cfd58234f1ab24dfa",
+            "summary.json": "f5fd08d854e893efc781a382001ca891005e0b1fe3b23391f82d25a4e85c3225",
+            "poll.jsonl": "bf03f1d041f14ad550df44a98c872119de867db8cc204703714adf0347a88583",
+            "queue.jsonl": "1b47d0f1e99317c21fa284c70813cea6de7571cd22f6f4102b775229043d1b73",
+            "roots.jsonl.gz": "ef9096905ec970d8301c35c2a40e02cefb02d36ef0df34c1840f4036ea429a74",
+            "destination.jsonl": "ffd40ebcff84cf1a7711cf7b2d14ff1863a9ed755eb5f264761eddc734249016"
+          }
+        }
+      }
+    },
+    {
+      "seed": "forge-capacity-adr5-2",
+      "snapshot_sha256": "134d9c3eca63d9f30e87b1bfd60cd73de9cc58f7fb04e6cd1e66a199606335a9",
+      "matched_intake_seconds": 300.0,
+      "arms": {
+        "base": {
+          "matched_intake_polls": {
+            "n": 1420,
+            "p50_ms": 126.210311,
+            "p95_ms": 200.115588,
+            "p99_ms": 223.166603,
+            "observed_hz": 4.733333333333333,
+            "errors": 0
+          },
+          "whole_observation": {
+            "samples_total": 1472,
+            "intake_requests_per_s": 4.733333333333333,
+            "single_poller_busy_pct_during_intake": 61.87280679266667,
+            "latency_ms": {
+              "n": 1472,
+              "mean": 132.7506816705163,
+              "p50": 127.454619,
+              "p95": 207.022046,
+              "p99": 232.699417
+            },
+            "errors": 0,
+            "writer_transactions": 0,
+            "reader_transactions": 1472
+          },
+          "intake_seconds": 300.0,
+          "population": {
+            "requested": 36000,
+            "planned_at_stop": 18001,
+            "emitted": 18000,
+            "terminal": 18000,
+            "correct": 18000,
+            "pending": 0,
+            "aborted": true
+          },
+          "charge_and_dispatch_checks": {
+            "all_emitted_correct": true,
+            "allocation_preserved": true,
+            "charge_matches": true,
+            "charges_by_cohort": true,
+            "cohort_limit": true,
+            "evidence_and_budget_live": true,
+            "foreign_keys": true,
+            "wire_matches": true
+          },
+          "sustained_gate": {
+            "all_intended": false,
+            "accounting_and_dispatch": true,
+            "status_100ms": false,
+            "e2e_p95": false,
+            "e2e_p99": false,
+            "drain": false,
+            "useful": false,
+            "backlog": false
+          },
+          "sustained_60_with_status": false,
+          "physical_dispatches": 12223,
+          "intake_correct_per_s": 57.02,
+          "source_sha256": {
+            "cell.json": "ef7cdd634bffad1525a0a53fc02c6affb5276510af12f79c3acce38c43920823",
+            "summary.json": "439b7991b2e7a08fc1109246fc339391263605f3df2ad87765dd1714f6003ea4",
+            "poll.jsonl": "f26b652bde62590b48bff54d05e0216e545f5a3ce8cfa1e67c5ef3a37fe59f45",
+            "queue.jsonl": "818451196b380ed44b6a94d1bac69825b54a2e1d42e7841ac89b32a7423608f2",
+            "roots.jsonl.gz": "bad6387f6e2842f5119da6de876781c8a76cc640ee819f45e63f8a7d9aaca8b7",
+            "destination.jsonl": "6918815547c770dca1846301a58bc00e43d6fb912a8484e8aafcba3f2cad25e0"
+          }
+        },
+        "cand": {
+          "matched_intake_polls": {
+            "n": 1499,
+            "p50_ms": 72.199769,
+            "p95_ms": 103.82797,
+            "p99_ms": 119.639193,
+            "observed_hz": 4.996666666666667,
+            "errors": 0
+          },
+          "whole_observation": {
+            "samples_total": 2341,
+            "intake_requests_per_s": 4.997777777777777,
+            "single_poller_busy_pct_during_intake": 43.935127692222224,
+            "latency_ms": {
+              "n": 2341,
+              "mean": 89.75668901708671,
+              "p50": 88.917467,
+              "p95": 138.474099,
+              "p99": 152.61796
+            },
+            "errors": 0,
+            "writer_transactions": 0,
+            "reader_transactions": 2341
+          },
+          "intake_seconds": 450.0,
+          "population": {
+            "requested": 36000,
+            "planned_at_stop": 27001,
+            "emitted": 27000,
+            "terminal": 27000,
+            "correct": 27000,
+            "pending": 0,
+            "aborted": true
+          },
+          "charge_and_dispatch_checks": {
+            "all_emitted_correct": true,
+            "allocation_preserved": true,
+            "charge_matches": true,
+            "charges_by_cohort": true,
+            "cohort_limit": true,
+            "evidence_and_budget_live": true,
+            "foreign_keys": true,
+            "wire_matches": true
+          },
+          "sustained_gate": {
+            "all_intended": false,
+            "accounting_and_dispatch": true,
+            "status_100ms": false,
+            "e2e_p95": false,
+            "e2e_p99": false,
+            "drain": false,
+            "useful": false,
+            "backlog": false
+          },
+          "sustained_60_with_status": false,
+          "physical_dispatches": 17858,
+          "intake_correct_per_s": 57.86888888888889,
+          "source_sha256": {
+            "cell.json": "ef7cdd634bffad1525a0a53fc02c6affb5276510af12f79c3acce38c43920823",
+            "summary.json": "10228e636919699b48ef220fff8b0546b2767037b7ea4a66da2f7315e561d2aa",
+            "poll.jsonl": "a240743db3485ccc6157a15d24167d2444eb95b8a9834a9f9ad2a6dac689f946",
+            "queue.jsonl": "cc61413dc0e18a8784ac37ac03c4f0e25edd8e4262b165a4903dd7e96c17d7e0",
+            "roots.jsonl.gz": "9fe5f8c59a25a5d179956084e423c1322fc493bfbd0b25e9001b2e485bc15b09",
+            "destination.jsonl": "5869f6cf6d44e484855aa5c1617665965d0a963013646c6f89c0219c37c462ab"
+          }
+        }
+      }
+    }
+  ]
+}

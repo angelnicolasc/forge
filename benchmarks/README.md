@@ -136,3 +136,54 @@ The cardinality drill isolated the cost of calculating available canary capacity
 The capacity check reads the active rollout's canary allocations and sums their attempts. This measurement motivates tracking capacity incrementally and comparing the result against a full ledger calculation before changing admission. The drill used one run per placement. The four populated tables model ledger shape, while the effects and charges from the 120 new tasks were checked against the destination. [Cardinality measurements](results/hardening-2026-11-21.json)
 
 The archived drills ran on 2026-11-21 UTC using a Linux x86-64 host, Python 3.12.16, SQLite 3.40.1 and a CPU quota of 17.28 cores. They used simulated traffic and a loopback HTTP provider. The public binding benchmark above measures provider-call reuse in sequential tasks. The archive records the separate load, recovery and upgrade experiments. Each excerpt identifies its original receipt by name and SHA-256. [Machine-readable archive](results/hardening-2026-11-21.json)
+
+## How long does it take to inspect a rollout?
+
+The operator's `rollout-status` command reads an allocation and traffic summary. A root can have multiple child attempts. The view counts that root once in its cohort and counts each dispatch intent separately. This benchmark reads the complete SDK response used by the command.
+
+### Paired measurement on Vast
+
+The idle fixture keeps 10,000 closed canary roots and three open roots in a stopped rollout. Each wheel starts from a copy of the same database, with the capacity projection enabled. Eight alternating blocks in ABBA order give each wheel 32 timed reads and four warm-ups. Each timed read opens a transaction and returns the complete operator response. The script compares every response and checks the expected cohort counts. Measurements exclude CLI startup.
+
+| Idle ledger | Reference | Candidate |
+|---|---:|---:|
+| Median status read | 31.0 ms | 28.8 ms |
+| p95 status read | 33.1 ms | 30.0 ms |
+
+The load drill used one active rollout per ledger copy, 12 workers, a loopback provider, and a status reader aiming for five polls per second. Each seed started with 10,000 historical roots. The scheduler offered 60 tasks/s for up to 600 seconds. Two consecutive 30-second checks with over 600 outstanding tasks stopped intake, followed by up to 60 seconds of drain. For each pair, the p95 includes polls started in the shared interval from the first scheduled arrival to the earlier intake cutoff. Emitted task counts cover each arm's own intake. Concurrent workers can produce different realized traffic mixes. This measures the full SDK read on one Linux host with an 11.52-core quota.
+
+| Seed | Matched intake | Status p95, reference → candidate | Observed polls, reference / candidate | Tasks emitted, reference / candidate |
+|---|---:|---:|---:|---:|
+| 1 | 330 s | 209.3 → 110.2 ms | 1,521 / 1,650 | 19,800 / 28,800 |
+| 2 | 300 s | 204.5 → 106.0 ms | 1,403 / 1,499 | 18,000 / 28,800 |
+| 3 | 300 s | 200.1 → 103.8 ms | 1,420 / 1,499 | 18,000 / 27,000 |
+
+Across the six trials, the observer recorded **0 status errors**. The candidate met the full sustained-throughput gate in **0/3 trials**. The candidate also exceeded the 100 ms status p95 target in all three runs. All 140,400 emitted tasks completed correctly before the drain deadline. All six ledgers reconciled physical dispatches and charges with the destination. The separate CLI acceptance run matched all nine traffic states across both wheels, including reservations, child calls, replays and pending confirmations.
+
+[Reproducible idle benchmark](rollout_status.py) · [Raw idle timings and wheel hashes](results/rollout-status.json) · [Paired load results, sample counts and trace digests](results/rollout-status-load.json) · [CLI acceptance fixture](../tests/acceptance/rollout_traffic.py)
+
+### Reproduce the idle comparison
+
+From a checkout containing this benchmark, build each revision in its own directory. Both revisions use the same development package version, so install each wheel by file into its own virtual environment.
+
+```sh
+set -eu
+RUN=$(mktemp -d)
+python3 -m venv "$RUN/build"
+"$RUN/build/bin/python" -m pip install "hatchling==1.29.0"
+for arm in reference candidate; do
+  case "$arm" in
+    reference) sha=2755009b7135fc132fcbb32a1f4ba09fddddad9f ;;
+    candidate) sha=2afe1c7182a92dd4d157e1812f8eefb34523843f ;;
+  esac
+  mkdir -p "$RUN/$arm/source" "$RUN/$arm/wheels"
+  git archive "$sha" standalone/forge-check | tar -x -C "$RUN/$arm/source"
+  "$RUN/build/bin/python" -m pip wheel --no-deps --no-build-isolation \
+    --wheel-dir "$RUN/$arm/wheels" "$RUN/$arm/source/standalone/forge-check"
+  sha256sum "$RUN/$arm/wheels/"*.whl
+  python3 -m venv "$RUN/$arm/venv"
+  "$RUN/$arm/venv/bin/python" -m pip install --no-index --no-deps "$RUN/$arm/wheels/"*.whl
+done
+"$RUN/candidate/venv/bin/python" -I benchmarks/rollout_status.py \
+  --reference-python "$RUN/reference/venv/bin/python" --output "$RUN/rollout-status.json"
+```
