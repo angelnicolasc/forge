@@ -45,7 +45,8 @@ class _ExactSum:
     def __init__(self) -> None:
         self.total = 0
 
-    def step(self, value: int | None) -> None:
+    def step(self, *values: object) -> None:
+        (value,) = values
         if value is not None:
             if type(value) is not int:
                 raise ValueError("Expected integer ledger amounts")

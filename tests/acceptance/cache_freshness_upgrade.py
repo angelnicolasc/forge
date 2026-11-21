@@ -19,13 +19,15 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from forge_check.governed.control import Control
-from forge_check.governed.db import Store
+from forge_check.governed.db import SCHEMA_VERSION, Store
 from forge_check.governed.host import Host, HttpProvider
 from forge_check.governed.ledger import Request
+from forge_check.governed.recovery import migrate
 from forge_check.governed.revision import Revision
 from preview_bindings import (
     CASES,
     KEY,
+    OWNER,
     PRINCIPALS,
     READER,
     STOCK,
@@ -84,6 +86,14 @@ def snapshot(source: Path, target: Path) -> None:
         original.backup(copy)
 
 
+def upgrade_snapshot(path: Path) -> dict[str, object] | None:
+    with closing(sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True)) as conn:
+        schema = conn.execute("PRAGMA user_version").fetchone()[0]
+    if schema == SCHEMA_VERSION:
+        return None
+    return migrate(path, OWNER, path.with_suffix(".before-migration.db"))
+
+
 def check(old_python: Path, root: Path) -> dict:
     ready, allow = threading.Event(), threading.Event()
 
@@ -129,6 +139,7 @@ def check(old_python: Path, root: Path) -> dict:
         old_clone, upgraded = root / "baseline.db", root / "upgraded.db"
         snapshot(old_db, old_clone)
         snapshot(old_db, upgraded)
+        exact_upgrade = upgrade_snapshot(upgraded)
         cases = {}
         for name, py, db in (
             ("published", old_python, old_clone),
@@ -163,6 +174,7 @@ def check(old_python: Path, root: Path) -> dict:
         wall_old, wall_new = root / "wall-old.db", root / "wall-new.db"
         snapshot(warm, wall_old)
         snapshot(warm, wall_new)
+        wall_upgrade = upgrade_snapshot(wall_new)
         old = run(old_python, wall_old, "published", "WALL", "after", None)
         new = run(candidate, wall_new, "upgraded", "WALL", "after", None)
         require(
@@ -188,6 +200,7 @@ def check(old_python: Path, root: Path) -> dict:
             "vast_lab_id": os.environ["FORGE_VAST_LAB_ID"],
             "source_version": seed["version"],
             "candidate_version": seed_current["version"],
+            "migration_backups": {"exact_boundary": exact_upgrade, "wall_clock": wall_upgrade},
             "exact_boundary": cases,
             "wall_clock": {"held_seconds": held, "old": old, "new": new},
             "destination_journal": dest.journal,
