@@ -37,6 +37,7 @@ from capacity import CAP, CHECKOUT, OPEN_CHARGES, SEED, add_history, seed
 from governed_oracle import Oracle
 from governed_trials import (
     FINGERPRINT,
+    MODEL,
     OPERATOR,
     OWNER,
     SCOPE,
@@ -482,8 +483,11 @@ def operate(path: Path, operator_index: int, arm: Arm) -> dict[str, Any]:
     require(allocated["allocation"]["cohort"] == "canary", "Sample did not exercise canary")
     phase["allocation"] = allocated["allocation"]
     phase["revision"] = allocated["revision"]
-    no_wire_request = request("meter-task", "meter-attempt", "meter-ticket")
-    require(actions.ledger.admit(no_wire_request).disposition == "dispatch", "Invalid reservation")
+    # The over-cap ticket in the query fixture suspends its binding. The model binding
+    # remains authorized and exercises the same reservation and charge ledger lifecycle.
+    no_wire_request = request("meter-task", "meter-attempt", "meter-ticket", binding=MODEL)
+    reservation = actions.ledger.admit(no_wire_request)
+    require(reservation.disposition == "dispatch", f"Invalid reservation: {reservation.reason}")
     require(actions.ledger.mark_dispatched("meter-attempt"), "Missing dispatch intent")
     observed = reconcile("recognize_charge")
     require(observed["charge_microusd"] == 70, "Unexpected charge")
@@ -515,6 +519,7 @@ def operate(path: Path, operator_index: int, arm: Arm) -> dict[str, Any]:
             verify(conn, totals)
     phase.update(
         capacity=totals,
+        settlement_binding=MODEL,
         traffic_by_cohort=cut["traffic_by_cohort"],
         allocations=cut["allocations"],
         retained_revision=pinned["revision"],
