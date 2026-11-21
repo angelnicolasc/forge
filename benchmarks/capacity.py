@@ -92,7 +92,6 @@ def add_history(world: World, count: int) -> int:
     columns_by_table = {
         "tasks": {"id": "h.root", "root_id": "h.root"},
         "rollout_allocations": {"root_id": "h.root", "bucket": "h.bucket"},
-        "finished_roots": {"root_id": "h.root"},
         "attempts": {
             "id": "h.root",
             "task_id": "h.root",
@@ -104,6 +103,8 @@ def add_history(world: World, count: int) -> int:
             "charge_microusd": "h.charge",
             "cache_key": "NULL",
         },
+        # Schema v3 accepts each charge before its root is marked as finished.
+        "finished_roots": {"root_id": "h.root"},
     }
     rows = []
     for i in range(count):
