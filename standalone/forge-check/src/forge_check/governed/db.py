@@ -45,8 +45,7 @@ class _ExactSum:
     def __init__(self) -> None:
         self.total = 0
 
-    def step(self, *values: object) -> None:
-        (value,) = values
+    def step(self, value: int | None, /) -> None:
         if value is not None:
             if type(value) is not int:
                 raise ValueError("Expected integer ledger amounts")
@@ -84,7 +83,8 @@ def open_ledger(path: Path) -> sqlite3.Connection:
     try:
         connection.row_factory = sqlite3.Row
         connection.create_function("forge_v3_writer", 0, lambda: 1, deterministic=True)
-        connection.create_aggregate("forge_exact_sum", 1, _ExactSum)
+        # SQLite accepts TEXT from an aggregate, including this exact decimal result.
+        connection.create_aggregate("forge_exact_sum", 1, _ExactSum)  # type: ignore[arg-type]
         connection.execute("PRAGMA foreign_keys=ON")
         connection.execute("PRAGMA synchronous=FULL")
         return connection
