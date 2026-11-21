@@ -2,6 +2,8 @@
 
 The standalone `forge-os-check` wheel includes a direct host for one model and one support tool. Install it on Python 3.11 or newer in a dedicated environment. The legacy `forge-os-cli` distribution also provides a `forge` executable. [Wheel installation](check.md#try-the-support-example)
 
+The stable PyPI wheel (`0.4.0`) starts the read-cache TTL when the host settles the result. Dispatch-based expiry starts with the `0.4.1.dev1` development wheel. [Downgrade with a warm ledger](#return-to-040-with-a-warm-ledger)
+
 ## Initialize the host
 
 Use one trusted host and a SQLite database on its local disk. Protect the ledger directory and configuration with operating system permissions. The host authenticates callers and supplies `--actor` from that identity. Keep the CLI, direct SDK access, provider configuration, and ledger write access inside that boundary. The filesystem administrator controls the stored evidence.
@@ -92,22 +94,36 @@ attempt = host.invoke(Request("ticket-s07", actor, "lookup", "lookup-1",
 | Run | The host checks permissions and records admission and a monetary reserve before external I/O. A missing price cap blocks strict admission. |
 | Stream | Add `--stream` or call `Host.stream(request)`. Chunk frames precede a terminal attempt. A missing terminal provider observation leaves an unresolved attempt. |
 | Cancel | Pass a `threading.Event` to `Host.stream`. A cancellation before dispatch confirms zero provider exposure. After dispatch, reconcile uncertain cost and effect through `forge reconcile` with the original attempt ID. |
-| Cache | An explicitly cacheable read can return a minimized result within its TTL and the same revision, actor, and binding scope. The TTL starts at the durable dispatch intent recorded by the host. A hit records the original attempt, its exclusive expiry and zero provider charge. |
+| Cache | An explicitly cacheable read can return a minimized result within its TTL and the same revision, actor, and binding scope. The TTL starts at settlement in `0.4.0` and at durable dispatch intent in `0.4.1.dev1`. At the exact expiry the entry is already ineligible. A hit records the original attempt, its exclusive expiry and zero provider charge. |
 | Retry | Use a new attempt ID with `--retry-of` and the same logical operation and input. Forge checks eligibility and the provider's idempotency capability. Replaying an existing attempt ID returns its recorded state. |
 
-The host bounds reuse of a read using its own dispatch time. A slow verified response can still be returned to the calling task. Once the dispatch TTL has elapsed the next task reads from the provider. A source can change within the TTL or already be serving older data. Set TTL to zero when every task needs a new provider lookup, and use a source version or timestamp when the business rule requires independent freshness.
+For example, take a two-second TTL, a dispatch at T and a verified result settled at T+1 s. On `0.4.0` that entry can serve a new read until T+3 s. On `0.4.1.dev1` it expires at T+2 s. A slow verified response can still reach its original caller. The source can also change within either window. For a new provider lookup on each new authorized operation, set `cache_ttl_seconds` to zero on the binding in the pinned revision. Use a source version or timestamp when the business rule requires independent freshness.
 
 The root budget covers recognized charges and unsettled obligations. A lost response retains its reserve. Reconciliation adds provider observations and deduplicates billing references. A reported charge above its cap is recorded and suspends the binding. Receipts record identifiers, configuration fingerprints and confirmation levels. Payloads and provider responses flow through the host and can appear on `wrap` stdout, so protect the calling process and output. A receipt can establish what the host observed. The independent ticket system establishes the business effect.
 
 ### Upgrade from settlement-based cache expiry
 
-Drain old writer processes before sharing their ledger with the upgraded host. New admissions use the dispatch-time bound even for warm entries written by the old wheel. Receipts, evidence certificates and release decisions already recorded keep their original expiry or verdict. An alias change affects new tasks. Existing tasks keep their pinned revision and any effects they have already produced.
+Drain the `0.4.0` writers before switching their ledger to `0.4.1.dev1`. When the new host reads a warm entry, it uses the earlier of its stored expiry and the original dispatch time plus TTL. Reading the entry leaves its stored expiry intact. Receipts, evidence certificates and release decisions already recorded keep their original expiry or verdict. An alias change affects new tasks. Existing tasks keep their pinned revision and any effects they have already produced.
 
 Apply the following steps to scopes whose promotion or canary checks depend on the freshness of cached reads.
 
 1. Hold new promotions and canary starts while switching hosts. Stop an open canary if further allocations need fresh evidence. Track already pinned tasks to completion and reconcile pending effects by their original attempt ID.
 2. Keep pre-upgrade exports and certificates for audit. Remove them from the observer's resubmission queue and from pending approval jobs. A stored certificate can still authorize a change until its original deadline.
 3. After the upgrade, have the trusted observer corroborate the relevant reads against the independent destination. For any cache hit it exports, include the matching origin and the new receipt's `valid_until`. Evaluate fresh evidence under a **new evidence ID** for the target revisions and current generation. Resume approvals with that certificate after a fresh `pass`.
+
+### Return to 0.4.0 with a warm ledger
+
+Switching the installed wheel changes the cache clock. The `forge rollback` command changes the alias for future tasks and keeps the installed wheel. A `0.4.0` process that reopens the same ledger trusts the expiry stored on each row. An entry originally written by `0.4.0` can therefore become eligible again after `0.4.1.dev1` would have rejected it.
+
+1. Stop new admissions and hold freshness-dependent promotions and canaries. Drain pinned tasks, finish in-flight calls and reconcile pending effects. Stop all hosts and background writers that share this ledger.
+2. On the drained ledger, use a read-only SQLite connection to find the last stored expiry across all entries.
+
+    ```sql
+    SELECT MAX(expires_at) AS latest_expiry_us FROM read_cache;
+    ```
+
+3. Keep writers stopped until the host's UTC clock in Unix microseconds reaches or exceeds `latest_expiry_us`. A `NULL` result means the cache is empty and there is no wait. At the boundary every pre-switch entry has expired. Restart the host with the `0.4.0` wheel on the same ledger.
+4. New entries written by `0.4.0` again expire relative to settlement. If a workflow requires dispatch-bounded freshness, keep it on hold or route new operations through an approved revision with `cache_ttl_seconds: 0` on each relevant binding. Check the revision actually pinned to the root, including canary assignments. Children inherit that pin, and replaying an attempt ID returns its recorded state. Re-evaluate freshness-dependent approvals with fresh observations and a new evidence ID before resuming them.
 
 ## Promote, roll back, and inspect
 
