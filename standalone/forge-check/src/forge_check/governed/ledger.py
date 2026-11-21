@@ -352,8 +352,15 @@ def _cache_row(conn: Connection, cache_key: str | None) -> Row | None:
     return cast(
         "Row | None",
         conn.execute(
-            "SELECT source_attempt_id, expires_at, result FROM read_cache "
-            "WHERE cache_key = ? AND expires_at > ?",
+            # Earlier writers started the TTL at settlement. Clamp their existing entries
+            # to the original dispatch time, including the expiry reported in hit receipts.
+            """SELECT source_attempt_id, expires_at, result FROM (
+                   SELECT c.source_attempt_id, c.result,
+                          MIN(c.expires_at, a.dispatched_at + a.cache_ttl_seconds * 1000000)
+                              AS expires_at
+                     FROM read_cache c JOIN attempts a ON a.id = c.source_attempt_id
+                    WHERE c.cache_key = ?
+               ) WHERE expires_at > ?""",
             (cache_key, _utc()),
         ).fetchone(),
     )
@@ -914,7 +921,7 @@ class Ledger:
             (
                 attempt["cache_key"],
                 attempt["id"],
-                now + attempt["cache_ttl_seconds"] * 1_000_000,
+                attempt["dispatched_at"] + attempt["cache_ttl_seconds"] * 1_000_000,
                 serialized,
             ),
         )

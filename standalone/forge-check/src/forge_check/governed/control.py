@@ -759,7 +759,12 @@ class Control:
         with self.store.write() as conn:
             require_role(conn, actor, "approve")
             now = now_micros()
-            row = self._rollout_view(conn, rollout_id, now)
+            row = _required(
+                conn.execute(
+                    "SELECT generation, stopped_at FROM rollouts WHERE id = ?", (rollout_id,)
+                ).fetchone(),
+                "rollout",
+            )
             if row["generation"] != expected_generation:
                 raise ValueError("Stale rollout generation")
             if row["stopped_at"] is None:
@@ -767,8 +772,7 @@ class Control:
                 if _alias(conn)["generation"] != expected_generation:
                     raise ValueError("Stale alias generation")
                 rollout.stop_open(conn, actor, now, "operator_stopped")
-                return self._rollout_view(conn, rollout_id, now)
-            return row
+            return self._rollout_view(conn, rollout_id, now)
 
     def issue_alias_lease(self, actor: str, lease_id: str, *, ttl_seconds: int) -> dict[str, Any]:
         identifier(lease_id, "lease")
