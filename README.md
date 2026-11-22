@@ -1,49 +1,63 @@
 # Forge Check
 
-An agent can complete every task and still miss the work that matters. Forge Check compares recorded agent runs against a business rule and tells your CI which cases passed, failed, or need more evidence.
+**Check what your agent actually did before you ship a change.**
 
-In the support example, the agent marked all 24 tickets complete. Eight needed a human. The queue recorded six escalations. Forge names the two tickets the team would otherwise miss.
+Give Forge a business rule and two recorded runs with observations from the system that owns the outcome. Forge tells CI which cases passed, which failed and where the evidence is missing.
 
-[Install from PyPI](https://pypi.org/project/forge-os-check/0.4.0/) · [Add a CI check](docs/check.md#add-one-step-to-your-ci) · [Govern tool calls](docs/governed.md)
+The support agent marked every ticket complete. Forge caught two that needed a human and ended in self-service. [Run the example](#try-the-support-check)
 
-## Catch two missed escalations
+<picture>
+  <source media="(max-width: 600px)" srcset="docs/assets/support-queue-compact.png">
+  <img src="docs/assets/support-queue.png" alt="Support demo with 24 completed tickets. Eight needed a human. Six reached the queue, and tickets S07 and S08 were missed. The other 16 correctly ended in self-service." width="920">
+</picture>
 
-Start in the root of this checkout with Python 3.11 or newer and a POSIX shell. Use a dedicated environment because the older `forge-os-cli` distribution also installs a command named `forge`. The base wheel has no runtime dependencies. This example reads saved, synthetic queue observations and makes zero model calls.
+## Try the support check
+
+The demo uses saved observations and makes **zero model calls**. With Git, Python 3.11+ and a POSIX shell, copy this block to get the sample files and run the published wheel in an isolated environment.
 
 ```sh
-python3 -m venv .venv-forge-check
-. .venv-forge-check/bin/activate
+git clone --depth 1 https://github.com/angelnicolasc/forge.git
+cd forge/examples/check-support
+python3 -m venv .venv
+. .venv/bin/activate
 python -m pip install 'forge-os-check==0.4.0'
 
-forge check \
-  --cases examples/check-support/cases.json \
-  --baseline examples/check-support/baseline.json \
-  --candidate examples/check-support/candidate-fail.json \
-  --output support-check.json
+forge check --cases cases.json --baseline baseline.json \
+  --candidate candidate-fail.json --output support-check.json
 ```
 
-The command deliberately exits with `1`. Look for these two cases in the output.
+The expected exit code is `1`. These two lines identify the regressions. The full report is in `support-check.json`.
 
 ```text
 S07 [fail] expected human, candidate self_service (completed), baseline human (completed)
 S08 [fail] expected human, candidate self_service (completed), baseline human (completed)
 ```
 
-Run the corrected candidate in the same shell.
+Change `candidate-fail.json` to `candidate-pass.json` and run the check again. The same 24 cases pass with exit code `0`. For your own agent, start with one rule and export the outcomes from the system that owns them. [Add a check to your CI](docs/check.md#add-one-step-to-your-ci) · [Input format](docs/check.md#supply-a-case-from-your-own-agent)
 
-```sh
-forge check \
-  --cases examples/check-support/cases.json \
-  --baseline examples/check-support/baseline.json \
-  --candidate examples/check-support/candidate-pass.json \
-  --output support-pass.json
-```
+## From a PR check to a release decision
 
-The second command exits with `0`. To use this in your own repo, choose a process outcome, freeze the eligible case IDs and export observations from the system that owns the outcome. Each run produces a JSON report that you can keep with the PR. [Input format and CI example](docs/check.md)
+When you're ready to govern live tool calls, route one operation through a Forge binding. The single-host runtime checks permissions, reserves budget before dispatch and records the call in SQLite.
 
-## How many provider calls does Forge avoid?
+| Operator question | What Forge keeps |
+|---|---|
+| What did we authorize? | A **Revision** pins the tool contracts, budget and checks for the task. |
+| What happened? | A **Receipt** records the binding's decision and the attempt. The destination's records can confirm the effect. |
+| Can we promote? | The **Gate** evaluates the evidence. A fresh pass lets an authorized operator promote the revision. |
 
-We sent the same inventory reads through the published `0.4.0` binding with caching off and with a five-minute TTL. The destination counted physical HTTP requests. Both settings returned identical stock values in every round.
+For example, a low stock reading can require a lookup in a reserve warehouse. If a complete journal shows that lookup was skipped, the Gate returns `fail`. If the observer is offline, it returns `insufficient`. Both keep the current revision in place. [Inventory example](docs/conditional-evidence.md) · [Connect a binding](docs/governed.md)
+
+## What caching saves on repeated reads
+
+Across three rounds with the published `0.4.0` binding, a five-minute cache cut **120 inventory requests to 8** when the same items recurred. With 120 distinct items, all 120 requests reached the provider.
+
+<picture>
+  <source media="(max-width: 600px)" srcset="docs/assets/inventory-cache-compact.png">
+  <img src="docs/assets/inventory-cache.png" alt="Provider requests per round. For eight recurring SKUs, 120 calls with caching off fell to 8 with caching on, a 93.3% reduction. For 120 distinct SKUs, both settings sent 120 calls." width="920">
+</picture>
+
+<details>
+<summary>Provider counts and test conditions</summary>
 
 <!-- bindings-benchmark:start -->
 
@@ -54,28 +68,16 @@ We sent the same inventory reads through the published `0.4.0` binding with cach
 
 <!-- bindings-benchmark:end -->
 
-The table shows calls per round. All three rounds returned the same counts. Stock stayed constant during the benchmark. For rules that require the latest stock, use a fresh lookup. [Commands, results and the single-ledger load limit](benchmarks/README.md)
+Each round used sequential reads against a destination with stable stock. Both cache settings returned the same values. Use a fresh lookup when a decision needs current inventory.
 
-## Govern a release
+</details>
 
-When a team also needs to control the calls an agent can make, the same distribution includes a single-host runtime. A trusted host routes explicitly configured operations through bindings and stores receipts in SQLite.
+[Benchmark and receipts](benchmarks/README.md#how-many-calls-reach-the-provider) · [Single-ledger load limits](benchmarks/README.md#where-does-a-single-ledger-saturate)
 
-| Concept | What an operator can answer |
-|---|---|
-| Revision | What did we authorize? An immutable manifest identifies the tool contracts, budgets and checks. A task starts on a pinned revision. |
-| Receipt | What happened at the binding? The receipt identifies the call, its revision and its recorded disposition. The destination's own records can confirm a business effect. |
-| Gate | Can we promote this change? The Gate evaluates saved evidence against the frozen rule. An authorized operator can promote with a fresh pass or retain the current revision when evidence is missing. |
+## Explore Forge
 
-A stock check illustrates the distinction. If primary inventory falls below the threshold, the rule requires a reserve lookup. A complete journal can establish that the lookup was skipped. If the observer is offline, Forge reports `insufficient`. Both outcomes hold the current revision. [Conditional inventory example](docs/conditional-evidence.md)
+- **Governed rollouts.** Start a bounded canary, inspect observed revisions and roll back future assignments. Reconcile previously dispatched calls with the destination. [Operations guide](docs/operations.md)
+- **Code Mode.** Compose approved reads in one program through the same bindings. An experimental, opt-in extra for Linux x86_64. [SDK quickstart](docs/code-mode.md)
+- **Project history.** The earlier multi-package harness has its own adapters, memory and tracing. Install it in a separate environment because both CLIs use the name `forge`. [Harness quickstart](docs/quickstart.md) · [Architecture](docs/architecture.md) · [Feature map](docs/feature-map.md)
 
-- **Direct bindings** enforce permissions and reserve budget before dispatch. Start here to put one agent operation under control. [Governed binding guide](docs/governed.md)
-- **Code Mode** is an opt-in, experimental Linux x86_64 extra. A program can compose approved reads through the same bindings. [SDK quickstart](docs/code-mode.md)
-- **Rollouts** let operators route a bounded canary, inspect observed revisions and roll back future starts. Previously dispatched calls still need to be reconciled with the destination. [Rollout and recovery](docs/operations.md)
-
-## Project
-
-Forge Check `0.4.0` is available on PyPI. The release workflow published the approved wheel and verified its digest. [Release artifact](https://pypi.org/project/forge-os-check/0.4.0/) · [Publication run](https://github.com/angelnicolasc/forge/actions/runs/44823397253) · [Architecture decisions](docs/decisions/index.md)
-
-The repository also contains the earlier multi-package Forge harness, including framework adapters, memory and tracing. Its installation and feature map are documented separately. [Harness quickstart](docs/quickstart.md) · [Harness architecture](docs/architecture.md) · [Harness feature map](docs/feature-map.md) · [Historical README and roadmap](https://github.com/angelnicolasc/forge/blob/6fc58c30ca50d3d9bda1e14e0764e77bb123df56/README.md)
-
-[Contributing](CONTRIBUTING.md) · [Security policy](SECURITY.md) · [Apache 2.0 license](LICENSE)
+[PyPI release](https://pypi.org/project/forge-os-check/0.4.0/) · [Architecture decisions](docs/decisions/index.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Apache 2.0](LICENSE)
