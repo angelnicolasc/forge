@@ -868,7 +868,7 @@ def _default_interceptor(bus: EventBus) -> LLMCallInterceptor:
         from forge_observe.interceptor import ForgeLLMInterceptor
     except ImportError as exc:  # pragma: no cover - environment-dependent
         raise RuntimeError(
-            "MetaOrchestrator requires forge-observe for its default LLM "
+            "MetaOrchestrator requires forge-os-observe for its default LLM "
             "interceptor. Install with: pip install forge-os"
         ) from exc
     return ForgeLLMInterceptor(bus)

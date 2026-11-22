@@ -1,7 +1,7 @@
 [project]
 name = "forge-os"
 version = "0.2.0"
-description = "Forge — universal agent harness (meta-package). Installs forge-core, forge-cli, forge-observe, forge-memory, and forge-adapters together."
+description = "Meta-package for the earlier Forge agent harness and its framework adapters, CLI, memory and telemetry."
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.11"
@@ -18,7 +18,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Typing :: Typed",
 ]
-keywords = ["agents", "llm", "orchestration", "harness", "multi-agent", "self-evolving", "forge"]
+keywords = ["agents", "llm", "orchestration", "harness", "multi-agent", "forge"]
 dependencies = [
     "forge-os-core==0.2.0",
     "forge-os-cli==0.2.0",

@@ -16,7 +16,7 @@ class AdapterNotFoundError(ForgeError):
     def __init__(self, source: str) -> None:
         super().__init__(
             f"No adapter found for '{source}'. "
-            "Install the appropriate extra (e.g., forge-adapters[langgraph]) "
+            "Install the appropriate extra (e.g., forge-os-adapters[langgraph]) "
             "or register a custom adapter."
         )
         self.source = source

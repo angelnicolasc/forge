@@ -1,29 +1,9 @@
-"""Forge Self-Evolution Loop — the differentiator.
+"""Propose topology changes from recent harness runs.
 
-The biology-inspired cycle that makes agents get smarter over time:
-
-    OBSERVE → HYPOTHESIZE → MUTATE → EVALUATE → COMMIT / ROLLBACK
-       ↑_______________________________________________|
-
-This loop runs after (or between) production runs. Each iteration:
-  1. Observes recent run_history from the MetaOrchestrator
-  2. Hypothesizes: tries each mutator to find a mutation candidate
-  3. Mutates: applies the highest-confidence mutation to the topology
-  4. Evaluates: runs the mutated flow on an eval task, computes FitnessScore
-  5. Commits (if fitness improves) or Rolls back (if fitness degrades)
-  6. Logs everything to the EvolutionJournal for full audit trail
-
-Safety guardrails:
-  - max_mutations_per_session: caps iterations per call
-  - cost_ceiling_per_eval: prevents expensive eval runs
-  - rollback_on_quality_drop: threshold below which mutations are rejected
-  - mode="suggest": propose only, never apply (human approves each change)
-
-Usage:
-    loop = EvolutionLoop(orchestrator=my_orchestrator)
-    mutation = await loop.step()   # one iteration
-    # or:
-    mutations = await loop.run(max_steps=5)  # up to 5 iterations
+Suggest mode returns a candidate for inspection. Automatic mode evaluates a
+baseline, snapshots the topology, applies the candidate and evaluates again.
+It commits a candidate within the configured score tolerance or restores
+the snapshot. The journal records proposal and evaluation decisions.
 """
 
 from __future__ import annotations

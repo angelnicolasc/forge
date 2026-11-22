@@ -197,7 +197,7 @@ def spec_attest(
         help="Write attestation JSON to file",
     ),
 ) -> None:
-    """Generate a SLSA Level 2-inspired attestation for a completed spec run."""
+    """Export an unsigned verification report for a completed spec run."""
     forge_spec = _import_spec()
     from forge_spec.types import VerifyResult
 

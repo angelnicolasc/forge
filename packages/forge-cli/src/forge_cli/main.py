@@ -1,14 +1,4 @@
-"""Forge CLI entry point.
-
-Usage:
-    forge wrap my_flow.py
-    forge run --input '{"query": "What is RAG?"}'
-    forge evolve --runs 5
-    forge observe
-    forge memory query "RAG optimization"
-    forge memory ingest document.txt
-    forge init my_project
-"""
+"""Command-line entry point for the earlier Forge agent harness."""
 
 from __future__ import annotations
 
@@ -34,7 +24,7 @@ if sys.platform == "win32":
 
 app = typer.Typer(
     name="forge",
-    help="Forge — Universal Agent Harness. Drop your agents. Watch them evolve, remember and win.",
+    help="Forge agent harness (legacy). Run and inspect agent workflows.",
     add_completion=True,
     rich_markup_mode="rich",
     no_args_is_help=True,
@@ -60,11 +50,7 @@ def main(
         help="Show version and exit.",
     ),
 ) -> None:
-    """[bold #FF6B35]Forge[/] — The living, self-evolving harness for production multi-agent systems.
-
-    \b
-    [dim]2026 is not the year of models. It's the year of harnesses.[/dim]
-    """  # noqa: E501
+    """Run and inspect workflows with the earlier Forge agent harness."""
 
 
 # ---------------------------------------------------------------------------
@@ -86,12 +72,14 @@ from forge_cli.commands.wrap import wrap_app  # noqa: E402
 
 app.add_typer(wrap_app, name="wrap", help="Wrap a multi-agent flow and instrument it.")
 app.add_typer(run_app, name="run", help="Execute a wrapped flow.")
-app.add_typer(evolve_app, name="evolve", help="Trigger the self-evolution loop.")
-app.add_typer(observe_app, name="observe", help="Open the live dashboard.")
-app.add_typer(memory_app, name="memory", help="Query, ingest, and inspect the Living Memory.")
+app.add_typer(evolve_app, name="evolve", help="Propose flow changes and inspect their journal.")
+app.add_typer(
+    observe_app, name="observe", help="Serve the observe API and its OpenAPI documentation."
+)
+app.add_typer(memory_app, name="memory", help="Query, ingest and inspect memory entries.")
 app.add_typer(rules_app, name="rules", help="Validate, lint, explain, and diff rule packs.")
 app.add_typer(mcp_app, name="mcp", help="Manage MCP tool routing, budgets, and cache.")
 app.add_typer(skills_app, name="skills", help="Load, inspect, and invoke Forge skills.")
 app.add_typer(review_app, name="review", help="Run review agents and policy gates.")
-app.add_typer(spec_app, name="spec", help="Init, verify, and attest Forge specs.")
+app.add_typer(spec_app, name="spec", help="Create specifications, verify runs and export reports.")
 app.add_typer(doctor_app, name="doctor", help="Diagnose the local Forge installation.")

@@ -1,15 +1,17 @@
-# forge-mcp
+# forge-os-mcp
 
-MCP Meta-Orchestrator for Forge — routes, secures, budgets, and caches tool calls across N upstream MCP servers.
+Part of the earlier Forge agent harness. For the standalone CI check, see [Forge Check](https://pypi.org/project/forge-os-check/).
+
+This harness component applies tool policies, call limits and a TTL cache to registered MCP clients. The example uses an in-memory fake client.
 
 ## Features
 
 - **Deny-by-default security**: tools must be explicitly `allowed: true` per server config
 - **Caller allowlists**: restrict tool access to specific agent/caller IDs
-- **Secret redaction**: responses are scanned and sanitized before reaching the agent context
+- **Secret redaction**: known credential patterns in response text are redacted
 - **Per-run budgets**: configurable `max_calls_per_run` per tool; `BudgetExceededError` on breach
-- **Exact-match TTL cache**: Anthropic prompt-caching semantics — identical input → cache hit
-- **Circuit breakers**: per-server, reusing `forge-core.CircuitBreaker` (5 failures → OPEN)
+- **Exact-match TTL cache**: eligible repeated tool calls can reuse a local cached result until it expires
+- **Circuit breakers**: per-server, reusing `forge_core.circuit_breaker.CircuitBreaker` (5 failures → OPEN)
 - **YAML config**: human-friendly server and policy authoring
 - **CLI**: `forge mcp list-tools`, `forge mcp call`, `forge mcp status`
 
@@ -47,7 +49,3 @@ servers:
         allowed: true
         max_calls_per_run: 5
 ```
-
-## Part of Forge
-
-This package is part of [Forge](https://github.com/angelnicolasc/forge) — the universal AI agent harness.

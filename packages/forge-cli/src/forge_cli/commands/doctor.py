@@ -1,9 +1,6 @@
 """forge doctor — Quick environment diagnostic.
 
-Prevents the top 80% of "it doesn't work on my machine" support tickets
-on day one: catches mismatched Python versions, missing optional
-extras, and broken default-backend imports before the user runs into
-them via ``forge wrap``.
+Checks the Python version, optional extras and default backend imports.
 
 Usage:
     forge doctor              # local checks, no network
@@ -19,6 +16,7 @@ import sys
 import typer
 from rich.console import Console
 from rich.table import Table
+from rich.text import Text
 
 from forge_observe.exporters.console import FORGE_ORANGE, FORGE_TEAL
 
@@ -54,7 +52,9 @@ def _check_module(module: str) -> tuple[bool, str]:
 @doctor_app.callback(invoke_without_command=True)
 def doctor(
     network: bool = typer.Option(
-        False, "--network", help="Also ping Anthropic / OpenAI healthz endpoints."
+        False,
+        "--network",
+        help="Also check HTTP reachability of the Anthropic and OpenAI API hosts.",
     ),
 ) -> None:
     """Diagnose the local Forge installation."""
@@ -108,7 +108,7 @@ def doctor(
         if ok:
             table.add_row(label, "[green]\u2713[/]", f"{mod} {detail}")
         else:
-            table.add_row(label, "[yellow]\u26a0[/]", f"not installed ({hint})")
+            table.add_row(label, "[yellow]\u26a0[/]", Text(f"not installed ({hint})"))
 
     if network:
         _check_network(table)
@@ -123,8 +123,7 @@ def doctor(
         raise typer.Exit(1)
 
     console.print(
-        "\n  [green]\u2713 Everything looks good.[/] "
-        "Try [bold]forge wrap examples/langgraph_research/flow.py[/] next.\n"
+        "\n  [green]\u2713 Required Python, package and backend import checks passed.[/]\n"
     )
 
 

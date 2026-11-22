@@ -1,7 +1,7 @@
 [project]
 name = "forge-spec"
 version = "0.2.0"
-description = "Spec-Driven Development for Forge — structured acceptance criteria, SLSA Level 2 attestation, and spec-gated evolution."
+description = "Evaluate criteria against a harness run and export an unsigned verification report."
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.11"
@@ -18,7 +18,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Typing :: Typed",
 ]
-keywords = ["agents", "llm", "spec", "slsa", "acceptance", "attestation", "compliance"]
+keywords = ["agents", "llm", "spec", "acceptance", "attestation", "compliance"]
 dependencies = [
     "forge-os-core==0.2.0",
     "pydantic>=2.7,<3.0",

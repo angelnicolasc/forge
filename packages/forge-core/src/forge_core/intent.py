@@ -19,7 +19,7 @@ Usage::
     # label == "run_tests", confidence > 0.35
 
 Requirements:
-    pip install forge-core[intent]
+    pip install 'forge-os-core[intent]'
     # installs sentence-transformers>=3.0 and numpy>=1.26
 """
 
@@ -98,7 +98,7 @@ class IntentClassifier:
             except ImportError as exc:
                 raise ImportError(
                     "sentence-transformers is required for IntentClassifier. "
-                    "Install with: pip install forge-core[intent]"
+                    "Install with: pip install 'forge-os-core[intent]'"
                 ) from exc
             logger.info("intent_classifier.loading_model", model=self._model_name)
             self._model = SentenceTransformer(self._model_name)

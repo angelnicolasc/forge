@@ -1,7 +1,7 @@
 [project]
 name = "forge-os-mcp"
 version = "0.2.0"
-description = "MCP Meta-Orchestrator for Forge — routes, secures, budgets, and caches tool calls across N upstream MCP servers."
+description = "Tool policies, call budgets and response caching for MCP clients registered with the Forge agent harness."
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.11"

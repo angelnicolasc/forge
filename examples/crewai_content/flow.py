@@ -1,23 +1,8 @@
-"""CrewAI Content Team — Forge Example.
+"""Content-writing fixture for the historical harness.
 
-A two-agent Crew that drafts a short article:
-
-1. **Researcher** — gathers bullet points on the topic
-2. **Writer**    — turns the bullets into a paragraph
-
-The file is designed to be runnable in three ways:
-
-* ``python flow.py`` — always works. Uses the local mock LLM built into
-  Forge (:class:`forge_core.testing.MockLLMProvider`) so the demo has
-  no network or credential requirements.
-* ``forge wrap flow.py --input '{"topic":"AI harnesses"}'`` — the
-  viral demo. Forge instruments every call and prints cost breakdown.
-* With real CrewAI (``pip install crewai``) and an API key in the env,
-  replace the ``run_mock`` path with ``crew.kickoff``.
-
-Ships with the CrewAI package being optional: if ``crewai`` isn't
-installed, we still produce a realistic-looking run by calling the mock
-provider directly from each "agent" function.
+A scripted researcher and writer produce notes and a paragraph.
+Run this module directly with Python after installing forge-os-core==0.2.0.
+It uses MockLLMProvider and does not construct a CrewAI crew.
 """
 
 from __future__ import annotations
@@ -66,9 +51,9 @@ def _build_mock_llm() -> MockLLMProvider:
         [
             MockResponse(
                 content=(
-                    "- Agent harnesses instrument otherwise opaque multi-agent flows\n"
-                    "- They make cost, latency, and errors observable per-agent\n"
-                    "- Self-evolving harnesses can suggest mutations that reduce cost"
+                    "- The example runs a researcher and a writer\n"
+                    "- The researcher returns three scripted notes\n"
+                    "- The writer receives those notes along with the topic"
                 ),
                 input_tokens=42,
                 output_tokens=60,
@@ -76,11 +61,8 @@ def _build_mock_llm() -> MockLLMProvider:
             ),
             MockResponse(
                 content=(
-                    "Agent harnesses sit between application code and the underlying "
-                    "multi-agent framework, capturing every LLM call so teams can see "
-                    "per-agent cost and latency. The most ambitious ones also propose "
-                    "and evaluate mutations automatically, turning 'observability' into "
-                    "'continuous improvement.'"
+                    "The researcher supplies three notes to the writer. Both use "
+                    "scripted responses from the local mock provider."
                 ),
                 input_tokens=90,
                 output_tokens=110,
@@ -92,14 +74,14 @@ def _build_mock_llm() -> MockLLMProvider:
 
 
 def run(topic: str = "AI harnesses", llm: MockLLMProvider | None = None) -> str:
-    """Entry point used by ``forge wrap`` and ``__main__``."""
+    """Run the two scripted steps."""
     llm = llm or _build_mock_llm()
     bullets = _researcher(topic, llm)
     article = _writer(topic, bullets, llm)
     return article
 
 
-# Module-level ``app`` so the GenericCallableAdapter picks this up.
+# Alias available to callers that load the example as a module.
 app = run
 
 
@@ -119,7 +101,3 @@ if __name__ == "__main__":
     print("\n" + "=" * 60)
     print(output)
     print("=" * 60)
-    print(
-        "\nFor the full Forge experience, run:\n"
-        '  forge wrap flow.py --input \'{"topic":"AI harnesses"}\''
-    )

@@ -1,8 +1,4 @@
-"""Forge Core — The brain of the universal agent harness.
-
-Provides the meta-orchestrator, type system, protocol definitions,
-and self-evolution loop for production multi-agent systems.
-"""
+"""Types, orchestration and evolution support for the earlier Forge agent harness."""
 
 from forge_core._version import __version__
 from forge_core.intent import IntentClassifier, get_intent_classifier

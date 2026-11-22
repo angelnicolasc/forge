@@ -1,20 +1,21 @@
 <div align="center">
 
-# forge-observe
+# forge-os-observe
 
 **Observability and FinOps for Forge.**
 
-OpenTelemetry tracing, event-driven cost tracking, real-time metrics, console output, and a FastAPI backend for monitoring multi-agent systems in production.
+OpenTelemetry tracing, cost estimates, run metrics, terminal output and a FastAPI backend for instrumented harness runs.
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-orange.svg)](../../LICENSE)
-[![Package](https://img.shields.io/badge/package-forge--observe-111827.svg)](https://github.com/angelnicolasc/forge/tree/main/packages/forge-observe)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-orange.svg)](https://github.com/angelnicolasc/forge/blob/main/LICENSE)
 
 </div>
 
+Part of the earlier Forge agent harness. For the standalone CI check, see [Forge Check](https://pypi.org/project/forge-os-check/).
+
 ---
 
-## Why `forge-observe`
+## Why `forge-os-observe`
 
 Agent systems are hard to operate when you cannot answer simple questions fast:
 
@@ -24,7 +25,7 @@ Agent systems are hard to operate when you cannot answer simple questions fast:
 - Are we seeing real telemetry or just framework-level guesses?
 - Can we expose live run data to dashboards and internal tooling?
 
-`forge-observe` is the package in Forge that turns runtime signals into something you can inspect, aggregate, export, and act on. It sits on top of `forge-core` and treats events as the source of truth for costs, spans, and operational visibility.
+`forge-os-observe` is the package in Forge that turns runtime signals into something you can inspect, aggregate, export, and act on. It sits on top of `forge-os-core` and treats events as the source of truth for costs, spans, and operational visibility.
 
 ## What ships in this package
 
@@ -48,13 +49,13 @@ uv sync
 Standalone:
 
 ```bash
-pip install forge-observe
+pip install forge-os-observe
 ```
 
 Requirements:
 
 - Python 3.11+
-- `forge-core==0.1.0`
+- `forge-os-core==0.2.0`
 - `opentelemetry-api`
 - `opentelemetry-sdk`
 - `opentelemetry-exporter-otlp`
@@ -64,7 +65,7 @@ Requirements:
 
 ## Quickstart
 
-The most important runtime object here is the interceptor. It converts raw model-call telemetry into populated `RunEvent` objects with costs and tracing metadata attached.
+The interceptor turns captured model-call telemetry into `RunEvent` objects with cost estimates and trace metadata.
 
 ```python
 from forge_core.events import EventBus
@@ -74,11 +75,11 @@ bus = EventBus()
 interceptor = ForgeLLMInterceptor(bus=bus)
 ```
 
-In a full Forge stack, `MetaOrchestrator` owns one interceptor and hands it to adapters so all frameworks feed the same event stream.
+`MetaOrchestrator` passes its interceptor to the adapter. The resulting events depend on the adapter's instrumentation.
 
 ## The core model
 
-`forge-observe` is built around one idea:
+`forge-os-observe` is built around one idea:
 
 ```text
 raw LLM/tool activity -> RunEvent -> metrics / traces / API / console
@@ -95,7 +96,7 @@ That gives you:
 
 ## `ForgeLLMInterceptor`
 
-`ForgeLLMInterceptor` is the canonical implementation of the `LLMCallInterceptor` protocol from `forge-core`.
+`ForgeLLMInterceptor` is the canonical implementation of the `LLMCallInterceptor` protocol from `forge-os-core`.
 
 Responsibilities:
 
@@ -105,7 +106,7 @@ Responsibilities:
 - preserve per-call metadata such as model, agent, tool, latency, and token counts
 - protect degraded providers through a circuit breaker
 
-This is the linchpin that keeps FinOps honest. If instrumentation bypasses the interceptor, costs stop being trustworthy.
+The totals cover instrumented calls. Unknown model prices contribute zero, so reconcile estimates with provider billing when total spend matters.
 
 ### Breaker behavior
 
@@ -197,7 +198,7 @@ These render:
 
 ## API and live backend
 
-`forge-observe` ships a FastAPI application that exposes recent runtime state over REST and SSE.
+`forge-os-observe` ships a FastAPI application that exposes recent runtime state over REST and SSE.
 
 Key endpoints:
 
@@ -294,20 +295,20 @@ This is especially important for fields like `agent_id`, where unbounded variati
 
 ## Package boundaries
 
-`forge-observe` focuses on observability and runtime reporting.
+`forge-os-observe` focuses on observability and runtime reporting.
 
 Related packages:
 
-- `forge-core`
+- `forge-os-core`
   - run model, event bus, protocols, orchestrator, guards
-- `forge-memory`
+- `forge-os-memory`
   - memory storage and retrieval
-- `forge-adapters`
+- `forge-os-adapters`
   - framework integrations
-- `forge-cli`
+- `forge-os-cli`
   - CLI entrypoints and user-facing commands
 
-That separation keeps `forge-observe` reusable in monitoring-oriented deployments.
+That separation keeps `forge-os-observe` reusable in monitoring-oriented deployments.
 
 ## Public API at a glance
 

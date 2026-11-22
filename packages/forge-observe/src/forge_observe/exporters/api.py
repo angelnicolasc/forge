@@ -1,9 +1,6 @@
 """REST + SSE API exporter for Forge.
 
-Exposes a FastAPI application at /api/v1/ that serves runs, evolution
-journal entries, and a live event stream. Consumed today by custom
-integrations (Grafana panels, internal dashboards); a first-party web
-UI is planned for v0.2.0. All responses are typed with Pydantic.
+Serves recorded runs, evolution journal entries and a live SSE event stream.
 
 Endpoints:
   GET  /api/v1/runs                  — list recent runs
@@ -214,12 +211,7 @@ def create_app(version: str = "0.1.0") -> FastAPI:
 
     @app.get("/.well-known/agent.json", tags=["a2a"])
     async def agent_discovery() -> dict[str, Any]:
-        """A2A-compliant discovery document for the Forge orchestrator.
-
-        Returns an AgentCard per the Google Agent-to-Agent (A2A) protocol.
-        Set FORGE_OBSERVE_AGENT_BASE_URL to include the ``url`` field and
-        achieve full A2A compliance; without it the field is omitted.
-        """
+        """Return the harness discovery card. FORGE_OBSERVE_AGENT_BASE_URL sets its optional URL."""
         import forge_core
         from forge_core.config import ObserveConfig
         from forge_core.types import AgentCard, ToolRef
@@ -228,7 +220,7 @@ def create_app(version: str = "0.1.0") -> FastAPI:
         card = AgentCard(
             name="Forge MetaOrchestrator",
             role="orchestrator",
-            description=("Universal AI agent harness — self-evolution, hybrid memory, OTel."),
+            description="Forge agent harness for running and instrumenting workflows.",
             version=forge_core.__version__,
             url=obs.agent_base_url,
             capabilities=[

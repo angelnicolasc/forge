@@ -47,13 +47,12 @@ def print_forge_banner() -> None:
     banner = Text()
     banner.append("  ⚡ ", style=FORGE_ORANGE)
     banner.append("FORGE", style="bold white")
-    banner.append(" — Universal Agent Harness", style=FORGE_TEAL)
-    banner.append("\n  Drop your agents. Watch them evolve, remember and win.\n", style=FORGE_GRAY)
+    banner.append(" — Agent harness (legacy)", style=FORGE_TEAL)
     _console.print(Panel(banner, border_style=FORGE_ORANGE, padding=(0, 2)))
 
 
 def print_run_result(result: RunResult, verbose: bool = False) -> None:
-    """Print a complete run result in a beautiful terminal layout."""
+    """Print a terminal summary for the recorded run."""
     _console.rule(f"[{FORGE_TEAL}]Run Complete[/]", style=FORGE_ORANGE)
 
     # Status badge

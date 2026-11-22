@@ -1,9 +1,6 @@
-# Forge Architecture
+# Historical harness architecture
 
-This document is the honest map of what Forge actually does at the
-component level. Every subsystem described here is backed by tests in
-`packages/*/tests/`; if a claim is made here and isn't exercised by a
-test, it's a bug in the docs.
+This guide describes the earlier multi-package harness. The [historical test reference](feature-map.md) links selected behaviors to their tests. For the standalone Forge Check runtime, see the [binding guide](governed.md) and [architecture decisions](decisions/index.md).
 
 ## High-level picture
 
@@ -14,22 +11,22 @@ test, it's a bug in the docs.
 └──────────────┬────────────────┘
                │  wrapped by
 ┌──────────────▼────────────────┐
-│     Adapter (forge-adapters)  │   Detects framework, injects
+│     Adapter (forge_adapters)  │   Detects framework, injects
 │                               │   callbacks/interceptors.
 └──────────────┬────────────────┘
                │  runs under
 ┌──────────────▼────────────────┐        ┌─────────────────────┐
 │   MetaOrchestrator            │◀──────▶│  EventBus           │
-│   (forge-core.harness)        │ publish│  (pub/sub fan-out)  │
+│   (forge_core.harness)        │ publish│  (pub/sub fan-out)  │
 └─┬────────────┬────────────────┘        └──┬──────────┬───────┘
   │            │                            │          │
   │ RunContext │ LLMCallInterceptor         │ subscribe│
   │ via        │ (forge-observe)            │          │
   │contextvars │                            ▼          ▼
   │            │                        Tracer     Metrics
-  │            │                        (OTel)     (cardinality-safe)
+  │            │                        (OTel)     (sanitized labels)
   │            ▼
-  │       CostModel + token counting
+  │       CostModel + token usage
   │
   │       ┌────────────────────┐          ┌──────────────────────┐
   ├──────▶│ MemoryContextInject│───read──▶│ HybridMemory          │
@@ -53,53 +50,29 @@ test, it's a bug in the docs.
 
 ### `RunContext` + `run_scope`
 
-Defined in `forge_core.context`. A `ContextVar` carries `run_id`,
-`agent_id`, `span_id`, and the task envelope through any async stack
-depth. This is how an interceptor called from deep inside a third-party
-graph knows which Forge run it's inside, without the adapter having to
-plumb identifiers through every call.
+A `ContextVar` carries the run, task and span identifiers across awaits. An interceptor can read those identifiers while the adapter executes the graph.
 
 ```python
-from forge_core.context import run_scope, current_run
+from forge_core.context import RunContext, current_run, run_scope
 
-with run_scope(RunContext(run_id=..., task_id=...)):
-    ...  # current_run() works here, even across awaits
+with run_scope(RunContext(run_id="r1", task_id="t1")):
+    assert current_run().task_id == "t1"
 ```
 
 ### `EventBus`
 
-Defined in `forge_core.events`. Fan-out, async, failure-isolated
-(handlers run under `gather(return_exceptions=True)`). Supports wildcard
-subscriptions via the literal `"*"` or `ALL_EVENTS`. Publishing a
-populated `RunEvent` is the canonical way any subsystem declares a fact
-about the run ("an LLM was called for X tokens at $Y"); anything that
-wants to observe runs — OTel tracer, metrics collector, memory
-ingester, dashboard SSE endpoint — subscribes instead of receiving
-callbacks.
+Subscribers register for a particular event kind or the wildcard `ALL_EVENTS`. On publication, `forge_core.events.EventBus` awaits the matching handlers concurrently and logs handler exceptions. A slow handler can delay publication.
 
 ### `LLMCallInterceptor`
 
-Protocol in `forge_core.protocols`. Canonical implementation in
-`forge_observe.interceptor.ForgeLLMInterceptor`. All adapters route
-their LLM observations through this single protocol. A call produces:
-
-1. `on_llm_start(model, agent_id, ...)` → opens an OTel span child of
-   the active run span; returns a `span_id`.
-2. `on_llm_end(span_id, input_tokens, output_tokens, output)` → closes
-   the span, publishes an `LLM_CALL` event carrying real token counts
-   and a real cost (from `CostModel`).
-
-The interceptor does **not** estimate tokens. Adapters that can't
-extract them from the SDK pass `0` and emit a structured warning.
+The protocol is defined in `forge_core.protocols`. The observe package implements it in `ForgeLLMInterceptor`. When an adapter reports a call, `on_llm_start` opens a span and returns its ID. `on_llm_end` records the usage supplied by the adapter and publishes an `LLM_CALL` event. The cost model estimates the charge from the recorded token counts and its configured price table. Missing token counts can appear as zero.
 
 ### Adapters
 
-Under `forge-adapters`. Each implements `Adapter` (load, run, stream,
-topology, set_interceptor, set_bus). Framework-specific work:
+The `forge-os-adapters` distribution provides the following integration points.
 
 - **LangGraph** — attaches `ForgeLangChainCallback` to the
-  `config.callbacks` of `ainvoke/astream`. All LangChain chat models
-  inside the graph now emit token usage to Forge.
+  `config.callbacks` of `ainvoke/astream`. Token counts depend on the usage metadata the model integration passes to the callback.
 - **CrewAI** — monkey-patches `crewai.Agent.execute_task` and
   `crewai.tools.BaseTool._run` inside a scoped context manager. LangChain
   callbacks cover the model layer.
@@ -109,8 +82,7 @@ topology, set_interceptor, set_bus). Framework-specific work:
 - **Generic callable** — a context manager monkey-patches
   `anthropic.*.messages.create`, `openai.*.chat.completions.create`, and
   `google.generativeai.GenerativeModel.generate_content`. Best-effort:
-  SDKs not installed are skipped silently; API shape changes degrade
-  with a warning rather than fail.
+  the hook applies to the supported SDK methods found in the process.
 
 ---
 
@@ -126,28 +98,14 @@ IDLE → OBSERVING → PROPOSING → APPLYING → EVALUATING → COMMITTING ─�
                                                                  IDLE
 ```
 
-Every transition is guarded. `APPLYING` captures a `TopologySnapshot`
+`APPLYING` captures a `TopologySnapshot`
 (frozen dataclass: `agents`, `config`, `prompts_map`, monotonic
-`version`, content hash) before calling `mutator.apply`. A rollback is
-`orchestrator.restore_snapshot(pre)` — replacement, not
-reconstruction, so there's no way to partially restore. Rollbacks are
-append-only in the journal; the version counter never rewinds.
+`version`, content hash) before calling `mutator.apply`. A rollback calls `orchestrator.restore_snapshot(pre)` to restore the captured topology. The journal records the rollback and the version counter continues forward.
 
-Mutators share a single typed protocol over `TopologyState`:
-
-```python
-class Mutator(Protocol):
-    mutation_kind: ClassVar[MutationKind]
-    def propose(self, run_results) -> Mutation | None
-    async def apply(self, mutation, state: TopologyState) -> TopologyState
-    async def rollback(self, mutation, snapshot: TopologySnapshot) -> None
-```
-
-Real implementations:
+A mutator proposes a change from recent run results and applies it to a `TopologyState`. Its rollback method takes the post-mutation state and returns a state. The orchestrator can also restore a captured topology snapshot. [Mutator protocol](https://github.com/angelnicolasc/forge/blob/main/packages/forge-core/src/forge_core/protocols.py)
 
 - `PromptRewriteMutator` uses `LLMClient.structured_call` with a
-  Pydantic schema (`PromptRewriteResponse`) — no regex, no free-form
-  text.
+  Pydantic schema (`PromptRewriteResponse`).
 - `ParameterTuneMutator` walks `MutationDiff.field_path` into
   `RunConfig` via a bidirectional resolver.
 - `AgentCullMutator` removes agents; rollback is `restore_snapshot`.
@@ -162,12 +120,11 @@ Auto-trigger (in `MetaOrchestrator.run`) is gated by
 
 `HybridMemory` orchestrates three layers:
 
-- Vector (ChromaDB default, Qdrant production).
-- Graph (NetworkX dev, Neo4j prod). NetworkX persists through SQLite in
-  WAL mode with normalized tables, not a pickle.
-- Symbolic forward-chaining rule engine (\~200 LOC, strict DSL).
+- ChromaDB stores vector entries.
+- NetworkX stores graph data in SQLite using WAL.
+- The symbolic rule engine filters or reranks retrieved entries.
 
-Results fuse through Reciprocal Rank Fusion.
+The query combines vector and graph rankings with reciprocal rank fusion. An application can inject its own backend. The shipped Neo4j class is an interface stub.
 
 `MemoryContextInjector` (`forge_memory.injection`) is the pre-run hook:
 gated by `FORGE_ENABLE_MEMORY_INJECTION` + per-config flag, it runs
@@ -199,16 +156,9 @@ compares incoming clocks:
 
 ## Observability
 
-- `ForgeLLMInterceptor` (forge-observe) — OTel spans, cost calc.
-- `CostModel` — real pricing table for Claude / GPT / Gemini families
-  at April 2026 prices, with a well-defined unknown-model fallback
-  (`$0.00` + `cost_model.unknown_model` warning).
-- `MetricsCollector` — aggregates bus events into per-agent / per-model
-  / session metrics. **Agent IDs pass through a `LabelSanitizer`** so a
-  unique-id-per-run caller can't grow the dimension without bound.
-- `LabelSanitizer` — allowlist + per-key unique-value cap. Over-cap
-  values hash into a stable `bucket_<sha1prefix>` bucket so observers
-  still see distinct-ish series without a metrics-store meltdown.
+- `ForgeLLMInterceptor` records spans and usage for observed calls.
+- `DefaultCostModel` uses a local price table. For an unknown model it records zero and logs `cost_model.unknown_model`. A run summary can therefore understate the provider bill.
+- `MetricsCollector` groups events by agent, model and session. `LabelSanitizer` keeps allowlisted keys and the first configured number of raw values per key. Additional values get an eight-character SHA-1 prefix. Distinct overflow values can still produce distinct metric series.
 
 ### Dashboard backend
 
@@ -236,35 +186,28 @@ FastAPI app in `forge_observe.exporters.api`:
   result). Timeout is a simple `asyncio.wait_for` above the race.
 - `CircuitBreaker` (`forge_core.circuit_breaker`) is a three-state
   breaker used for:
-  - LLM API calls (trip on repeated SDK failures so hung endpoints stop
-    starving the loop),
+  - LLM instrumentation (after repeated failures, the interceptor can skip opening a span),
   - memory backend queries (so ChromaDB/Neo4j outages degrade to empty
     retrieval instead of blocking runs),
   - the evolution loop (auto-suspend after repeated rollbacks until the
     operator calls `reset()`).
 
-All three breakers are ordinary `CircuitBreaker` instances; the policy
-lives at the call site, not in the breaker.
+Each caller configures its own breaker.
 
 ---
 
 ## Testing scaffolding
 
-`forge_core.testing` ships two primitives that every acceptance test in
-this repo uses and that downstream users should reach for too:
+`forge_core.testing` supplies fixtures for harness integration tests.
 
 - `MockLLMProvider` — programmable scripted responses with token
   counts. Implements the `LLMClient.structured_call` contract so the
   evolution loop can be driven deterministically.
 - `ForgeTestHarness` — composes an `EventBus` + a test-only
   interceptor; its `run_flow(callable, input)` wraps every
-  `llm.complete(...)` call with `on_llm_start` / `on_llm_end`, so the
-  flow author gets realistic event streams without writing interceptor
-  glue.
+  `llm.complete(...)` call with `on_llm_start` / `on_llm_end`, to produce repeatable test events.
 
-Integration tests (`test_full_stack.py`,
-`test_full_stack_metrics.py`) use these to assert on the complete
-pipeline without a network call.
+The harness integration suite uses these fixtures to check run events and aggregate metrics offline.
 
 ---
 
@@ -273,8 +216,6 @@ pipeline without a network call.
 | Flag | Package | Effect |
 |------|---------|--------|
 | `FORGE_ENABLE_EVOLUTION_AUTO` | forge-core | Auto-trigger after N runs |
-| `FORGE_ENABLE_MEMORY_INJECTION` | forge-core | Inject memory into envelopes |
+| `FORGE_ENABLE_MEMORY_INJECTION` | forge-memory | Inject memory into envelopes |
 | `FORGE_ENABLE_LLM_JUDGE` | forge-core | Quality score via LLM |
 | `FORGE_ENABLE_LLM_ENTITY_EXTRACTION` | forge-memory | Entities via LLM vs regex |
-| `FORGE_ENABLE_GENERIC_INSTRUMENTATION` | forge-observe | Monkey-patch LLM SDKs |
-| `FORGE_COST_HARD_FAIL` | forge-core | `BudgetExceeded` raise vs warn |

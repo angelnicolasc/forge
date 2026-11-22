@@ -1,4 +1,4 @@
-"""forge observe — Launch the Forge dashboard and metrics server."""
+"""forge observe — Start the harness REST API and event stream."""
 
 from __future__ import annotations
 
@@ -15,15 +15,11 @@ console = Console()
 def observe(
     host: str = typer.Option("127.0.0.1", "--host", help="API server host."),
     port: int = typer.Option(8787, "--port", "-p", help="API server port."),
-    open_browser: bool = typer.Option(True, "--open/--no-open", help="Open dashboard in browser."),
+    open_browser: bool = typer.Option(
+        True, "--open/--no-open", help="Open the API documentation in a browser."
+    ),
 ) -> None:
-    """Start the Forge observe REST + SSE API server.
-
-    \b
-    [dim]The API serves real-time metrics, run traces, and evolution history.
-    A web UI on top of this API is planned for v0.2.0; until then, consume the
-    endpoints directly or wire them into your own Grafana / Datadog stack.[/dim]
-    """
+    """Serve recorded runs over REST and publish events over SSE."""
     import uvicorn
 
     from forge_observe.exporters.api import app as api_app

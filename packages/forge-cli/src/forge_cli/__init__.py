@@ -1,4 +1,4 @@
-"""Forge CLI — Drop your agents. Watch them evolve, remember and win."""
+"""CLI for the earlier Forge agent harness."""
 
 from forge_cli._version import __version__
 

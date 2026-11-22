@@ -1,4 +1,4 @@
-"""HybridMemory — The Living Collaborative Memory for Forge.
+"""HybridMemory combines vector, graph and symbolic retrieval.
 
 Orchestrates three complementary knowledge backends:
 
@@ -8,12 +8,6 @@ Orchestrates three complementary knowledge backends:
 
 Results from vector and graph are fused via Reciprocal Rank Fusion (RRF),
 then passed through the symbolic rule engine for final filtering and reranking.
-
-This is the feature no one else has production-ready:
-  - Cross-run persistence (agents remember what happened in past runs)
-  - Collaborative writes (multiple agents can write to the same KB)
-  - Full provenance (every entry has creator, version, and evidence chain)
-  - Deterministic overrides (symbolic rules always win over statistical retrieval)
 
 Usage:
     memory = HybridMemory()

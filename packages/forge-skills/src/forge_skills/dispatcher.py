@@ -1,6 +1,6 @@
 """forge_skills.dispatcher — IntentDispatcher: free text → SkillDef via IntentClassifier.
 
-Requires forge-core[intent] (sentence-transformers) to be installed.
+Requires forge-os-core[intent] (sentence-transformers) to be installed.
 The classifier is loaded lazily on the first classify call.
 """
 
@@ -32,7 +32,7 @@ class IntentDispatcher:
       3. Call resolve(text) to get the matching SkillDef, or raise DispatchError.
 
     The underlying IntentClassifier is loaded lazily on the first call.
-    If forge-core[intent] is not installed, an ImportError is raised with
+    If forge-os-core[intent] is not installed, an ImportError is raised with
     a clear installation hint.
     """
 
@@ -58,8 +58,8 @@ class IntentDispatcher:
                 from forge_core.intent import IntentClassifier  # type: ignore[attr-defined]
             except ImportError as exc:
                 raise ImportError(
-                    "IntentDispatcher requires forge-core[intent]. "
-                    "Install with: pip install forge-core[intent]"
+                    "IntentDispatcher requires forge-os-core[intent]. "
+                    "Install with: pip install 'forge-os-core[intent]'"
                 ) from exc
             self._classifier = IntentClassifier(
                 model_name=self._model_name,

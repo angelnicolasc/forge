@@ -1,21 +1,4 @@
-"""forge wrap — The viral front door of Forge.
-
-Wraps any multi-agent flow in a single command and instruments it
-with full observability, cost tracking, and optional evolution.
-
-Usage:
-    forge wrap my_langgraph_flow.py
-    forge wrap my_crew.py --evolution
-    forge wrap my_flow.py --input '{"query": "summarize this"}' --verbose
-
-What happens:
-    1. Auto-detects the framework (LangGraph / CrewAI / AutoGen / generic)
-    2. Loads and validates the flow
-    3. Runs it with full OpenTelemetry instrumentation
-    4. Displays a beautiful Rich dashboard with cost, latency, and topology
-    5. Optionally stores results in Living Collaborative Memory
-    6. If --evolution is set, feeds results into the self-evolution loop
-"""
+"""Load a supported flow, run it with its adapter, and display the recorded result."""
 
 from __future__ import annotations
 
@@ -64,12 +47,12 @@ def wrap(
         False,
         "--evolution",
         "-e",
-        help="Enable the self-evolution loop after the run.",
+        help="Suggest a change without applying it. Requires two runs on the same orchestrator.",
     ),
     memory: bool = typer.Option(
         True,
         "--memory/--no-memory",
-        help="Store run results in Living Collaborative Memory.",
+        help="Store the run output in harness memory.",
     ),
     verbose: bool = typer.Option(
         False,
@@ -90,15 +73,9 @@ def wrap(
         help="Start the observe REST + SSE API in the background for this run.",
     ),
 ) -> None:
-    """[bold #FF6B35]Wrap[/] any multi-agent flow with full Forge instrumentation.
+    """Run a flow using an installed adapter entry point.
 
-    \b
-    [dim]One command. Full observability. Self-evolution ready.[/dim]
-
-    [bold]Examples:[/bold]
-      [green]forge wrap my_flow.py[/green]
-      [green]forge wrap my_crew.py --input '{"topic": "AGI safety"}' --evolution[/green]
-      [green]forge wrap my_flow.py --budget 0.50 --observe[/green]
+    The published 0.2.0 harness adapters require explicit selection in the Python SDK.
     """
     print_forge_banner()
 
@@ -237,28 +214,28 @@ async def _ingest_to_memory(run_result: object, config: object) -> None:
         if content and content != "None":
             run_id = getattr(run_result, "run_id", None)
             await memory.ingest_text(content, source_run_id=run_id, tags={"source": "forge_run"})
-            console.print(f"  [{FORGE_TEAL}]✓ Stored in Living Memory[/]")
+            console.print(f"  [{FORGE_TEAL}]✓ Stored in harness memory[/]")
     except Exception as exc:
         console.print(f"  [dim]Memory ingest skipped: {exc}[/]")
 
 
 async def _run_evolution(orchestrator: object, config: object) -> None:
-    """Trigger evolution loop if enough runs available."""
+    """Request one suggestion when the orchestrator has at least two runs."""
     try:
         from forge_core.evolution.loop import EvolutionLoop
 
         history = getattr(orchestrator, "run_history", [])
         if len(history) < 2:
             console.print(
-                f"  [{FORGE_TEAL}]ℹ  Evolution needs ≥ 2 runs. "
-                f"Current: {len(history)}. Keep running![/]"
+                f"  [{FORGE_TEAL}]No proposal: the orchestrator has {len(history)} run(s). "
+                "At least two are required.[/]"
             )
             return
 
         loop = EvolutionLoop(orchestrator=orchestrator)  # type: ignore[arg-type]
         mutation = await loop.step()
         if mutation:
-            console.print(f"  [{FORGE_TEAL}]⚗  Evolution proposed:[/] {mutation.description}")
+            console.print(f"  [{FORGE_TEAL}]Proposed change:[/] {mutation.description}")
     except Exception as exc:
         console.print(f"  [dim]Evolution skipped: {exc}[/]")
 
@@ -290,14 +267,14 @@ async def _push_to_api(run_result: object, config: object) -> None:
 def _print_framework_hint(source: str) -> None:
     """Print a helpful hint about which extras to install."""
     hints = {
-        "langgraph": "pip install 'forge-adapters[langgraph]'",
-        "crewai": "pip install 'forge-adapters[crewai]'",
-        "autogen": "pip install 'forge-adapters[autogen]'",
+        "langgraph": "pip install 'forge-os-adapters[langgraph]'",
+        "crewai": "pip install 'forge-os-adapters[crewai]'",
+        "autogen": "pip install 'forge-os-adapters[autogen]'",
     }
     for keyword, install_cmd in hints.items():
         if keyword in source.lower():
-            console.print(f"\n  [dim]Hint: Try installing [bold]{install_cmd}[/][/]")
+            console.print(f"\n  Install the adapter with {install_cmd}", markup=False)
             return
     console.print(
-        "\n  [dim]No specific adapter detected. Try: pip install 'forge-adapters[all]'[/]"
+        "\n  Install all framework adapters with pip install 'forge-os-adapters[all]'", markup=False
     )

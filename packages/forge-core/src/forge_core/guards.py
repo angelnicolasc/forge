@@ -1,31 +1,9 @@
-"""Runtime guards for cost and time budgets.
+"""Runtime guards for elapsed time and reported cost.
 
-A run without enforced limits is a loaded gun pointed at the operator's
-credit card — the adapters are happy to grind through a $40 API bill if
-the user's callable recurses. Two guards make this safe:
-
-* :class:`CostBudgetGuard` subscribes to the event bus's ``LLM_CALL``
-  events and tallies total cost. When the tally meets or exceeds the
-  per-run ceiling, it signals an :class:`asyncio.Event` that
-  :func:`run_with_guards` is racing against the adapter's ``run`` task.
-  The adapter task gets cancelled; :exc:`BudgetExceeded` is raised.
-
-* A plain ``asyncio.wait_for(task, timeout_seconds)`` enforces the wall
-  clock. If the adapter hangs, ``wait_for`` cancels it and we raise
-  :exc:`TimeoutExceeded`.
-
-These guards are orthogonal: either can fire independently. Both always
-leave the bus in a well-defined state — the guard cleans up its
-subscription in ``__aexit__`` / ``dispose``.
-
-Why not just let the orchestrator check cost after the run?
------------------------------------------------------------
-
-Because some frameworks (a recursive LangGraph agent, an infinite-loop
-coding agent) can issue thousands of LLM calls in a single invocation.
-Post-hoc enforcement is "close the barn door after the horse is gone."
-The guard fires mid-flight, *before* the next LLM call fees get added.
-That's the only honest form of enforcement.
+The cost guard subscribes to LLM_CALL events. Reaching the configured ceiling
+signals the orchestrator to cancel the adapter task. Detection follows the
+reported spend, so a call can take the observed total past the ceiling.
+The timeout guard cancels the task if its deadline expires.
 """
 
 from __future__ import annotations

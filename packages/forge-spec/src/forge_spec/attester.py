@@ -1,4 +1,4 @@
-"""forge_spec.attester — SLSA Level 2-inspired attestation generator."""
+"""Generate an unsigned report for a verified harness run."""
 
 from __future__ import annotations
 
@@ -12,8 +12,7 @@ from forge_spec.types import CriterionStatus, SpecAttestation, SpecDef, VerifyRe
 class SpecAttester:
     """Build a SpecAttestation from a VerifyResult.
 
-    The attestation follows SLSA provenance v1 envelope format (predicate_type +
-    build_type). Cryptographic signing is deferred (DT-5).
+    Records the specification digest, run identifier and criterion counts.
     """
 
     def attest(self, spec: SpecDef, verify_result: VerifyResult) -> SpecAttestation:

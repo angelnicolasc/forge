@@ -1,16 +1,7 @@
-"""forge_rules.glob_intersect — Scope intersection detection at lint time.
+"""Look for overlapping rule scopes by testing generated example paths.
 
-Original contribution: detect overlapping glob patterns before runtime so operators
-can resolve ambiguities proactively rather than discover them in production.
-
-Algorithm:
-  1. Convert each glob pattern to a regex.
-  2. Probe with a set of concrete path examples derived from the pattern.
-  3. Two patterns intersect if any probe path matches both regexes.
-
-This is a conservative check — it may report false positives for exotic patterns
-but will never miss a true intersection on the probe set. It runs in O(N²) over
-the rule list at lint time, not at inference time.
+A matching example identifies a possible conflict. Sampling a finite set
+of paths can miss an intersection between more complex patterns.
 """
 
 from __future__ import annotations
