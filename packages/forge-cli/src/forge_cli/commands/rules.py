@@ -50,7 +50,7 @@ def rules_validate(
 def rules_lint(
     pack_file: Path = typer.Argument(..., help="YAML rule pack to lint.", metavar="FILE"),
     fail_on_intersect: bool = typer.Option(
-        False, "--strict", "-s", help="Exit 1 on any scope intersection."
+        False, "--strict", "-s", help="Exit 1 if lint reports overlapping scope patterns."
     ),
 ) -> None:
     """[bold]Lint[/] a rule pack for overlapping scope patterns (scope intersection detection)."""
@@ -72,7 +72,7 @@ def rules_lint(
     intersections = engine.lint()
 
     if not intersections:
-        console.print(f"  [{FORGE_TEAL}]✓ No scope intersections found in {pack.name!r}.[/]")
+        console.print(f"  [{FORGE_TEAL}]✓ No scope overlap reported for {pack.name!r}.[/]")
         return
 
     table = Table(title="Scope Intersections", border_style=FORGE_ORANGE)

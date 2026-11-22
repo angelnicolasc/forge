@@ -1,9 +1,7 @@
 """forge_mcp.cache — Exact-match TTL cache for tool call results.
 
-Cache semantics mirror Anthropic's prompt caching: identical input →
-identical output served from cache, with no upstream round-trip. No vector
-similarity — purely content-hash equality (SHA-256 over JSON-serialized
-tool name + arguments).
+Cache keys hash the tool name and arguments. A matching unexpired entry
+returns the stored result without an upstream call.
 
 Thread-safe for concurrent async callers via a threading.Lock (the lock is
 held only for dict operations, not during upstream calls).

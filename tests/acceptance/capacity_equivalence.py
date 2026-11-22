@@ -73,9 +73,16 @@ class Audit:
                 finally:
                     selected.reset(token)
             self.events.append(
-                {"decision": name, "reference": repr(alternatives[0]), "projection": repr(alternatives[1])}
+                {
+                    "decision": name,
+                    "reference": repr(alternatives[0]),
+                    "projection": repr(alternatives[1]),
+                }
             )
-            require(actual == alternatives[0] == alternatives[1], f"Decision mismatch: {self.events[-1]}")
+            require(
+                actual == alternatives[0] == alternatives[1],
+                f"Decision mismatch: {self.events[-1]}",
+            )
             return actual
 
         def checked_plan(conn, **kwargs):
@@ -116,13 +123,20 @@ def create_world(name: str, oracle: Oracle, *, budget: int = 100) -> tuple[World
     return world, proposal, digest
 
 
-def open_rollout(
-    world, proposal, name, *, slots=4, budget=10_000, mode="canary", source="direct"
-):
+def open_rollout(world, proposal, name, *, slots=4, budget=10_000, mode="canary", source="direct"):
     return world.control.start_rollout(
-        OWNER, name, proposal, f"{world.path.name}-evidence", 1,
-        mode=mode, seed="capacity-oracle", basis_points=10_000,
-        ends_at=now() + 180_000_000, max_concurrent=slots, budget_microusd=budget, source=source,
+        OWNER,
+        name,
+        proposal,
+        f"{world.path.name}-evidence",
+        1,
+        mode=mode,
+        seed="capacity-oracle",
+        basis_points=10_000,
+        ends_at=now() + 180_000_000,
+        max_concurrent=slots,
+        budget_microusd=budget,
+        source=source,
     )
 
 
@@ -141,7 +155,10 @@ def check_destination(oracle, ledger, expected, start):
             charge, revision = expected[attempt]
             require(row["charge_microusd"] == charge, f"Destination charge differs for {attempt}")
             require(row["revision"] == revision, f"Destination pin differs for {attempt}")
-            require(ledger.attempt(attempt)["charge_microusd"] == charge, f"Ledger charge differs for {attempt}")
+            require(
+                ledger.attempt(attempt)["charge_microusd"] == charge,
+                f"Ledger charge differs for {attempt}",
+            )
 
 
 def deterministic(oracle, audit):
@@ -153,7 +170,11 @@ def deterministic(oracle, audit):
         open_rollout(world, proposal, shadow, mode="shadow")
         require(world.task("shadow-task")["allocation"]["cohort"] == "shadow", "Expected shadow")
         oracle.arrange("shadow-ticket", Behavior(charge=9))
-        state_matches(world.submit(request("shadow-task", "shadow-charge", "shadow-ticket")), "dispatch", "succeeded")
+        state_matches(
+            world.submit(request("shadow-task", "shadow-charge", "shadow-ticket")),
+            "dispatch",
+            "succeeded",
+        )
         world.control.finish_task(OPERATOR, "shadow-task")
         audit.totals(world.store, shadow, (0, 0, 0), "shadow excluded")
         world.control.stop_rollout(OWNER, shadow, 1)
@@ -170,19 +191,29 @@ def deterministic(oracle, audit):
         state_matches(world.submit(read), "dispatch", "succeeded")
         audit.totals(world.store, run, (2, 70, 200), "child charge")
         state_matches(world.submit(read), "replay", "succeeded")
-        state_matches(world.submit(request("det-child", "det-cache", "det-read")), "cached", "cached")
+        state_matches(
+            world.submit(request("det-child", "det-cache", "det-read")), "cached", "cached"
+        )
         audit.totals(world.store, run, (2, 70, 200), "replay and cache")
         oracle.arrange("zero-ticket", Behavior(charge=0))
         world.task(zero)
-        state_matches(world.submit(request(zero, "det-zero", "zero-ticket")), "dispatch", "succeeded")
+        state_matches(
+            world.submit(request(zero, "det-zero", "zero-ticket")), "dispatch", "succeeded"
+        )
         world.control.finish_task(OPERATOR, zero)
         audit.totals(world.store, run, (2, 70, 200), "explicit zero charge")
 
         duplicate_root = "det-duplicate-root"
         world.task(duplicate_root)
         duplicate = request(duplicate_root, "det-duplicate-claim", "duplicate-ticket")
-        require(world.ledger.admit(duplicate).disposition == "dispatch", "Expected reservable duplicate fixture")
-        require(world.ledger.mark_dispatched(duplicate.attempt_id), "Duplicate fixture did not claim intent")
+        require(
+            world.ledger.admit(duplicate).disposition == "dispatch",
+            "Expected reservable duplicate fixture",
+        )
+        require(
+            world.ledger.mark_dispatched(duplicate.attempt_id),
+            "Duplicate fixture did not claim intent",
+        )
         disputed = world.ledger.settle(
             duplicate.attempt_id,
             Observation("det-duplicate", "succeeded", "verified", 70, charge_ref="charge-det-read"),
@@ -193,10 +224,18 @@ def deterministic(oracle, audit):
         audit.totals(world.store, run, (3, 70, 300), "duplicate billing evidence holds exposure")
         world.ledger.settle(
             duplicate.attempt_id,
-            Observation("det-duplicate-corrected", "succeeded", "verified", 0, charge_ref="det-duplicate-none"),
+            Observation(
+                "det-duplicate-corrected",
+                "succeeded",
+                "verified",
+                0,
+                charge_ref="det-duplicate-none",
+            ),
         )
         world.control.finish_task(OPERATOR, duplicate_root)
-        audit.totals(world.store, run, (2, 70, 200), "unique definitive bill closes duplicate fixture")
+        audit.totals(
+            world.store, run, (2, 70, 200), "unique definitive bill closes duplicate fixture"
+        )
 
         lost = request(second, "det-late", "det-lost", binding=MODEL)
         oracle.arrange("det-lost", Behavior(mode="drop", charge=120))
@@ -208,27 +247,50 @@ def deterministic(oracle, audit):
         audit.totals(world.store, run, (2, 70, 200), "unknown child/root charge still held")
         recovered = world.host.reconcile(OWNER, lost.attempt_id)
         require(recovered.attempt["charge_microusd"] == 120, "Late over-cap charge not recognized")
-        require(world.ledger.balance(second)["over_limit_microusd"] == 20, "Missing over-cap balance")
+        require(
+            world.ledger.balance(second)["over_limit_microusd"] == 20, "Missing over-cap balance"
+        )
         audit.totals(world.store, run, (2, 190, 220), "minimum example: cap max before close")
         world.control.finish_task(OPERATOR, first)
         audit.totals(world.store, run, (1, 190, 190), "minimum example: first close")
 
-        original = Observation("det-repeat", "succeeded", "verified", 70, charge_ref="charge-det-read")
+        original = Observation(
+            "det-repeat", "succeeded", "verified", 70, charge_ref="charge-det-read"
+        )
         world.ledger.settle(read.attempt_id, original)
         world.ledger.settle(read.attempt_id, original)
         audit.totals(world.store, run, (1, 190, 190), "post-close charge replay")
-        conflict = Observation("det-conflict", "succeeded", "verified", 120, charge_ref="charge-det-read")
+        conflict = Observation(
+            "det-conflict", "succeeded", "verified", 120, charge_ref="charge-det-read"
+        )
         outcome = world.ledger.settle(read.attempt_id, conflict)
         require(outcome["charge_microusd"] == 70, "Contradiction rewrote the recognized charge")
         require(
-            any(receipt["phase"] == "charge_conflict" for receipt in world.ledger.receipts("det-child")),
+            any(
+                receipt["phase"] == "charge_conflict"
+                for receipt in world.ledger.receipts("det-child")
+            ),
             "Post-close contradiction did not write a conflict receipt",
         )
         with world.store.read() as conn:
-            require(conn.execute("SELECT 1 FROM read_cache WHERE source_attempt_id = 'det-read'").fetchone() is None, "Contradiction failed to evict the source cache")
-            require(conn.execute("SELECT 1 FROM binding_suspensions WHERE attempt_id = 'det-read'").fetchone() is not None, "Contradiction failed to suspend the binding")
+            require(
+                conn.execute(
+                    "SELECT 1 FROM read_cache WHERE source_attempt_id = 'det-read'"
+                ).fetchone()
+                is None,
+                "Contradiction failed to evict the source cache",
+            )
+            require(
+                conn.execute(
+                    "SELECT 1 FROM binding_suspensions WHERE attempt_id = 'det-read'"
+                ).fetchone()
+                is not None,
+                "Contradiction failed to suspend the binding",
+            )
         audit.totals(world.store, run, (1, 190, 190), "post-close contradictory charge")
-        state_matches(world.submit(request("det-child", "det-denied", "denied-ticket")), "denied", "denied")
+        state_matches(
+            world.submit(request("det-child", "det-denied", "denied-ticket")), "denied", "denied"
+        )
         require(not oracle.dispatches("denied-ticket"), "Closed root made a new dispatch")
         audit.totals(world.store, run, (1, 190, 190), "post-close denial")
 
@@ -241,18 +303,27 @@ def deterministic(oracle, audit):
         open_rollout(world, proposal, "det-next")
         world.task("det-no-attempts")
         world.control.revoke_revision(OWNER, "det-revoke", revision)
-        state_matches(world.submit(request(second, "det-revoked", "revoked-ticket")), "denied", "denied")
+        state_matches(
+            world.submit(request(second, "det-revoked", "revoked-ticket")), "denied", "denied"
+        )
         world.control.finish_task(OPERATOR, second)
-        audit.totals(world.store, run, (0, 190, 190), "close after newer rollout; original attributed")
+        audit.totals(
+            world.store, run, (0, 190, 190), "close after newer rollout; original attributed"
+        )
         audit.totals(world.store, "det-next", (1, 0, 100), "new rollout unaffected")
         world.control.finish_task(OPERATOR, "det-no-attempts")
         audit.totals(world.store, "det-next", (0, 0, 0), "close without attempts")
-    check_destination(oracle, world.ledger, {
-        "shadow-charge": (9, world.base.digest),
-        "det-read": (70, revision),
-        "det-zero": (0, revision),
-        "det-late": (120, revision),
-    }, start)
+    check_destination(
+        oracle,
+        world.ledger,
+        {
+            "shadow-charge": (9, world.base.digest),
+            "det-read": (70, revision),
+            "det-zero": (0, revision),
+            "det-late": (120, revision),
+        },
+        start,
+    )
 
 
 def worker():
@@ -274,14 +345,20 @@ def race(database, operation, roots):
     def spawn(root):
         return subprocess.Popen(
             [sys.executable, __file__, "--worker", str(database), operation, root],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
         )
 
     with running(spawn(roots[0])) as first, running(spawn(roots[1])) as second:
         children = (first, second)
         for child in children:
             readable, _, _ = select([child.stdout], [], [], 10)
-            require(bool(readable) and child.stdout.readline() == "ready\n", "Race worker never reached barrier")
+            require(
+                bool(readable) and child.stdout.readline() == "ready\n",
+                "Race worker never reached barrier",
+            )
         for child in children:
             child.stdin.write("go\n")
             child.stdin.flush()
@@ -298,8 +375,15 @@ def thresholds(oracle, audit, *, metric, slots, budget):
     rows = [result["result"] for result in results]
     ordered = sorted(rows, key=lambda row: row["allocation"]["cohort"])
     winner, fallback = ordered
-    require(winner["allocation"]["reason"] == "selected" and winner["revision"] == revision, "No final-slot winner")
-    require(fallback["allocation"]["reason"] == f"{metric}_limit" and fallback["revision"] == world.base.digest, "Wrong serialized fallback")
+    require(
+        winner["allocation"]["reason"] == "selected" and winner["revision"] == revision,
+        "No final-slot winner",
+    )
+    require(
+        fallback["allocation"]["reason"] == f"{metric}_limit"
+        and fallback["revision"] == world.base.digest,
+        "Wrong serialized fallback",
+    )
     audit.totals(world.store, label, (1, 0, 100), f"concurrent {metric}")
     closed = race(world.db, "finish", (winner["id"], winner["id"]))
     require(closed[0]["result"] == closed[1]["result"], "Concurrent close did not replay")
@@ -330,6 +414,7 @@ def seeded(oracle, audit, seed):
     open_rollout(world, proposal, label, slots=4, budget=400)
     roots: dict[str, Root] = {}
     expected = {}
+
     def totals():
         active = consumed = exposure = 0
         for root in roots.values():
@@ -349,12 +434,19 @@ def seeded(oracle, audit, seed):
             if action == "start":
                 active, _, exposure = totals()
                 expected_reason = (
-                    "concurrency_limit" if active >= 4 else
-                    "spend_limit" if exposure + 100 > 400 else "selected"
+                    "concurrency_limit"
+                    if active >= 4
+                    else "spend_limit"
+                    if exposure + 100 > 400
+                    else "selected"
                 )
                 allocation = world.task(key)["allocation"]
-                audit.events.append({"start": key, "oracle_reason": expected_reason, "allocation": allocation})
-                require(allocation["reason"] == expected_reason, f"Generated decision diverged: {key}")
+                audit.events.append(
+                    {"start": key, "oracle_reason": expected_reason, "allocation": allocation}
+                )
+                require(
+                    allocation["reason"] == expected_reason, f"Generated decision diverged: {key}"
+                )
                 roots[key] = Root(expected_reason == "selected")
             elif action == "call" and billable:
                 root_id = rng.choice(billable)
@@ -389,13 +481,23 @@ def precision(oracle, audit):
         for index in range(count + 1)
     ]
     for call in attempts:
-        require(world.ledger.admit(call).disposition == "dispatch", f"Unclaimed precision fixture {call.attempt_id}")
-        require(world.ledger.mark_dispatched(call.attempt_id), f"No dispatch intent {call.attempt_id}")
+        require(
+            world.ledger.admit(call).disposition == "dispatch",
+            f"Unclaimed precision fixture {call.attempt_id}",
+        )
+        require(
+            world.ledger.mark_dispatched(call.attempt_id), f"No dispatch intent {call.attempt_id}"
+        )
     for call in attempts:
         observed = world.ledger.settle(
             call.attempt_id,
-            Observation(f"observe-{call.attempt_id}", "succeeded", "verified", MAX_SAFE_INTEGER,
-                        charge_ref=f"bill-{call.attempt_id}"),
+            Observation(
+                f"observe-{call.attempt_id}",
+                "succeeded",
+                "verified",
+                MAX_SAFE_INTEGER,
+                charge_ref=f"bill-{call.attempt_id}",
+            ),
         )
         require(observed["charge_microusd"] == MAX_SAFE_INTEGER, "Maximum legal charge changed")
     exact = MAX_SAFE_INTEGER * (count + 1)
@@ -405,7 +507,9 @@ def precision(oracle, audit):
     world.control.finish_task(OPERATOR, second["id"])
     audit.totals(world.store, label, (0, exact, exact), "large closed accumulator round trip")
     select_mode(world.store, "compare")
-    audit.totals(world.store, label, (0, exact, exact), "large aggregate verified before reactivation")
+    audit.totals(
+        world.store, label, (0, exact, exact), "large aggregate verified before reactivation"
+    )
 
 
 def inconsistent(oracle, audit):
@@ -432,11 +536,21 @@ def inconsistent(oracle, audit):
                 rollout.set_capacity_mode(conn, "compare")
             alias = world.control.get_alias(OWNER)
             allocation = rollout.plan_root(
-                conn, scope=world.base.document["scope"], root_id="corrupt-contender",
-                source="direct", generation=alias["generation"], stable=alias["revision"], now=now(),
+                conn,
+                scope=world.base.document["scope"],
+                root_id="corrupt-contender",
+                source="direct",
+                generation=alias["generation"],
+                stable=alias["revision"],
+                now=now(),
             )
-            require(allocation is not None and allocation.reason == "concurrency_limit", "Corruption admitted extra canary work")
-            audit.events.append({"fault": fault, "canonical_fallback": observed, "reason": allocation.reason})
+            require(
+                allocation is not None and allocation.reason == "concurrency_limit",
+                "Corruption admitted extra canary work",
+            )
+            audit.events.append(
+                {"fault": fault, "canonical_fallback": observed, "reason": allocation.reason}
+            )
             conn.execute("ROLLBACK TO corrupt")
             conn.execute("RELEASE corrupt")
     audit.totals(world.store, label, (1, 0, 100), "pristine state after corruption drills")
@@ -448,7 +562,7 @@ def main():
     args = parser.parse_args()
     lab = os.environ.get("FORGE_VAST_LAB_ID", "")
     if sys.platform != "linux" or not lab.isdigit():
-        parser.error("Run on the designated Vast instance")
+        parser.error("Requires Linux and a numeric FORGE_VAST_LAB_ID.")
     evidence = args.output_dir.resolve()
     evidence.mkdir(parents=True, exist_ok=True)
     cases = []
@@ -475,13 +589,16 @@ def main():
             for event in oracle.journal:
                 journal.write(json.dumps(event) + "\n")
     passed = all(case["status"] == "pass" for case in cases)
-    dump(evidence / "equivalence.json", {
-        "status": "pass" if passed else "fail",
-        "vast_lab_id": lab,
-        "version": version("forge-os-check"),
-        "seeds": SEEDS,
-        "cases": cases,
-    })
+    dump(
+        evidence / "equivalence.json",
+        {
+            "status": "pass" if passed else "fail",
+            "vast_lab_id": lab,
+            "version": version("forge-os-check"),
+            "seeds": SEEDS,
+            "cases": cases,
+        },
+    )
     return 0 if passed else 1
 
 

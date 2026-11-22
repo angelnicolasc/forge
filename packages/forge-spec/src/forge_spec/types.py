@@ -5,13 +5,12 @@ from __future__ import annotations
 import hashlib
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
-if TYPE_CHECKING:
-    from forge_core.types import MutationKind
+from forge_core.types import MutationKind  # noqa: TC001 - Pydantic resolves this field at runtime.
 
 
 class CheckType(StrEnum):
@@ -124,12 +123,7 @@ class VerifyResult(BaseModel):
 
 
 class SpecAttestation(BaseModel):
-    """SLSA Level 2-inspired provenance attestation for a verified spec run.
-
-    Follows the SLSA provenance v1 envelope format. No cryptographic signing
-    in this release (DT-5). The document can be consumed by SLSA tooling once
-    signing is added.
-    """
+    """Unsigned verification report for a harness run, keyed by its specification hash."""
 
     id: str = Field(default_factory=lambda: uuid4().hex[:16])
     predicate_type: str = "https://slsa.dev/provenance/v1"

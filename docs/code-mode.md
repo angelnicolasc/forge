@@ -1,6 +1,6 @@
 # Compose governed reads with Code Mode
 
-Code Mode is an experimental SDK profile for composing governed reads in JavaScript on Linux x86_64. The package requires Python 3.11 or newer. Release checks cover Python 3.11 and 3.12.
+Code Mode is an experimental SDK profile for composing governed reads in JavaScript on Linux x86_64. The package requires Python 3.11 or newer. Release checks cover Python 3.11 and 3.12. The [saved-result check](check.md) uses the base wheel and runs on Windows as well.
 
 Install the stable 0.4.0 extra from PyPI in a dedicated environment.
 
@@ -88,6 +88,6 @@ The body receives the supplied JSON as `input`. Call `tools['binding.id'](argume
 | `output_contract` | The result cannot be serialized as JSON or exceeds its size bound | `output_serialization` or `output_limit` |
 | `runtime` | The program throws, an operation remains uncertain, or a runtime bound is reached | `program_error`, `subcall_unresolved`, or the violated limit |
 
-An accepted program ID is single-use. `CodeRun` reports the execution phase and links its attempts through `attempt_ids`. There is no automatic repair or fallback. Reconcile uncertain calls before choosing another operation. Completion describes the program lifecycle. The trusted application and the evidence gate decide business correctness. The [conditional inventory example](conditional-evidence.md) shows how a completed program can still leave a required read unconfirmed.
+An accepted program ID is single-use. `CodeRun` reports the execution phase and links its attempts through `attempt_ids`. There is no automatic repair or fallback. Reconcile uncertain calls before choosing another operation. A completed program can still skip a required read. The trusted observer supplies the evidence used to evaluate that rule. The [conditional inventory example](conditional-evidence.md#run-the-inventory-demo) shows both a confirmed omission and an unavailable observer.
 
 The executor keeps provider credentials and dispatch authority in the host. QuickJS runs in a fresh, bounded Wasmtime process with the selected read capabilities and explicit input. The watchdog can stop the worker while a call already handed to the host completes under the provider timeout. Its receipt and reserve remain in the ledger. [QuickJS sandbox design](https://github.com/langchain-ai/quickjs-rs/tree/e086fb48f9f2b56ff1ca14de8484a32208192bba#security) · [Wasmtime security model](https://github.com/bytecodealliance/wasmtime/blob/main/docs/security.md)

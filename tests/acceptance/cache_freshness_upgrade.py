@@ -219,7 +219,7 @@ def main() -> None:
     parser.add_argument("--at", type=int)
     args = parser.parse_args()
     if sys.platform != "linux" or not os.environ.get("FORGE_VAST_LAB_ID", "").isdigit():
-        parser.error("Run on the assigned Vast instance")
+        parser.error("Requires Linux and a numeric FORGE_VAST_LAB_ID.")
     if args.operation:
         outcome = read(args.db, args.origin, args.branch, args.sku, args.operation, args.at)
         print(json.dumps(outcome))

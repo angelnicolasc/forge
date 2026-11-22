@@ -1,21 +1,8 @@
-"""AutoGen Coding Team — Forge Example.
+"""Coding conversation fixture for the historical harness.
 
-A two-agent conversation that writes a small Python function:
-
-1. **Coder**  — proposes a first implementation
-2. **Reviewer** — suggests one concrete improvement
-
-As with :mod:`examples.crewai_content.flow`, this file is runnable in
-three modes:
-
-* ``python flow.py`` — always works via the local mock LLM.
-* ``forge wrap flow.py --input '{"task":"sum a list"}'`` — Forge-wrapped
-  demo with cost breakdown.
-* With real ``autogen-agentchat`` and an API key, swap the mock LLM for
-  a configured ``ModelClient`` and let a real :class:`Team` drive the
-  turn-taking. The Forge AutoGen adapter subscribes to the framework's
-  structured ``TRACE_LOGGER_NAME`` records so no code changes here are
-  needed to capture per-agent tokens / cost.
+A scripted coder and reviewer return a Python function and review text.
+Run this module directly with Python after installing forge-os-core==0.2.0.
+It uses MockLLMProvider and does not construct an AutoGen team.
 """
 
 from __future__ import annotations
@@ -69,7 +56,7 @@ def _build_mock_llm() -> MockLLMProvider:
             ),
             MockResponse(
                 content=(
-                    "Prefer the built-in sum(xs) for clarity and C-speed summation. "
+                    "The built-in sum(xs) expresses this operation directly. "
                     "If non-numeric entries are possible, consider filtering or "
                     "raising a clear TypeError."
                 ),
@@ -107,7 +94,3 @@ if __name__ == "__main__":
     print("\n=== TASK ===\n" + out["task"])
     print("\n=== CODE ===\n" + out["code"])
     print("\n=== REVIEW ===\n" + out["review"])
-    print(
-        "\nFor the full Forge experience, run:\n"
-        '  forge wrap flow.py --input \'{"task":"sum a list"}\''
-    )

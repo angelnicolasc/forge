@@ -1,20 +1,4 @@
-"""OpenTelemetry-based tracing for Forge runs.
-
-Instruments every LLM call, tool invocation, and agent handoff
-with OpenTelemetry spans for full observability.
-
-After L7/L8 fase α, the tracer attaches to the :class:`EventBus` as a
-subscriber — that's how Gap #2 ("``ForgeTracer`` implementado pero nunca
-invocado") gets closed. The interceptor already opens nested OTel spans
-per LLM call; the tracer's job here is to (a) ensure a tracer provider
-is configured (console export by default, OTLP on demand) and (b) mirror
-run-level bus events as additional spans for frameworks where the
-interceptor isn't the source of truth.
-
-Call :func:`attach_tracer_to_orchestrator` once at startup to connect
-the tracer to an orchestrator's bus. After that, every future run gets
-OTel spans automatically — no explicit ``tracer.record_run`` call needed.
-"""
+"""Create OpenTelemetry spans for harness events observed on the event bus."""
 
 from __future__ import annotations
 

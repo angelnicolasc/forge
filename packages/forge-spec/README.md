@@ -1,80 +1,43 @@
 # forge-spec
 
+Part of the earlier Forge agent harness. For the standalone CI check, see [Forge Check](https://pypi.org/project/forge-os-check/).
+
 Spec-Driven Development for the Forge agent harness.
 
-Define what an agent run must achieve (`spec.yaml`), verify it against real
-`RunResult` output, and generate SLSA Level 2-inspired attestations for
-compliance and audit trails.
+Define criteria in `spec.yaml`, evaluate them against a `RunResult`, and export an unsigned report of the criteria, results and specification hash.
 
 ## Installation
 
 ```bash
 pip install forge-spec
 # With LLM-assisted spec refinement:
-pip install forge-spec[llm]
+pip install 'forge-spec[llm]'
 ```
 
-## Quick start
+The published `forge-spec==0.2.0` wheel can fail when constructing `SpecDef` with Pydantic 2.11.10. That wheel imports the required `MutationKind` only during type checking. The source tree includes the runtime import.
+
+## Verify an output label
+
+This example checks a synthetic harness result for the substring `needs_review`. Its report describes the supplied output. To establish that a ticket reached a queue, collect an observation from the ticket system.
 
 ```python
-from forge_spec import SpecDef, AcceptanceCriterion, SpecRunner
+import asyncio
+
+from forge_core.types import RunResult
+from forge_spec import AcceptanceCriterion, SpecDef, SpecRunner
 
 spec = SpecDef(
-    name="no-show-optimizer",
-    description="Reduce appointment no-show rate",
-    objectives=["Reduce no-show rate by 15%"],
+    name="review-label",
     acceptance_criteria=[
         AcceptanceCriterion(
-            id="ac-001",
-            description="Run completes successfully",
-            check_type="assertion",
-            expected="run_result.status == 'completed'",
-        ),
-        AcceptanceCriterion(
-            id="ac-002",
-            description="Output contains recommendations",
+            id="has-review-label",
+            description="The run output contains the review label",
             check_type="contains",
-            expected="recommendation",
-        ),
+            expected="needs_review",
+        )
     ],
 )
-
-runner = SpecRunner()
-verify_result, attestation = await runner.run_pipeline(spec, run_result)
-print(f"Compliance: {verify_result.compliance_rate:.0%}")
+run = RunResult(task_id="ticket-07", output="needs_review")
+verification, report = asyncio.run(SpecRunner().run_pipeline(spec, run))
+print(report.passed_criteria, report.failed_criteria)  # 1 0
 ```
-
-## spec.yaml format
-
-```yaml
-name: no-show-optimizer
-version: "0.1.0"
-description: Reduce appointment no-show rate
-objectives:
-  - Reduce no-show rate by at least 15%
-constraints:
-  - id: no-model-swap
-    description: Preserve the primary LLM model during evolution
-    mutation_kinds_blocked:
-      - model_swap
-acceptance_criteria:
-  - id: ac-001
-    description: Run must complete successfully
-    check_type: assertion
-    expected: "run_result.status == 'completed'"
-    weight: 2.0
-  - id: ac-002
-    description: Output mentions recommendations
-    check_type: contains
-    expected: recommendation
-risks:
-  - id: risk-001
-    description: Model hallucination in recommendations
-    likelihood: 0.3
-    impact: 0.8
-    mitigation: Use structured output validation
-```
-
-## Technical debt
-
-See DEVLOG.md for DT entries introduced in Phase 4.

@@ -1,10 +1,10 @@
 # Forge Check
 
-Use Forge Check to decide whether an agent change is safe to promote under a rule your team owns. Start with saved results in CI. Add a governed binding when you also need to authorize a call, reserve its budget and record what happened.
+Use Forge Check to decide whether a recorded candidate satisfies a business rule your team owns. Start with saved results in CI. Add a governed binding when you also need to authorize a call, reserve its budget and record what happened.
 
 ## Get your first verdict
 
-The support example follows 24 synthetic tickets. An independent read of the queue finds that two tickets marked complete still needed a human. The example runs on the base `forge-os-check` wheel using Python 3.11 or newer. It requires no model credentials. [Install 0.4.0 and run the support example](check.md#try-the-support-example)
+The support example follows 24 synthetic tickets. The saved queue observations include two confirmed routing mistakes. With those same observations missing, the check reports insufficient evidence and keeps all 24 tickets in its coverage denominator. The example runs on the base `forge-os-check` wheel using Python 3.11 or newer. It requires no model credentials. [Install 0.4.0 and run the support example](check.md#try-the-support-example)
 
 | What you need to do | Where to start |
 |---|---|
@@ -16,6 +16,6 @@ The support example follows 24 synthetic tickets. An independent read of the que
 
 A **revision** fixes the manifest a task runs under. A **receipt** records a binding decision and the associated call. The **Gate** evaluates the evidence tied to a proposed revision and produces the verdict an operator needs before promotion. [Design decisions](decisions/index.md)
 
-## Earlier Forge harness
+## Historical Forge harness
 
-The multi-package harness has its own CLI, framework adapters, memory and tracing. Give it a separate environment from Forge Check because both CLIs use the executable name `forge`. [Harness quickstart](quickstart.md) · [Architecture](architecture.md) · [Feature map](feature-map.md)
+The historical multi-package harness is no longer actively maintained. It has its own CLI, framework adapters, memory and tracing. Give it a separate environment from Forge Check because both CLIs use the executable name `forge`. [Harness quickstart](quickstart.md) · [Architecture](architecture.md) · [Feature map](feature-map.md)

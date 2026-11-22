@@ -269,7 +269,7 @@ def main() -> None:
         parser.add_argument(f"--{name}", required=True)
     args = parser.parse_args()
     if sys.platform != "linux" or os.environ.get("FORGE_VAST_LAB_ID") != args.vast_id:
-        parser.error("Run on the identified Vast instance")
+        parser.error("Requires Linux and a FORGE_VAST_LAB_ID that matches --vast-id.")
     verifier = Path(__file__).resolve().parents[2] / ".github/standalone/preview_artifact.py"
     command = [
         sys.executable,

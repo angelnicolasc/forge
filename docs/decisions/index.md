@@ -1,6 +1,6 @@
 # Architecture decisions
 
-Forge’s first governed binding handled support tickets. Moving to inventory exposed an assumption the support example could never catch. A stock lookup takes a SKU, yet both execution paths required a ticket ID. Fixing that raised a second question. Once an agent can write a program that calls the right tool, how does its operator know the program asked *enough* questions?
+The first governed binding used a ticket ID. The inventory example needed a SKU and, for low stock, a second lookup against a reserve warehouse. The first three decisions cover how the host represents those inputs, runs the lookups and evaluates the resulting evidence.
 
 These records trace those choices through the `forge-os-check` preview. Each accepted decision identifies the preview version that implements it.
 

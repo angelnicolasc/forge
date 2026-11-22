@@ -1,78 +1,22 @@
-# Feature Map
+# Earlier Forge harness — test reference
 
-Every feature claim in the [README](https://github.com/angelnicolasc/forge#readme) maps to a concrete test
-or an honest roadmap entry. The plan ζ.9 gate is: **no row in the
-`Status` column may be 🚧**. If something is partial, it either has a
-test covering the shipped slice or moves to the Roadmap section at the
-bottom of the README.
+These source tests cover the earlier agent harness under `packages/`. Each link opens the test for the named behavior. For the standalone Forge Check product, see [Check saved agent results in CI](check.md).
 
-Last updated: 2026-05-13 (post-audit hardening).
+| Harness behavior | Test |
+| --- | --- |
+| The generic adapter restores the patched SDK method after an exception. | [`test_generic_adapter_restores_sdk_after_exception`](https://github.com/angelnicolasc/forge/blob/9216000d01ea08c32f8bc38db80d11ddb46f1865/packages/forge-adapters/tests/test_generic_adapter.py#L242) |
+| The CrewAI fixture publishes tool events to the harness bus. | [`test_execute_publishes_tool_events`](https://github.com/angelnicolasc/forge/blob/9216000d01ea08c32f8bc38db80d11ddb46f1865/packages/forge-adapters/tests/test_crewai_adapter.py#L236) |
+| The AutoGen adapter converts a paired start and end in its structured log into an LLM event. | [`test_handler_paired_llm_start_and_end_publishes_llm_call_event`](https://github.com/angelnicolasc/forge/blob/9216000d01ea08c32f8bc38db80d11ddb46f1865/packages/forge-adapters/tests/test_autogen_adapter.py#L118) |
+| The harness aggregates recorded costs by agent and model. | [`test_cost_aggregated_by_agent_and_model`](https://github.com/angelnicolasc/forge/blob/9216000d01ea08c32f8bc38db80d11ddb46f1865/packages/forge-core/tests/test_e2e_cost_tracking.py#L95) |
+| Reported cost above the ceiling cancels the test run and raises a budget error. | [`test_run_with_guards_raises_budget_exceeded_when_cost_trips`](https://github.com/angelnicolasc/forge/blob/9216000d01ea08c32f8bc38db80d11ddb46f1865/packages/forge-core/tests/test_guards.py#L117) |
+| The local graph store preserves entries across a restart. | [`test_graph_persistence_survives_restart`](https://github.com/angelnicolasc/forge/blob/9216000d01ea08c32f8bc38db80d11ddb46f1865/packages/forge-memory/tests/test_graph_persistence.py#L45) |
+| A run submitted through the observe API appears in the run list. | [`test_run_ingest_and_list`](https://github.com/angelnicolasc/forge/blob/9216000d01ea08c32f8bc38db80d11ddb46f1865/packages/forge-observe/tests/test_api.py#L60) |
+| The MCP budget raises an error when the call allowance is exhausted. | [`test_exceeds_limit_raises`](https://github.com/angelnicolasc/forge/blob/9216000d01ea08c32f8bc38db80d11ddb46f1865/packages/forge-mcp/tests/test_budget.py#L20) |
+| Rule selection filters by the supplied path. | [`test_scope_filter`](https://github.com/angelnicolasc/forge/blob/9216000d01ea08c32f8bc38db80d11ddb46f1865/packages/forge-rules/tests/test_engine.py#L125) |
+| The skills dispatcher rejects a match below its confidence threshold. | [`test_resolve_below_threshold_raises`](https://github.com/angelnicolasc/forge/blob/9216000d01ea08c32f8bc38db80d11ddb46f1865/packages/forge-skills/tests/test_dispatcher.py#L72) |
+| The spec report counts passed, failed and skipped criteria. | [`test_attest_criterion_counts`](https://github.com/angelnicolasc/forge/blob/9216000d01ea08c32f8bc38db80d11ddb46f1865/packages/forge-spec/tests/test_attester.py#L71) |
+| The review cascade preserves the severity of a heuristic finding. | [`test_heuristic_findings_returned`](https://github.com/angelnicolasc/forge/blob/9216000d01ea08c32f8bc38db80d11ddb46f1865/packages/forge-review/tests/test_cascade.py#L43) |
 
-| Feature claim (README) | Primary test | Status |
-|---|---|---|
-| Wrap LangGraph flows | `packages/forge-adapters/tests/test_crewai_adapter.py`, `packages/forge-core/tests/test_e2e_cost_tracking.py` | ✅ tested |
-| Wrap CrewAI flows | `packages/forge-adapters/tests/test_crewai_adapter.py` | ✅ tested |
-| Wrap AutoGen flows | `packages/forge-adapters/tests/test_autogen_adapter.py` | ✅ tested |
-| Wrap any async callable (Generic) | `packages/forge-adapters/tests/test_generic_adapter.py`, `tests/e2e/test_wrap_demo.py` | ✅ tested |
-| Real-time cost tracking, per agent | `packages/forge-core/tests/test_e2e_cost_tracking.py`, `packages/forge-observe/tests/test_interceptor_breaker.py` | ✅ tested |
-| Cost model with live pricing table | `packages/forge-observe/tests/test_full_stack_metrics.py` (and `cost_model.py` unit surface) | ✅ tested |
-| Budget enforcement (`cost_ceiling` / `--budget`) | `packages/forge-core/tests/test_guards.py` | ✅ tested |
-| Prompt-rewrite mutator | `packages/forge-core/tests/test_mutations_v2.py`, `test_evolution_fullcycle.py` | ✅ tested |
-| Parameter-tune mutator | `packages/forge-core/tests/test_mutations_v2.py` | ✅ tested |
-| Agent-cull mutator (with rollback) | `packages/forge-core/tests/test_mutations_v2.py`, `test_topology_snapshot.py` | ✅ tested |
-| Model-swap mutator | `packages/forge-core/tests/test_mutations_v2.py` | ✅ tested |
-| Auto-trigger evolution after N runs | `packages/forge-core/tests/test_evolution_auto_trigger.py` | ✅ tested (flag-gated) |
-| Evolution loop with snapshot + rollback | `packages/forge-core/tests/test_topology_snapshot.py`, `test_evolution_fullcycle.py` | ✅ tested |
-| Auto-suspend evolution after N failed rollbacks | `packages/forge-core/tests/test_evolution_breaker.py` | ✅ tested |
-| Vector memory layer (ChromaDB) | `packages/forge-memory/tests/test_memory.py` | ✅ tested |
-| Graph memory layer (NetworkX, SQLite-backed) | `packages/forge-memory/tests/test_graph_persistence.py` | ✅ tested |
-| Symbolic rule layer (forward-chaining) | `packages/forge-memory/tests/test_memory.py` (symbolic suite) | ✅ tested |
-| Memory context injection into next run | `packages/forge-memory/tests/test_injection.py` | ✅ tested (flag-gated) |
-| Memory versioning + vector clocks | `packages/forge-memory/tests/test_versioning.py` | ✅ tested |
-| LLM-based entity extraction (w/ regex fallback) | `packages/forge-memory/tests/test_ingestion_llm.py` | ✅ tested (flag-gated) |
-| LLM-as-judge fitness scorer | `packages/forge-core/tests/test_llm_judge.py` | ✅ tested (flag-gated) |
-| OpenTelemetry tracing, nested spans | `packages/forge-core/tests/test_e2e_cost_tracking.py` | ✅ tested |
-| Cardinality-safe metrics labels | `packages/forge-observe/tests/test_labels.py` | ✅ tested |
-| Circuit breakers (LLM / evolution / memory) | `packages/forge-observe/tests/test_interceptor_breaker.py`, `packages/forge-core/tests/test_evolution_breaker.py`, `packages/forge-memory/tests/test_hybrid_breaker.py` | ✅ tested |
-| REST API (`/runs`, `/evolution`, `/memory`) | `packages/forge-observe/tests/test_api.py` | ✅ tested |
-| SSE live stream endpoint | `packages/forge-observe/tests/test_api.py::test_stream_generator_registers_and_cleans_up` | ✅ tested |
-| `forge wrap` CLI end-to-end demo | `tests/e2e/test_wrap_demo.py` | ✅ tested |
-| Concurrent evolution trigger safety (FSM) | `packages/forge-core/tests/test_evolution_concurrent.py` | ✅ tested |
-| Extended thinking tokens in cost model | `packages/forge-observe/tests/test_cost_model.py` (thinking_tokens path) | ✅ tested |
-| Prompt-cache token tracking | `packages/forge-observe/src/forge_observe/cost_model.py` (cached_input_tokens) | ✅ tested |
-| Streaming token events (LLM_TOKEN) | `packages/forge-observe/src/forge_observe/interceptor.py::on_llm_token` | ✅ tested |
-| Adapter degradation visible in SSE stream | `packages/forge-adapters/src/forge_adapters/generic.py` (ADAPTER_DEGRADED event) | ✅ tested |
-| GraphBackend Protocol (NetworkX/Neo4j abstraction) | `packages/forge-memory/src/forge_memory/graph/backends.py` | ✅ tested |
-| SSE subscriber cap configurable via env var | `FORGE_OBSERVE_MAX_SSE_SUBSCRIBERS` in `exporters/api.py` | ✅ tested |
-| TaskEnvelope.context typed (TypedDict) | `packages/forge-core/src/forge_core/types.py::TaskEnvelopeContext` | ✅ tested |
-| **forge-rules** — Rules Engine with conflict resolution | `packages/forge-rules/tests/` (84 tests) | ✅ tested (Phase 1) |
-| **forge-rules** — Scope intersection detection | `packages/forge-rules/tests/test_glob_intersect.py` | ✅ tested (Phase 1) |
-| **forge-rules** — YAML round-trip + CLI (`rules validate/lint/explain`) | `packages/forge-rules/tests/test_loader.py`, `test_cli_rules.py` | ✅ tested (Phase 1) |
-| **forge-mcp** — MCP Meta-Orchestrator (8-layer governance pipeline) | `packages/forge-mcp/tests/` (94 tests) | ✅ tested (Phase 2) |
-| **forge-mcp** — Tool budget, TTL cache, secret redaction | `packages/forge-mcp/tests/test_budget.py`, `test_cache.py`, `test_security.py` | ✅ tested (Phase 2) |
-| **forge-mcp** — Forge as MCP server (expose memory + evolution to clients) | `packages/forge-mcp/src/forge_mcp/forge_server.py` | 🚧 shipped (Phase 2 +) |
-| **forge-skills** — Skills Runtime with intent-based dispatch | `packages/forge-skills/tests/` (100 tests) | ✅ tested (Phase 3) |
-| **forge-skills** — SKILL.md format + child_scope isolation | `packages/forge-skills/tests/test_loader.py`, `test_executor.py` | ✅ tested (Phase 3) |
-| **forge-spec** — Spec-Driven Development (ASSERTION/REGEX/CONTAINS checks) | `packages/forge-spec/tests/` (90 tests) | ✅ tested (Phase 4) |
-| **forge-spec** — SLSA Level 2 attestation generation | `packages/forge-spec/tests/test_attester.py` | ✅ tested (Phase 4) |
-| **forge-review** — Review Agents & Policy Gates (P0–P3 severity) | `packages/forge-review/tests/` (96 tests) | ✅ tested (Phase 5) |
-| **forge-review** — CascadingReviewer + 4 hook points | `packages/forge-review/tests/test_cascade.py`, `test_runner.py` | ✅ tested (Phase 5) |
-| Pricing table updateable without release (`FORGE_PRICING_TABLE_PATH`) | `packages/forge-observe/src/forge_observe/cost_model.py::_load_pricing_table` | ✅ tested |
-| Web dashboard UI on top of the observe API | — | 📋 roadmap (v0.2.0) |
-| OTLP exporter to Grafana/Datadog | wiring via opentelemetry-sdk; no integration test | 📋 roadmap (0.1.x) |
-| Neo4j / Qdrant production backends | `Neo4jGraphBackend` stub ships; bolt driver impl planned | 📋 roadmap (0.2.x) |
-| RBAC / multi-tenant | — | 📋 roadmap (0.2.x) |
-| forge mcp serve (SSE / stdio transports) | CLI command ships; requires `forge-mcp[sdk]` | 📋 roadmap (0.1.x) |
+The [LangGraph characterization](https://github.com/angelnicolasc/forge/blob/main/tests/characterization/p00/README.md) exercises native, adapter and CLI paths separately. It documents a CLI argument-order discrepancy and a difference between reported topology and independently observed execution.
 
-## Reading this table
-
-- **✅ tested** — the behavior named in the README has an assertion in
-  the linked test and fails loudly on regression. "Flag-gated" means the
-  behavior only activates with the named `FORGE_ENABLE_*` env var; the
-  default path is also tested.
-- **📋 roadmap** — intentionally not in v0.1.0. The README's Roadmap
-  section is the single source of truth for expected delivery.
-
-Adding a new feature bullet to the README? Add a row here in the same
-PR, or the CI gate will treat the claim as aspirational and the PR is
-blocked at review.
+The spec report test passes with the runtime type import in this source tree. The published `forge-spec==0.2.0` wheel and Pydantic 2.11.10 can fail while constructing `SpecDef` because the wheel imports `MutationKind` only during type checking.

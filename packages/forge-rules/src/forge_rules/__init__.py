@@ -1,7 +1,7 @@
 """forge_rules — Rules Engine for Forge.
 
 Context-aware rule packs with fixed-lattice conflict resolution
-and original scope intersection detection at lint time.
+and linting for potentially overlapping rule scopes.
 """
 
 from forge_rules.engine import RulesEngine

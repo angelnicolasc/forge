@@ -307,7 +307,7 @@ def main() -> int:
     args = parser.parse_args()
     lab_id = os.environ.get("FORGE_VAST_LAB_ID", "")
     if sys.platform != "linux" or not re.fullmatch(r"[0-9]+", lab_id):
-        parser.error("Use the verified Vast Linux VM and its FORGE_VAST_LAB_ID")
+        parser.error("Run on Linux and set FORGE_VAST_LAB_ID to the numeric lease ID.")
     if (args.profile == "checkout") != (args.checkout is not None):
         parser.error("--profile checkout requires --checkout, which is forbidden for public-wheel")
     if os.environ.get("PYTHONPATH") or sys.prefix == sys.base_prefix:

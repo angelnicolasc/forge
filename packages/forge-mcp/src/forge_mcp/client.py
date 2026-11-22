@@ -95,7 +95,7 @@ class StdioMCPClient:
             import mcp  # type: ignore[import-not-found]  # noqa: F401
         except ImportError as exc:
             raise ImportError(
-                "StdioMCPClient requires the 'mcp' extra: pip install forge-mcp[sdk]"
+                "StdioMCPClient requires the SDK extra: pip install 'forge-os-mcp[sdk]'"
             ) from exc
         # Real connection logic deferred — see DT-1 in DEVLOG.md
         raise NotImplementedError("StdioMCPClient.connect() is not yet implemented (DT-1)")

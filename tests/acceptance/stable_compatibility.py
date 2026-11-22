@@ -187,7 +187,9 @@ def main():
         or os.uname().machine != "x86_64"
         or not re.fullmatch(r"[1-9][0-9]*", lab_id)
     ):
-        parser.error("Run in the approved Vast Linux x86_64 instance")
+        parser.error(
+            "Requires Linux x86_64 and a positive FORGE_VAST_LAB_ID without leading zeros."
+        )
     require(re.fullmatch(r"[0-9a-f]{40}", args.commit), "Require the exact candidate commit")
     for name in ("wheel", "previous_wheel", "python311", "python312", "wheelhouse"):
         setattr(args, name, getattr(args, name).resolve(strict=True))

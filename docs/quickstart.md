@@ -1,117 +1,54 @@
-# Quickstart
+# Historical harness quickstart
 
-Get from zero to a live, instrumented multi-agent flow in under 5 minutes.
+This guide runs a local LangGraph flow with the `forge-os` 0.2.0 harness. The flow has three nodes and uses fixed responses. It needs no model credentials. For the current tool that checks saved outcomes in CI, use the [Forge Check quickstart](check.md).
 
-If you already have results from two agent revisions, [compare them in CI](check.md) with the standalone check.
+## Install the harness
 
-## 1. Install
+From the repository root, create a separate Python 3.11+ environment. The historical harness and Forge Check both install a command named `forge`. The following commands use a POSIX shell.
 
-```bash
-pip install forge-os
+```sh
+python3 -m venv .venv-harness
+. .venv-harness/bin/activate
+python -m pip install "forge-os[langgraph]==0.2.0"
+python examples/langgraph_research/flow.py
 ```
 
-Or with specific framework adapters:
+The planner generates three questions, the researcher writes a placeholder for each one, and the synthesizer formats them into a report. The fixture makes no search or model calls.
 
-```bash
-pip install 'forge-os[langgraph]'   # LangGraph support
-pip install 'forge-os[crewai]'      # CrewAI support
-pip install 'forge-os[autogen]'     # AutoGen support
-pip install 'forge-os[all]'         # Everything
+## Run the graph through the adapter
+
+From the same directory and environment, load the graph into `LangGraphAdapter` and attach it to the orchestrator. This selects the adapter explicitly.
+
+```sh
+python - <<'PY'
+import asyncio
+
+from forge_adapters.langgraph_adapter import LangGraphAdapter
+from forge_core.harness import MetaOrchestrator
+from forge_core.types import TaskEnvelope
+
+
+async def main():
+    adapter = LangGraphAdapter()
+    await adapter.load("examples/langgraph_research/flow.py")
+    harness = MetaOrchestrator()
+    harness.set_adapter(adapter)
+    result = await harness.run(TaskEnvelope(input={"query": "Where did the ticket go?"}))
+    print(result.status.value, result.cost.llm_calls, len(result.output["findings"]))
+
+
+asyncio.run(main())
+PY
 ```
 
-## 2. Wrap your existing flow
+The last line should be `completed 0 3` for the run status, observed model calls and number of fixture findings. When a graph calls a model through LangChain, usage reported to its callback can also appear in the run result.
 
-=== "LangGraph"
+## Inspect the local API
 
-    ```python
-    # my_flow.py — your existing LangGraph flow
-    from langgraph.graph import StateGraph, END
-    from typing import TypedDict
-
-    class State(TypedDict):
-        query: str
-        answer: str
-
-    def researcher(state: State) -> State:
-        # ... your LLM call
-        return {"answer": f"Research result for: {state['query']}"}
-
-    graph = StateGraph(State)
-    graph.add_node("researcher", researcher)
-    graph.set_entry_point("researcher")
-    graph.add_edge("researcher", END)
-    app = graph.compile()
-    ```
-
-    ```bash
-    forge wrap my_flow.py --input '{"query": "What is agent harness?"}'
-    ```
-
-=== "CrewAI"
-
-    ```python
-    # my_crew.py
-    from crewai import Agent, Crew, Task
-
-    researcher = Agent(role="Researcher", goal="Find facts", backstory="Expert researcher")
-    task = Task(description="Research: {topic}", agent=researcher)
-    crew = Crew(agents=[researcher], tasks=[task])
-    ```
-
-    ```bash
-    forge wrap my_crew.py --input '{"topic": "agent harnesses 2026"}'
-    ```
-
-=== "AutoGen"
-
-    ```python
-    # my_team.py
-    from autogen_agentchat.agents import AssistantAgent
-    from autogen_agentchat.teams import RoundRobinGroupChat
-
-    agent = AssistantAgent("assistant", model_client=...)
-    team = RoundRobinGroupChat([agent])
-    ```
-
-    ```bash
-    forge wrap my_team.py --input '{"task": "Summarize RAG papers"}'
-    ```
-
-## 3. Start the observe API
-
-```bash
-forge observe
+```sh
+forge observe --no-open
 ```
 
-This starts the REST + SSE metrics server at `http://localhost:8787` (try
-`http://localhost:8787/docs` for the OpenAPI explorer). A web UI on top of
-this API is planned for v0.2.0 — see the roadmap in the project README.
+With the server running, open its [API explorer](http://127.0.0.1:8787/docs). The API stores posted run records in that server process. Starting it after an SDK run does not import the previous run.
 
-## 4. Enable memory
-
-Results are automatically stored in the Living Collaborative Memory.
-Query them later:
-
-```bash
-forge memory query "What did the researcher find about RAG?"
-forge memory status
-```
-
-## 5. Enable evolution
-
-After a few runs, let Forge propose optimizations:
-
-```bash
-forge evolve my_flow.py --mode suggest
-```
-
-Or let it apply them automatically:
-
-```bash
-forge evolve my_flow.py --mode auto --runs 10
-```
-
-## Next steps
-
-- [Architecture](architecture.md) — understand how Forge works under the hood
-- [Feature map](feature-map.md) — every feature claim mapped to the test that proves it
+The harness also exposes memory ingestion and an evolution loop for applications that supply run history. See the [architecture guide](architecture.md) for the components involved and the [test reference](feature-map.md) for exercised behaviors.

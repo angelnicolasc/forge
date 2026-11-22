@@ -1,6 +1,6 @@
-# Standalone preview release
+# Publishing the standalone wheel
 
-The standalone wheel has a dedicated release path. A designated, disposable Vast Linux x86_64 VM builds the wheel and runs its acceptance. The GitHub intake verifies the resulting receipt and the signed source series. The publisher consumes that accepted artifact by digest.
+Build the wheel once on a disposable Vast Linux x86_64 instance, run the release checks against that wheel, and publish those same bytes. GitHub verifies the signed commit series, the reports and artifact digests. For everyday CLI changes, the [public wheel tests](../../standalone/forge-check/tests/test_check_cli.py) run without a Vast instance.
 
 ## Create the Vast receipt
 
@@ -15,7 +15,9 @@ python3 .github/standalone/preview_artifact.py build --repo "$CHECKOUT" \
   --commit "$CANDIDATE_SHA" --dist "$DIST" --output "$OUT/build.json"
 ```
 
-Run the preview acceptance scripts against that exact wheel in the designated Vast reservation. Supply the expected baseline SHA-256 from the maintainer's approved artifact record. For the third command, install the wheel and its Code Mode extra from the approved wheelhouse in a clean Python 3.12 environment. Preserve the original reports and the Vast reservation and closure receipts outside the ZIP.
+Record the instance ID from the Vast reservation in `FORGE_VAST_LAB_ID`. The scripts record this operator-supplied value. Intake compares it across the reports and with the workflow input. The operator checks the reservation and closure records separately and retains them outside the ZIP.
+
+Run the checks against the candidate wheel. Use Python 3.12 for `preview_release.py` and supply the expected baseline SHA-256 from the maintainer's artifact record. Install the candidate with its Code Mode extra from the reviewed wheelhouse in a clean Python 3.12 environment for the commands that use `$CODE_PYTHON`. Preserve the original reports.
 
 ```bash
 python3 tests/acceptance/preview_release.py --wheel "$WHEEL" --sha256 "$WHEEL_SHA256" \
@@ -66,17 +68,17 @@ The repository owner controls the trust inputs, environments, branch policy and 
 | `standalone-preview-intake` | Restrict to protected `main` and require reviewer approval. Supply the same trust inputs, `STANDALONE_BASELINE_SHA256`, and the approved HTTPS hostname in `STANDALONE_VAST_BUNDLE_HOST`. Place a direct, short-lived read URL for the sealed archive in the environment secret `STANDALONE_VAST_BUNDLE_URL`. The URL must serve the ZIP bytes without a redirect. |
 | `standalone-preview-testpypi` | Restrict to protected `main`, require reviewer approval and prevent self-review where supported. Supply the same baseline digest. On TestPyPI configure a Trusted Publisher for `angelnicolasc/forge`, workflow `standalone-preview-publish.yml`, environment `standalone-preview-testpypi`, project `forge-os-check`. |
 
-Require the `forge/standalone-signed-series` status from GitHub Actions on the protected integration branch. Preserve the verified Git objects when advancing the branch and verify any new merge commit under the same policy. Keep write credentials unavailable to untrusted pull-request workflows. The PR verifier uses the trusted base's script, fetches the exact candidate object, and reports the status on the candidate SHA.
+Require the `forge/standalone-signed-series` status on the protected integration branch. The PR verifier uses the trusted base's script, fetches the candidate object, and reports the result on that SHA. The [Standalone wheel contract job](../workflows/ci.yml) exercises the installed CLI with read-only permissions. After observing the job on a pull request, add its status to branch protection alongside the signature status. Preserve the tested Git objects when advancing the branch and verify any new integration commit before merging it.
 
 ## Intake and promotion
 
-1. Check the Vast closure and approval record. Set the short-lived read URL and invoke **Standalone preview candidate** from `main` with the approved commit, Vast ID, bundle digest and wheel digest. The candidate commit must be fetchable from the repository at this point. Intake verifies these inputs and retains the sealed ZIP and signature report as a run artifact.
-2. Review the successful intake run and exact attempt. Invoke **Publish standalone preview to TestPyPI** from `main` with the approved run ID, attempt and the same four inputs. The publisher checks the run identity, stages one verified release-candidate wheel and submits the bytes through OIDC.
+1. Compare the Vast instance ID with the reservation and closure records. Set the short-lived read URL. Invoke **Standalone preview candidate** from `main` with `candidate_sha`, `vast_id`, `bundle_sha256` and `wheel_sha256`. The commit must be fetchable from the repository. Intake checks the signed source, the recorded IDs and both digests, then retains the ZIP and signature report as a run artifact.
+2. Review the successful intake run and choose the attempt that produced the ZIP. Invoke **Publish standalone preview to TestPyPI** from `main` with that run ID, attempt and the same input values. The publisher checks the run identity, stages the matching release-candidate wheel and submits its bytes through OIDC.
 3. Review the publication receipt. The workflow downloads the published wheel and compares its SHA-256 with the approved wheel. A post-publication failure requires investigation of the same release-candidate version. Keep the former approved artifact and use a new release-candidate version for changed bytes.
 
 ## Stable release
 
-The stable lane publishes final versions of the standalone wheel. Use the reviewed commit reachable from protected `main`, with a successful `forge/standalone-signed-series` status on that exact SHA. The stable workflows dispatch only from `main`. They build no artifacts and require no release tag.
+The stable workflows publish the wheel built in the lab and produce verification and publication receipts. Dispatch them from protected `main` using a reviewed commit reachable from that branch with a successful `forge/standalone-signed-series` status on its SHA. The workflows accept a commit SHA directly.
 
 ### Prepare the stable evidence in Vast
 
@@ -94,7 +96,7 @@ Add `--stable-compatibility "$OUT/stable-compatibility.json"` to the seal comman
 
 ### Configure the stable environments
 
-Restrict every environment below to protected `main`. Keep independent approvals on both publication environments and enable prevention of self-review.
+Restrict each environment below to protected `main`. Configure required reviewers and prevent self-review on both publication environments. A reviewer other than the deployment initiator must approve each deployment under this configuration.
 
 | Environment | Owner configuration |
 |---|---|
@@ -109,7 +111,7 @@ Review the sealed ZIP for public disclosure before running intake. The TestPyPI 
 
 1. Invoke **Publish standalone stable to TestPyPI** with the approved SHA, Vast ID, bundle digest and wheel digest. Review the staged wheel and approve the TestPyPI deployment. Record the successful run ID and attempt, and preserve the receipt that ties the index download to the original bundle.
 2. In a clean Vast consumer environment, download the exact version from TestPyPI and check its SHA-256 before installation. Install to a dedicated virtual environment. Record the first `forge check` verdict and explanation with the base install, the inventory demo with the Code Mode extra, and the approved rollback procedure. Record the production go/no-go against that run and evidence.
-3. Invoke **Promote standalone stable to PyPI** with the same four approvals and the approved TestPyPI run ID and attempt. The read-only job re-verifies the sealed bundle, checks the TestPyPI receipt, and downloads and hashes the wheel again from TestPyPI. Keep the PyPI deployment approval pending until the reviewer has checked the Vast consumer evidence and recorded the go/no-go.
+3. Invoke **Promote standalone stable to PyPI** with the same `candidate_sha`, `vast_id`, `bundle_sha256` and `wheel_sha256` values. Supply the TestPyPI run ID and attempt from step 1. The read-only job checks the sealed bundle and TestPyPI receipt, then downloads the staged wheel and checks its digest. The reviewer checks the consumer results from step 2 and decides whether to authorize the PyPI deployment.
 4. Compare the published PyPI receipt with the approved wheel digest. Keep the separate TestPyPI and PyPI receipts with the Vast evidence. Investigate any post-upload failure before attempting the same version again.
 
 ## Recover an ambiguous upload

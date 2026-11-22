@@ -52,8 +52,7 @@ class ChromaDBBackend:
             from chromadb.utils import embedding_functions
         except ImportError as exc:
             raise ImportError(
-                "chromadb is required for the vector backend. "
-                "Install with: pip install 'forge-memory[chromadb]' or pip install chromadb"
+                "chromadb is required for the vector backend. Install with: pip install chromadb"
             ) from exc
 
         self._persist_dir.mkdir(parents=True, exist_ok=True)

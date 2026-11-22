@@ -63,7 +63,7 @@ class ObserveConfig(BaseSettings):
     api_host: str = "127.0.0.1"
     api_port: int = 8787
     cost_alert_threshold: Decimal = Decimal("5.00")
-    # A2A discovery: set to enable fully A2A-compliant /.well-known/agent.json
+    # A2A discovery: base URL included in /.well-known/agent.json when configured
     agent_base_url: str | None = None  # FORGE_OBSERVE_AGENT_BASE_URL
 
     model_config = {"env_prefix": "FORGE_OBSERVE_"}

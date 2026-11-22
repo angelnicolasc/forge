@@ -1,4 +1,4 @@
-"""Vast-only experiments against an installed wheel and independent support fixture."""
+"""Run support experiments against an installed wheel and a separate support fixture."""
 
 from __future__ import annotations
 
@@ -434,7 +434,7 @@ def main() -> int:
     parser.add_argument("--install-ms", type=int, default=0)
     options = parser.parse_args()
     if sys.platform != "linux" or not os.environ.get("FORGE_VAST_LAB_ID", "").isdigit():
-        parser.error("run only on the verified Vast Linux host")
+        parser.error("Requires Linux and a numeric FORGE_VAST_LAB_ID.")
     output = options.output.resolve()
     checkout = Path(__file__).resolve().parents[2]
     with tempfile.TemporaryDirectory(prefix="forge-operations-") as temporary:

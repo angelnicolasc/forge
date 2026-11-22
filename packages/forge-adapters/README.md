@@ -1,32 +1,19 @@
 <div align="center">
 
-# forge-adapters
+# forge-os-adapters
 
 **Framework adapters for Forge.**
 
 Drop-in wrappers for LangGraph, CrewAI, AutoGen, and generic Python callables, all normalized into the same Forge runtime contract.
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-orange.svg)](../../LICENSE)
-[![Package](https://img.shields.io/badge/package-forge--adapters-111827.svg)](https://github.com/angelnicolasc/forge/tree/main/packages/forge-adapters)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-orange.svg)](https://github.com/angelnicolasc/forge/blob/main/LICENSE)
 
 </div>
 
+Part of the earlier Forge agent harness. For the standalone CI check, see [Forge Check](https://pypi.org/project/forge-os-check/).
+
 ---
-
-## Why `forge-adapters`
-
-Every agent framework brings its own execution model, callback system, and topology representation.
-
-That becomes a problem the moment you want one operational layer across all of them:
-
-- one orchestrator
-- one task envelope
-- one result type
-- one event model
-- one tracing and cost path
-
-`forge-adapters` is the compatibility layer that makes that possible. It converts framework-specific flows into Forge's shared `Adapter` contract so the rest of the stack can stay uniform.
 
 ## What ships in this package
 
@@ -49,22 +36,28 @@ uv sync
 Standalone:
 
 ```bash
-pip install forge-adapters
+pip install forge-os-adapters
 ```
 
 Framework-specific extras:
 
 ```bash
-pip install 'forge-adapters[langgraph]'
-pip install 'forge-adapters[crewai]'
-pip install 'forge-adapters[autogen]'
-pip install 'forge-adapters[all]'
+pip install 'forge-os-adapters[langgraph]'
+pip install 'forge-os-adapters[crewai]'
+pip install 'forge-os-adapters[autogen]'
+pip install 'forge-os-adapters[all]'
 ```
 
 Requirements:
 
 - Python 3.11+
-- `forge-core==0.1.0`
+- `forge-os-core==0.2.0`
+
+### Migrating from the earlier package name
+
+The old `forge-adapters==0.2.0` wheel depends on an unrelated distribution named `forge-core`. For this harness, replace `forge-adapters` with `forge-os-adapters` in your requirements, keeping any framework extra. Replace any direct `forge-core` requirement intended for this harness with `forge-os-core`.
+
+Regenerate the lock file and rebuild the virtual environment. An existing exact pin or lock entry can still select the old wheel even after a PyPI yank. Inspect the new lock for `forge-os-adapters` and its dependency `forge-os-core`. The Python import remains `forge_adapters`.
 
 ## The adapter contract
 
@@ -98,7 +91,7 @@ What it does:
 - instruments `ainvoke()` or `invoke()` execution paths
 - supports streaming through `astream_events()` or `astream()`
 
-This is the most direct path when a user already has a LangGraph workflow and wants Forge-level observability without rewriting the flow.
+The [LangGraph example](https://github.com/angelnicolasc/forge/tree/main/examples/langgraph_research) selects this adapter explicitly.
 
 ### `CrewAIAdapter`
 
@@ -145,8 +138,6 @@ What it does:
 - supports sync callables via `asyncio.to_thread`
 - scopes SDK monkey-patching for supported LLM clients during execution
 
-That last point is the key differentiator. When the user calls SDKs directly inside their function, Forge can still capture telemetry through temporary instrumentation of common client libraries.
-
 ## Framework discovery
 
 `forge_adapters.discovery` provides file-based auto-detection for known frameworks.
@@ -166,7 +157,7 @@ from forge_adapters.discovery import discover_adapter
 adapter = discover_adapter("my_flow.py")
 ```
 
-This is the mechanism higher-level Forge components use to turn a Python file into the right adapter automatically.
+This helper can be called explicitly from Python. The 0.2.0 CLI uses a separate entry-point lookup, and the published adapters lack those registrations.
 
 ## Quickstart
 
@@ -219,11 +210,9 @@ Framework-specific adapters override:
 - `_load_impl(...)`
 - `_execute(...)`
 
-This keeps the package consistent without forcing every integration to reinvent the same boilerplate.
-
 ## Instrumentation strategy by framework
 
-One of the most important aspects of `forge-adapters` is that instrumentation is not uniform across frameworks, because the frameworks themselves are not uniform.
+One of the most important aspects of `forge-os-adapters` is that instrumentation is not uniform across frameworks, because the frameworks themselves are not uniform.
 
 ### LangGraph
 
@@ -256,26 +245,6 @@ Uses SDK monkey-patching.
 - patches supported LLM SDK entrypoints inside a scoped context
 - restores original methods after the run
 - works for both async and sync user functions
-
-This split is important because it shows the design is framework-aware rather than pretending every ecosystem can be instrumented the same way.
-
-## SDK patching in the generic adapter
-
-The generic adapter is especially useful for direct SDK users because it scopes monkey-patching during the run and restores the original SDK methods afterward.
-
-That gives you a path from:
-
-```text
-plain Python function calling model SDKs directly
-```
-
-to:
-
-```text
-Forge-compatible run with LLM_CALL events, token counts, and costs
-```
-
-without forcing the user to refactor their code into a specific framework.
 
 ## Topology extraction
 
@@ -310,17 +279,17 @@ Primary modules:
 
 ## Package boundaries
 
-`forge-adapters` focuses on framework integration only.
+`forge-os-adapters` focuses on framework integration only.
 
 Related packages:
 
-- `forge-core`
+- `forge-os-core`
   - protocols, types, orchestrator, event model
-- `forge-observe`
+- `forge-os-observe`
   - interceptor, tracer, metrics, cost model
-- `forge-memory`
+- `forge-os-memory`
   - memory backends and context injection
-- `forge-cli`
+- `forge-os-cli`
   - user-facing commands and package composition
 
 This separation keeps adapter code focused on translating framework behavior rather than owning the entire runtime.
@@ -329,7 +298,7 @@ This separation keeps adapter code focused on translating framework behavior rat
 
 In a full Forge application, adapters are usually not used standalone. The typical flow is:
 
-1. `MetaOrchestrator` detects or receives an adapter
+1. The caller loads an adapter and registers it with `MetaOrchestrator.set_adapter()`
 2. The orchestrator wires the shared interceptor and bus into that adapter
 3. The adapter executes the framework-specific flow
 4. Costs, spans, and events flow back through the shared Forge runtime

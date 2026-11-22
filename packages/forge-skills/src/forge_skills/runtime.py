@@ -36,7 +36,7 @@ class SkillRuntime:
         rt.register(my_skill, handler=my_handler)
         result = await rt.invoke("my_skill", arguments={"x": 1})
 
-        # Intent-based (requires forge-core[intent]):
+        # Intent-based (requires forge-os-core[intent]):
         rt.sync_intents()
         result = await rt.dispatch_text("please summarize this article")
     """
@@ -112,7 +112,7 @@ class SkillRuntime:
         """Re-register all skill example phrases with the IntentClassifier.
 
         Must be called after any registration change before dispatch_text() works.
-        Requires forge-core[intent] (sentence-transformers).
+        Requires forge-os-core[intent] (sentence-transformers).
         """
         self._dispatcher.sync_intents()
 
@@ -158,7 +158,7 @@ class SkillRuntime:
         """Classify *text* to a skill and invoke it.
 
         Returns SkillResult(error=...) if no skill matches above the confidence
-        threshold — does not raise. Requires forge-core[intent] to be installed.
+        threshold — does not raise. Requires forge-os-core[intent] to be installed.
         """
         try:
             skill = await self._dispatcher.resolve(text)

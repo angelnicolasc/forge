@@ -1,7 +1,7 @@
 [project]
 name = "forge-os-core"
 version = "0.2.0"
-description = "Core orchestration engine for Forge — universal agent harness with self-evolution capabilities."
+description = "Orchestration, run events and runtime guards for the earlier Forge agent harness."
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.11"
@@ -18,7 +18,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Typing :: Typed",
 ]
-keywords = ["agents", "llm", "orchestration", "harness", "multi-agent", "self-evolving"]
+keywords = ["agents", "llm", "orchestration", "harness", "multi-agent"]
 dependencies = [
     "pydantic>=2.7,<3.0",
     "pydantic-settings>=2.4,<3.0",

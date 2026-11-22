@@ -1,15 +1,12 @@
-"""Graph backend protocol and production-ready implementations.
+"""Graph backend protocol and Neo4j interface stub.
 
 Defines ``GraphBackend``, the structural typing contract for all graph stores
 used by :class:`~forge_memory.hybrid.HybridMemory`.  Any class that implements
 the methods below satisfies the protocol — no inheritance required.
 
-Shipped implementations:
-  - :class:`NetworkXBackend` (this package) — dev / single-node; SQLite-WAL
-    persistence, zero external deps.
-  - :class:`Neo4jGraphBackend` (stub) — production; full implementation
-    planned for v0.2.0.  Instantiating it today raises ``NotImplementedError``
-    with an actionable message.
+Backend interfaces:
+  - :class:`NetworkXBackend` uses NetworkX with SQLite-WAL persistence on one host.
+  - :class:`Neo4jGraphBackend` reserves the interface for a future backend.
 
 Why a separate protocol rather than reusing ``forge_core.protocols.MemoryBackend``?
 The ``MemoryBackend`` protocol expresses the *query* surface (store / query /
@@ -111,41 +108,9 @@ class GraphBackend(Protocol):
 
 
 class Neo4jGraphBackend:
-    """Production graph backend using Neo4j (Bolt driver).
+    """Reserved interface for a Neo4j graph backend."""
 
-    .. note::
-        **Not yet implemented.**  This class is a typed stub that raises
-        ``NotImplementedError`` on every method call.  Full implementation
-        is planned for **v0.2.0**.
-
-        To use Neo4j today, install the extra and set ``NEO4J_URI``:
-
-        .. code-block:: bash
-
-            pip install "forge-memory[neo4j]"
-            export NEO4J_URI=bolt://localhost:7687
-            export NEO4J_USER=neo4j
-            export NEO4J_PASSWORD=...
-
-        Then pass an instance to ``HybridMemory``:
-
-        .. code-block:: python
-
-            from forge_memory.graph.backends import Neo4jGraphBackend
-            from forge_memory.hybrid import HybridMemory
-
-            memory = HybridMemory(graph_backend=Neo4jGraphBackend())
-
-    When v0.2.0 lands, the same constructor call works — no changes needed
-    in caller code, only the ``NotImplementedError`` goes away.
-    """
-
-    _MSG = (
-        "Neo4jGraphBackend is not yet implemented. "
-        "Full implementation is planned for forge-memory v0.2.0. "
-        "Until then, use the default NetworkXBackend (dev) "
-        "or open a GitHub issue if you need Neo4j support urgently."
-    )
+    _MSG = "Neo4jGraphBackend is not yet implemented. Use NetworkXBackend for local storage."
 
     @property
     def backend_type(self) -> str:

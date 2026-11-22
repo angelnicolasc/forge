@@ -1,20 +1,21 @@
 <div align="center">
 
-# forge-core
+# forge-os-core
 
 **The orchestration engine behind Forge.**
 
-Production-grade primitives for wrapping agent systems with a uniform run model, structured events, budget guards, topology snapshots, and an opt-in self-evolution loop.
+Runtime primitives for wrapping agent systems with a uniform run model, structured events, budget guards, topology snapshots, and an opt-in self-evolution loop.
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-orange.svg)](../../LICENSE)
-[![Package](https://img.shields.io/badge/package-forge--core-111827.svg)](https://github.com/angelnicolasc/forge/tree/main/packages/forge-core)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-orange.svg)](https://github.com/angelnicolasc/forge/blob/main/LICENSE)
 
 </div>
 
+Part of the earlier Forge agent harness. For the standalone CI check, see [Forge Check](https://pypi.org/project/forge-os-check/).
+
 ---
 
-## Why `forge-core`
+## Why `forge-os-core`
 
 Most agent stacks start as framework-specific flows and end up needing the same hard parts:
 
@@ -25,7 +26,7 @@ Most agent stacks start as framework-specific flows and end up needing the same 
 - adapter boundaries that do not lock you into one framework
 - a safe way to evolve topology and prompts over time
 
-`forge-core` is the package that standardizes those concerns. It gives the rest of Forge a shared contract, and it is also useful on its own if you are building adapters, custom harnesses, or evaluation infrastructure around agent workflows.
+`forge-os-core` is the package that standardizes those concerns. It gives the rest of Forge a shared contract, and it is also useful on its own if you are building adapters, custom harnesses, or evaluation infrastructure around agent workflows.
 
 ## What lives in this package
 
@@ -49,13 +50,13 @@ uv sync
 Standalone:
 
 ```bash
-pip install forge-core
+pip install forge-os-core
 ```
 
 Optional extras:
 
 ```bash
-pip install 'forge-core[evolution]'
+pip install 'forge-os-core[evolution]'
 ```
 
 Requirements:
@@ -67,41 +68,15 @@ Requirements:
 - `opentelemetry-api`
 - `opentelemetry-sdk`
 
-## Quickstart
+## Running a flow
 
-The main entrypoint is `MetaOrchestrator`. It runs a loaded adapter under a consistent task and result model.
-
-```python
-import asyncio
-
-from forge_core.harness import MetaOrchestrator
-from forge_core.types import TaskEnvelope
-
-
-async def main() -> None:
-    orchestrator = MetaOrchestrator()
-    await orchestrator.load("my_flow.py")
-
-    result = await orchestrator.run(
-        TaskEnvelope(
-            input={"query": "Find retrieval optimization ideas"},
-        )
-    )
-
-    print(result.status)
-    print(result.duration_ms)
-    print(result.cost.total_cost)
-    print(result.output)
-
-
-asyncio.run(main())
-```
+Install the [harness](https://pypi.org/project/forge-os/) with the framework extra needed by your flow. Load an adapter explicitly and pass it to `MetaOrchestrator.set_adapter()` before running the task. The [LangGraph example](https://github.com/angelnicolasc/forge/tree/main/examples/langgraph_research) shows this path with the published 0.2.0 harness.
 
 ## Core ideas
 
 ### 1. One run model for every adapter
 
-`forge-core` defines a single contract:
+`forge-os-core` defines a single contract:
 
 ```text
 TaskEnvelope -> Adapter -> RunResult
@@ -109,24 +84,17 @@ TaskEnvelope -> Adapter -> RunResult
 
 That contract lets different frameworks plug into the same harness without changing the surrounding orchestration code.
 
-### 2. Events are the source of truth
+### 2. Run events
 
 The orchestrator publishes `RunEvent` objects onto an `EventBus`. Observers subscribe independently, so tracing, metrics, memory ingestion, dashboards, and evolution triggers do not have to be hard-wired into the adapter itself.
 
-This keeps the runtime composable and makes instrumentation easier to reason about.
+### 3. Timeouts and reported cost
 
-### 3. Guardrails are first-class
-
-`run_with_guards()` enforces:
-
-- wall-clock timeouts
-- per-run cost ceilings
-
-These are not post-hoc warnings. They are active runtime controls designed to stop runaway flows before they keep spending.
+`run_with_guards()` cancels an adapter task when it times out or when reported `LLM_CALL` events reach the configured budget. A call can take the observed cost above the ceiling before cancellation. Calls outside the instrumented adapter do not contribute to this tally.
 
 ### 4. Evolution is snapshot-based
 
-The evolution loop works against captured topology state, applies mutations, evaluates them, and commits or rolls them back. The rollback path is snapshot-driven, which gives the package a safer foundation for automatic changes than mutating live objects in place.
+In automatic mode the loop evaluates a candidate topology and can restore an earlier harness snapshot. The snapshot describes the topology recorded by the harness. Use the [LangGraph characterization](https://github.com/angelnicolasc/forge/blob/main/tests/characterization/p00/README.md) to see how that can differ from the graph that actually executes.
 
 ## Architecture
 
@@ -202,7 +170,7 @@ Key methods:
 
 ## Protocol-first extension model
 
-`forge-core` uses Python `Protocol`s rather than inheritance-heavy base classes. If an object satisfies the expected methods, it can participate in the system.
+`forge-os-core` uses Python `Protocol`s rather than inheritance-heavy base classes. If an object satisfies the expected methods, it can participate in the system.
 
 Important protocols include:
 
@@ -232,7 +200,7 @@ Important models include:
 - `AgentCard`
   - portable agent topology representation
 - `MemoryEntry` and `MemoryQuery`
-  - memory types shared with `forge-memory`
+  - memory types shared with `forge-os-memory`
 - `Mutation`, `MutationDiff`, and `FitnessScore`
   - evolution primitives
 
@@ -269,8 +237,6 @@ subscription = bus.subscribe(ALL_EVENTS, handle)
 - `CostBudgetGuard` subscribes to `LLM_CALL` events and trips when a run reaches its ceiling
 - `run_with_guards()` races the adapter execution against cost and timeout limits
 - `BudgetExceeded` and `TimeoutExceeded` give callers explicit failure modes
-
-This is a useful layer even outside the rest of Forge if you need hard operational boundaries around agent execution.
 
 ## Circuit breakers
 
@@ -350,14 +316,14 @@ assert len(run.events) == 2
 
 ## Package boundaries
 
-`forge-core` is intentionally focused on orchestration contracts and runtime primitives.
+`forge-os-core` is intentionally focused on orchestration contracts and runtime primitives.
 
 It does not try to own every concern itself:
 
-- `forge-memory` handles hybrid memory and context injection backends
-- `forge-observe` provides the default LLM interceptor and observability stack
-- `forge-adapters` provides framework-specific adapter implementations
-- `forge-cli` exposes the command-line interface
+- `forge-os-memory` handles hybrid memory and context injection backends
+- `forge-os-observe` provides the default LLM interceptor and observability stack
+- `forge-os-adapters` provides framework-specific adapter implementations
+- `forge-os-cli` exposes the command-line interface
 
 That split keeps the core package reusable in lighter deployments.
 

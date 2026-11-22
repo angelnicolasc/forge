@@ -1,7 +1,7 @@
 [project]
 name = "forge-os-memory"
 version = "0.2.0"
-description = "Living Collaborative Memory for Forge — hybrid vector + graph + symbolic knowledge base with versioning and provenance."
+description = "Vector, graph and rule-based retrieval with local version history for the Forge agent harness."
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.11"

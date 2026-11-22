@@ -1,5 +1,7 @@
 # forge-skills
 
+Part of the earlier Forge agent harness. For the standalone CI check, see [Forge Check](https://pypi.org/project/forge-os-check/).
+
 Skills Runtime for the Forge agent harness.
 
 Provides intent-based skill dispatch, SKILL.md loading, and sub-run execution
@@ -10,7 +12,7 @@ with full EventBus integration.
 ```bash
 pip install forge-skills
 # With intent-based dispatch (sentence-transformers):
-pip install forge-skills[intent]
+pip install 'forge-skills[intent]'
 ```
 
 ## Quick start
@@ -59,7 +61,3 @@ Summarize the following text concisely:
 
 {text}
 ```
-
-## Technical debt
-
-See DEVLOG.md for DT entries introduced in Phase 3.

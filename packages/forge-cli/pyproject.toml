@@ -1,7 +1,7 @@
 [project]
 name = "forge-os-cli"
 version = "0.2.0"
-description = "CLI for Forge — wrap any multi-agent flow in one command. Watch it evolve."
+description = "CLI for running and inspecting workflows with the earlier Forge agent harness."
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.11"

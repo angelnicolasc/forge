@@ -1,14 +1,14 @@
 # forge-os
 
-**Meta-package for Forge — the universal agent harness.**
+Install the earlier Forge agent harness to run and instrument agent workflows. The standalone CI product is [Forge Check](https://pypi.org/project/forge-os-check/). Use separate Python environments because both products provide the `forge` command.
 
-Installing `forge-os` pulls in the five runtime packages together:
+The harness includes the following distributions.
 
-- [`forge-core`](../forge-core) — orchestration engine, evolution FSM, types
-- [`forge-cli`](../forge-cli) — the `forge` command
-- [`forge-observe`](../forge-observe) — tracing, metrics, cost model, dashboard backend
-- [`forge-memory`](../forge-memory) — hybrid vector / graph / symbolic memory
-- [`forge-adapters`](../forge-adapters) — LangGraph / CrewAI / AutoGen / generic adapters
+- [forge-os-core](https://pypi.org/project/forge-os-core/) provides orchestration and shared types.
+- [forge-os-cli](https://pypi.org/project/forge-os-cli/) installs the harness CLI.
+- [forge-os-observe](https://pypi.org/project/forge-os-observe/) records traces, costs and metrics.
+- [forge-os-memory](https://pypi.org/project/forge-os-memory/) provides cross-run memory.
+- [forge-os-adapters](https://pypi.org/project/forge-os-adapters/) integrates agent frameworks.
 
 ## Install
 
@@ -25,23 +25,9 @@ pip install "forge-os[autogen]"
 pip install "forge-os[all]"
 ```
 
-## Quickstart
+## Using the harness
 
-```bash
-forge wrap examples/langgraph_research/flow.py --input '{"query":"What is RAG?"}'
-```
-
-Or use the Python API:
-
-```python
-import forge_os
-print(forge_os.__version__)
-
-from forge_os import MetaOrchestrator, TaskEnvelope
-```
-
-For the full feature matrix and architecture, see the [project README](../../README.md)
-and [`docs/architecture.md`](../../docs/architecture.md).
+From a source checkout, follow the [harness quickstart](https://github.com/angelnicolasc/forge/blob/main/docs/quickstart.md). The [test map](https://github.com/angelnicolasc/forge/blob/main/docs/feature-map.md) links selected harness behaviors to their tests. The [architecture guide](https://github.com/angelnicolasc/forge/blob/main/docs/architecture.md) describes how the packages work together.
 
 ## License
 

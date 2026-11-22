@@ -161,7 +161,7 @@ def check():
 
 if __name__ == "__main__":
     if sys.platform != "linux" or not os.environ.get("FORGE_VAST_LAB_ID"):
-        raise SystemExit("Run on the identified Vast instance")
+        raise SystemExit("Requires Linux and a nonempty FORGE_VAST_LAB_ID.")
     results = check()
     print(
         json.dumps({"version": version("forge-os-check"), "scenarios": results, "status": "pass"})

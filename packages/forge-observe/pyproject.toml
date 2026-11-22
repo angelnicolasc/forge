@@ -1,7 +1,7 @@
 [project]
 name = "forge-os-observe"
 version = "0.2.0"
-description = "Production observability and FinOps for Forge — OpenTelemetry tracing, cost tracking, and real-time metrics."
+description = "OpenTelemetry tracing, cost tracking and metrics for the earlier Forge agent harness."
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.11"

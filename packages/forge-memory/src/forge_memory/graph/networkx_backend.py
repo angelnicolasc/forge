@@ -1,10 +1,8 @@
 """NetworkX graph store backend for Forge Memory.
 
-In-process graph database using NetworkX. Zero external dependencies.
+In-process graph database using NetworkX and SQLite.
 Stores entities as nodes and relationships as edges with temporal validity.
 Inspired by Graphiti's temporal knowledge graph model.
-
-For production deployments, swap with Neo4jBackend.
 
 Persistence model
 -----------------

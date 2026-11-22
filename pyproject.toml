@@ -1,7 +1,7 @@
 [project]
 name = "forge-workspace"
 version = "0.0.0"
-description = "Forge — Universal Agent Harness. The living, self-evolving orchestration layer for production multi-agent systems."
+description = "Development workspace for the historical Forge agent harness."
 requires-python = ">=3.11"
 
 [tool.uv.workspace]
@@ -125,9 +125,6 @@ omit = [
 branch = true
 
 [tool.coverage.report]
-# First measurement with branch=true (enabled 2026-05-13 per audit remediation).
-# Combined statement+branch coverage landed at 76%. Setting floor to 77% now;
-# target 80% in next sprint once forge-spec runner/constraints gaps are closed.
 fail_under = 77
 skip_covered = false
 show_missing = true

@@ -1,7 +1,7 @@
 [project]
 name = "forge-os-adapters"
 version = "0.2.0"
-description = "Framework adapters for Forge — drop-in wrappers for LangGraph, CrewAI, AutoGen, and any async callable."
+description = "Framework adapters for running and instrumenting workflows with the earlier Forge agent harness."
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.11"

@@ -2,20 +2,27 @@
 
 A stock lookup returns 2 units. The workflow calls for a reserve lookup when primary stock falls below 5. An agent can return valid JSON and finish with `completed` after that one lookup. The Gate uses the independent record of reads to decide whether the task met the rule. [Why Forge added the rule](decisions/0003-conditional-evidence.md)
 
-## Run the one-minute demo
+<a id="run-the-one-minute-demo"></a>
 
-From the source checkout on Linux, point `FORGE_WHEEL` to the standalone candidate wheel. Install it with the Code Mode extra in a clean environment. The fixture runs the three cases against a local inventory destination.
+## Run the inventory demo
+
+From the repository root on Linux x86_64, download the published wheel and install its Code Mode extra in a dedicated Python 3.11+ environment. The fixture starts a local inventory service and reads its journal through a separate observer. No model credentials are needed.
 
 ```bash
-python3 -m venv .venv-conditional
-source .venv-conditional/bin/activate
+DEMO_DIR=$(mktemp -d)
+python3 -m venv "$DEMO_DIR/venv"
+. "$DEMO_DIR/venv/bin/activate"
+python -m pip download --only-binary=:all: --no-deps --dest "$DEMO_DIR" "forge-os-check==0.4.0"
+FORGE_WHEEL="$DEMO_DIR/forge_os_check-0.4.0-py3-none-any.whl"
 python -m pip install "${FORGE_WHEEL}[code-mode]"
 python tests/acceptance/conditional_evidence.py --demo --wheel "$FORGE_WHEEL" \
-  --output-dir conditional-receipts
-cat conditional-receipts/demo.json
+  --output-dir "$DEMO_DIR/receipts"
+cat "$DEMO_DIR/receipts/demo.json"
 ```
 
-The following fields are from the `demo.json` produced by `0.4.0rc2`. Each scenario starts from a fresh scope at generation 1.
+A `wall_limit` error means the program worker exceeded its execution deadline before the fixture obtained a completed run. Only a completed fixture produces the three Gate decisions.
+
+These fields appear under `rows` in the report. Each scenario starts from generation 1. The published 0.4.0 wheel reproduces the three decisions originally demonstrated with 0.4.0rc2.
 
 ```json
 [
@@ -105,7 +112,7 @@ A cache observation uses `kind: "cache"`, the cache-hit receipt, and `origin_rec
 
 ## Evaluate and promote
 
-Use the [governed release commands](governed.md#promote-roll-back-and-inspect) to register and propose the candidate. Supply both run documents and the observation timestamp from the trusted exporter. The observation timestamp must be at or after the end of each evidence window. The Gate checks the age of both runs against that timestamp. The saved comparison uses the latest window end in the input files.
+Use the [governed release commands](operations.md#promote-roll-back-and-inspect) to register and propose the candidate. Supply both run documents and the observation timestamp from the trusted exporter. The observation timestamp must be at or after the end of each evidence window. The Gate checks the age of both runs against that timestamp. The saved comparison uses the latest window end in the input files.
 
 ```bash
 forge evaluate --db state/governed.sqlite3 --actor inventory-observer \
@@ -133,7 +140,7 @@ The JSON report preserves the supporting observations. Identical repeats of the 
 
 ### Upgrade an existing RC2 conditional scope
 
-1. Pause release decisions for the scope, drain pending calls and replace every RC2 writer sharing its ledger, including workers that dispatch bindings. Retain a consistent backup using the [governed recovery procedure](governed.md). Resume traffic after the writers run RC3. Legacy scopes continue to use their original verifier.
+1. Pause release decisions for the scope, drain pending calls and replace every RC2 writer sharing its ledger, including workers that dispatch bindings. Retain a consistent backup using the [governed recovery procedure](operations.md#back-up-restore-and-reconcile). Resume traffic after the writers run RC3. Legacy scopes continue to use their original verifier.
 2. Keep the protected manifest on `forge-check/2`. RC3 stamps new conditional evaluations with `forge-check/2.1`. Previous decisions remain inspectable. Replaying an old operation returns its historical result. A fresh promotion or rollout based on an RC2 conditional evaluation returns `evidence_revalidation_required`.
 3. Inspect active rollouts. New roots on an affected rollout use stable. An already pinned canary cannot start additional binding calls under the old certificate. A shadow allocation backed by that certificate stops dispatching shadow reads. Drain or stop the old rollout, then register a fresh one if needed.
 4. Obtain current evidence from the observer. Repeat `forge evaluate` with the existing protected rule, a fresh trial window and a **new evidence ID**. Use that ID, the current generation and a **new decision ID** to promote. Check the alias and inspect the recorded decision. If the Gate still reports `insufficient`, its reason identifies the observation the operator needs.

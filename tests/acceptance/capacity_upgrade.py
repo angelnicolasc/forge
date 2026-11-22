@@ -62,10 +62,18 @@ def canonical(path):
         require([row[0] for row in checks] == ["ok"], "SQLite integrity check failed")
         require(not conn.execute("PRAGMA foreign_key_check").fetchall(), "Invalid foreign keys")
         tables = [
-            "tasks", "attempts", "receipts", "rollout_allocations", "finished_roots",
-            "charge_claims", "binding_suspensions", "aliases",
+            "tasks",
+            "attempts",
+            "receipts",
+            "rollout_allocations",
+            "finished_roots",
+            "charge_claims",
+            "binding_suspensions",
+            "aliases",
         ]
-        schema = {row[0] for row in conn.execute("SELECT name FROM sqlite_schema WHERE type='table'")}
+        schema = {
+            row[0] for row in conn.execute("SELECT name FROM sqlite_schema WHERE type='table'")
+        }
         rows = {
             table: [tuple(row) for row in conn.execute(f"SELECT * FROM {table} ORDER BY rowid")]
             for table in tables
@@ -77,7 +85,8 @@ def canonical(path):
 
 def host(store, oracle):
     return Host(
-        store, fingerprint_key=FINGERPRINT,
+        store,
+        fingerprint_key=FINGERPRINT,
         provider=HttpProvider(oracle.origin, token=TOKEN, timeout=5),
     )
 
@@ -100,11 +109,17 @@ def seed_v2(name):
         for root in (keys[0], keys[-1]):
             world.control.finish_task(OPERATOR, root)
         with world.store.read() as conn:
-            require(rollout.capacity(conn, ROOT) == CAPACITY, "Legacy fixture counted the wrong funds")
+            require(
+                rollout.capacity(conn, ROOT) == CAPACITY, "Legacy fixture counted the wrong funds"
+            )
         return {
-            "ledger": str(world.db), "balances": {root: world.ledger.balance(root) for root in keys},
-            "revision": revision, "history": canonical(world.db), "version": version("forge-os-check"),
-            "journal": oracle.journal, "outcomes": list(oracle.outcomes.values()),
+            "ledger": str(world.db),
+            "balances": {root: world.ledger.balance(root) for root in keys},
+            "revision": revision,
+            "history": canonical(world.db),
+            "version": version("forge-os-check"),
+            "journal": oracle.journal,
+            "outcomes": list(oracle.outcomes.values()),
         }
 
 
@@ -139,7 +154,9 @@ def legacy_live(path, origin):
     for operation in (
         lambda: control.start_task(OPERATOR, "legacy-after-backfill", worker="legacy"),
         lambda: old_host.invoke(request("upgrade-open", "legacy-after-backfill", "legacy-ticket")),
-        lambda: old_host.ledger.settle("upgrade-pending", Observation("legacy-charge", "succeeded", "verified", 29)),
+        lambda: old_host.ledger.settle(
+            "upgrade-pending", Observation("legacy-charge", "succeeded", "verified", 29)
+        ),
     ):
         try:
             operation()
@@ -181,7 +198,10 @@ def worker():
             Control(store).start_task(OPERATOR, root, worker="crash")
         elif operation == "charge":
             Ledger(store, fingerprint_key=FINGERPRINT).settle(
-                root, Observation(f"external-{root}", "succeeded", "verified", 37, charge_ref=f"fee-{root}")
+                root,
+                Observation(
+                    f"external-{root}", "succeeded", "verified", 37, charge_ref=f"fee-{root}"
+                ),
             )
         elif operation == "close":
             Control(store).finish_task(OPERATOR, root)
@@ -196,11 +216,17 @@ def command(interpreter, *args):
 
 
 def run(interpreter, *args):
-    return collect(subprocess.Popen(command(interpreter, *args), text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE))
+    return collect(
+        subprocess.Popen(
+            command(interpreter, *args), text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+    )
 
 
 def interrupted(*args):
-    process = subprocess.run(command(sys.executable, *args), capture_output=True, text=True, timeout=30, check=False)
+    process = subprocess.run(
+        command(sys.executable, *args), capture_output=True, text=True, timeout=30, check=False
+    )
     require(
         process.returncode == -signal.SIGKILL and process.stdout == "transaction boundary\n",
         f"Expected SIGKILL at {args}: {process.returncode} {process.stderr}",
@@ -231,8 +257,10 @@ def measure_migration(path, backup):
         backfill_ms.append((time.perf_counter_ns() - started) / 1_000_000)
 
     wal = Path(f"{path}-wal")
+
     def wal_bytes():
         return wal.stat().st_size if wal.exists() else 0
+
     with closing(open_ledger(path)), ThreadPoolExecutor(max_workers=1) as workers:
         before = wal_bytes()
         contender_result = workers.submit(contender)
@@ -262,13 +290,19 @@ def verify_v2(interpreter, name, oracle, report):
     # The old interpreter and its already-initialized Store survive the transaction.
     process = subprocess.Popen(
         command(interpreter, "legacy-live", path, oracle.origin),
-        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
     )
     initial = canonical(path)
     report["pre_upgrade"] = initial
     with running(process):
         readable, _, _ = select([process.stdout], [], [], 10)
-        require(bool(readable) and process.stdout.readline() == "ready\n", "Legacy writer failed to initialize")
+        require(
+            bool(readable) and process.stdout.readline() == "ready\n",
+            "Legacy writer failed to initialize",
+        )
         abandoned = Path(f"{name}-interrupted.sqlite3")
         interrupted("migration-crash", path, abandoned)
         require(canonical(path) == initial, "A killed migration changed the authoritative ledger")
@@ -278,13 +312,20 @@ def verify_v2(interpreter, name, oracle, report):
         source_manifest, metrics = measure_migration(path, clean)
         require(source_manifest["sha256"] == digest(clean), "Migration backup digest mismatch")
         report.update(snapshot=source_manifest, migration=metrics, post_upgrade=canonical(path))
-        require(report["post_upgrade"]["schema"] > initial["schema"], "Upgrade did not bump the schema")
-        require(report["post_upgrade"]["canonical_sha256"] == initial["canonical_sha256"], "Migration changed canonical rows")
+        require(
+            report["post_upgrade"]["schema"] > initial["schema"], "Upgrade did not bump the schema"
+        )
+        require(
+            report["post_upgrade"]["canonical_sha256"] == initial["canonical_sha256"],
+            "Migration changed canonical rows",
+        )
         process.stdin.write("go\n")
         process.stdin.flush()
         report["old_live"] = collect(process)
     report["old_new"] = run(interpreter, "open-old", path)
-    require(not oracle.dispatches("legacy-ticket"), "The active legacy process reached the destination")
+    require(
+        not oracle.dispatches("legacy-ticket"), "The active legacy process reached the destination"
+    )
     store = Store(path, create=False)
     runtime = host(store, oracle)
     audit = Audit()
@@ -293,7 +334,10 @@ def verify_v2(interpreter, name, oracle, report):
     select_mode(store, "projection")
     audit.totals(store, ROOT, CAPACITY, "v2 populated backfill")
     pending = runtime.ledger.attempt("upgrade-pending")
-    require(pending["status"] == "uncertain" and pending["reserved_microusd"] == 100, "Upgrade lost pending exposure")
+    require(
+        pending["status"] == "uncertain" and pending["reserved_microusd"] == 100,
+        "Upgrade lost pending exposure",
+    )
 
     # A sealed snapshot restored while the source is quiesced starts fenced.
     restore_path = Path(f"{name}-restored.sqlite3")
@@ -308,8 +352,13 @@ def verify_v2(interpreter, name, oracle, report):
     result = restored_host.reconcile(OWNER, "upgrade-pending")
     require(result.attempt["charge_microusd"] == 29, "Restore lost a destination charge")
     resumed = recovery.resume(
-        restored_store, OWNER, restored["recovery_id"], audit_ref="capacity-external-audit",
-        covered_through_us=now(), source_quiesced=True, post_snapshot_effects=0,
+        restored_store,
+        OWNER,
+        restored["recovery_id"],
+        audit_ref="capacity-external-audit",
+        covered_through_us=now(),
+        source_quiesced=True,
+        post_snapshot_effects=0,
     )
     require(not resumed["fenced"], "Reconciled restore did not resume")
     restored_control.finish_task(OPERATOR, "upgrade-pending")
@@ -318,7 +367,9 @@ def verify_v2(interpreter, name, oracle, report):
     current_manifest = recovery.backup(restored_store, OWNER, disk)
     current_path = Path(f"{name}-restored-v3.sqlite3")
     current = recovery.restore(disk, current_path, current_manifest)
-    audit.totals(Store(current_path, create=False), ROOT, (1, 77, 160), "v3 backup and fenced restore")
+    audit.totals(
+        Store(current_path, create=False), ROOT, (1, 77, 160), "v3 backup and fenced restore"
+    )
     report.update(restored_v2=restored, restored_v3=current, v3_snapshot=current_manifest)
 
     # Revert the calculator over the same current authoritative file and reconcile by ID.
@@ -333,7 +384,10 @@ def verify_v2(interpreter, name, oracle, report):
     select_mode(store, "projection")
     audit.totals(store, ROOT, (1, 77, 160), "projection restored after rollback")
     journal = count_by_attempt(oracle, {"upgrade-billed", "upgrade-open", "upgrade-pending"})
-    require(set(journal.values()) == {1} and len(journal) == 3, "Migration or rollback repeated an effect")
+    require(
+        set(journal.values()) == {1} and len(journal) == 3,
+        "Migration or rollback repeated an effect",
+    )
     report["physical_dispatches_by_attempt"] = journal
     report["capacity"] = audit.events
 
@@ -349,10 +403,14 @@ def verify_v1(v1, baseline, oracle, report):
     path = Path("seed-v1.sqlite3").resolve()
     oracle.arrange("P20-v1-pending", Behavior(mode="drop"))
     legacy_runner = Path(__file__).with_name("recovery_trials.py")
-    state = collect(subprocess.Popen(
-        [v1, str(legacy_runner), "--worker", "legacy", str(path), oracle.origin],
-        text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-    ))
+    state = collect(
+        subprocess.Popen(
+            [v1, str(legacy_runner), "--worker", "legacy", str(path), oracle.origin],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    )
     initial = canonical(path)
     old = Path("v1-before-v2.sqlite3")
     first = run(baseline, "v1-to-v2", path, old)
@@ -361,20 +419,38 @@ def verify_v1(v1, baseline, oracle, report):
     second_path = Path("v2-before-v3.sqlite3")
     second, metrics = measure_migration(path, second_path)
     final = canonical(path)
-    require(initial["schema"] == 1 and middle["schema"] == 2 and final["schema"] > 2, "Missing schema hop")
+    require(
+        initial["schema"] == 1 and middle["schema"] == 2 and final["schema"] > 2,
+        "Missing schema hop",
+    )
     runtime = host(Store(path, create=False), oracle)
     control = Control(runtime.store)
     require(control.get_alias(OWNER) == state["alias"], "Schema hops changed the alias")
-    require(control.get_decision(OWNER, "P20-v1-promotion") == state["decision"], "Schema hops changed the Gate")
+    require(
+        control.get_decision(OWNER, "P20-v1-promotion") == state["decision"],
+        "Schema hops changed the Gate",
+    )
     for key, balance in state["balances"].items():
         require(runtime.ledger.balance(key) == balance, "Schema hops lost a reservation")
     from_v1 = Path("restored-v1.sqlite3")
     restored = recovery.restore(old, from_v1, first)
-    require(restored["fenced"] and restored["unresolved_attempts"] == 1, "v1 restore lost its fence")
+    require(
+        restored["fenced"] and restored["unresolved_attempts"] == 1, "v1 restore lost its fence"
+    )
     recovered = host(Store(from_v1, create=False), oracle).reconcile(OWNER, "P20-v1-pending")
     require(recovered.attempt["charge_microusd"] == 13_000, "v1 restore lost the terminal charge")
-    require(count_by_attempt(oracle, {"P20-v1-known", "P20-v1-pending"}) == {"P20-v1-known": 1, "P20-v1-pending": 1}, "Legacy recovery repeated a dispatch")
-    report.update(schemas=[initial, middle, final], v1_snapshot=first, v2_snapshot=second, migration=metrics, restored_v1=restored)
+    require(
+        count_by_attempt(oracle, {"P20-v1-known", "P20-v1-pending"})
+        == {"P20-v1-known": 1, "P20-v1-pending": 1},
+        "Legacy recovery repeated a dispatch",
+    )
+    report.update(
+        schemas=[initial, middle, final],
+        v1_snapshot=first,
+        v2_snapshot=second,
+        migration=metrics,
+        restored_v1=restored,
+    )
 
 
 def verify_crashes(oracle, report):
@@ -392,26 +468,39 @@ def verify_crashes(oracle, report):
             # Record the side effect independently, then kill the process settling it.
             call = request(key, key, key)
             admission = world.ledger.admit(call)
-            require(admission.disposition == "dispatch" and world.ledger.mark_dispatched(key), "Missing durable intent")
+            require(
+                admission.disposition == "dispatch" and world.ledger.mark_dispatched(key),
+                "Missing durable intent",
+            )
             attempt = world.ledger.attempt(key)
             oracle.arrange(key, Behavior(charge=37))
-            observation = HttpProvider(oracle.origin, token=TOKEN).dispatch({
-                "configuration": {"effect": "write"}, "attempt_id": key,
-                "operation_id": key, "operation_key": attempt["operation_key"],
-                "binding_id": call.binding_id, "revision": revision, "input": {"ticket_id": key},
-                "stream": False,
-            })
+            observation = HttpProvider(oracle.origin, token=TOKEN).dispatch(
+                {
+                    "configuration": {"effect": "write"},
+                    "attempt_id": key,
+                    "operation_id": key,
+                    "operation_key": attempt["operation_key"],
+                    "binding_id": call.binding_id,
+                    "revision": revision,
+                    "input": {"ticket_id": key},
+                    "stream": False,
+                }
+            )
             require(observation["charge_microusd"] == 37, "Missing independent effect")
         for when, expected in zip(("before", "after"), totals, strict=True):
             interrupted("write-crash", world.db, when, operation, key)
             reopened = Store(world.db, create=False)
             audit.totals(reopened, "crash-boundaries", expected, f"{operation}: {when} commit")
             if operation == "charge" and when == "before":
-                require(world.ledger.attempt(key)["charge_microusd"] is None, "Lost atomic settlement")
+                require(
+                    world.ledger.attempt(key)["charge_microusd"] is None, "Lost atomic settlement"
+                )
         if operation == "charge":
             known = world.host.reconcile(OWNER, key).attempt
             require(known["charge_microusd"] == 37, "Reconcile changed the already-booked amount")
-    require(count_by_attempt(oracle, {key}) == {key: 1}, "Crash replay repeated a destination effect")
+    require(
+        count_by_attempt(oracle, {key}) == {key: 1}, "Crash replay repeated a destination effect"
+    )
     report["capacity"] = audit.events
     report["independent_dispatches"] = oracle.dispatches(key)
 
@@ -425,19 +514,39 @@ def main():
     args = parser.parse_args()
     lab = os.environ.get("FORGE_VAST_LAB_ID", "")
     if sys.platform != "linux" or not lab.isdigit():
-        parser.error("Run on the designated Vast instance")
+        parser.error("Requires Linux and a numeric FORGE_VAST_LAB_ID.")
     evidence = args.output_dir.resolve()
     evidence.mkdir(parents=True, exist_ok=True)
     cases = []
-    interpreters = {key: str(Path(value).absolute()) for key, value in (
-        ("baseline", args.baseline_python), ("public", args.public_python), ("v1", args.v1_python)
-    )}
+    interpreters = {
+        key: str(Path(value).absolute())
+        for key, value in (
+            ("baseline", args.baseline_python),
+            ("public", args.public_python),
+            ("v1", args.v1_python),
+        )
+    }
     with TemporaryDirectory() as scratch, chdir(scratch):
         shutil.copytree(SUPPORT, "support")
         for name, trial in (
-            ("v2-reference", lambda oracle, report: verify_v2(interpreters["baseline"], "reference-v2", oracle, report)),
-            ("v2-public", lambda oracle, report: verify_v2(interpreters["public"], "public-v2", oracle, report)),
-            ("v1-v2-v3", lambda oracle, report: verify_v1(interpreters["v1"], interpreters["baseline"], oracle, report)),
+            (
+                "v2-reference",
+                lambda oracle, report: verify_v2(
+                    interpreters["baseline"], "reference-v2", oracle, report
+                ),
+            ),
+            (
+                "v2-public",
+                lambda oracle, report: verify_v2(
+                    interpreters["public"], "public-v2", oracle, report
+                ),
+            ),
+            (
+                "v1-v2-v3",
+                lambda oracle, report: verify_v1(
+                    interpreters["v1"], interpreters["baseline"], oracle, report
+                ),
+            ),
             ("allocation-charge-close-crashes", verify_crashes),
         ):
             report = {"case": name, "status": "pass"}
@@ -450,10 +559,16 @@ def main():
                     print(report["traceback"], file=sys.stderr)
                 report["destination_journal"] = oracle.journal
     passed = all(case["status"] == "pass" for case in cases)
-    dump(evidence / "upgrade-recovery.json", {
-        "status": "pass" if passed else "fail", "cases": cases, "vast_lab_id": lab,
-        "version": version("forge-os-check"), "v1_transform": "installed control wheel",
-    })
+    dump(
+        evidence / "upgrade-recovery.json",
+        {
+            "status": "pass" if passed else "fail",
+            "cases": cases,
+            "vast_lab_id": lab,
+            "version": version("forge-os-check"),
+            "v1_transform": "installed control wheel",
+        },
+    )
     return 0 if passed else 1
 
 

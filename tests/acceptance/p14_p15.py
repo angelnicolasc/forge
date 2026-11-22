@@ -1,4 +1,4 @@
-"""Prove isolated read-binding parity and limits on an identified Vast VM."""
+"""Compare read-binding results and limits between the two execution paths."""
 
 from __future__ import annotations
 
@@ -426,7 +426,7 @@ def main() -> int:
     if sys.platform != "linux" or not re.fullmatch(
         r"[0-9]+", os.environ.get("FORGE_VAST_LAB_ID", "")
     ):
-        raise SystemExit("Run only on the identified Vast Linux instance")
+        raise SystemExit("Requires Linux and a numeric FORGE_VAST_LAB_ID.")
     if len(sys.argv) == 3 and sys.argv[1] == "--child":
         return _child(Path(sys.argv[2]))
     parser = argparse.ArgumentParser(description=__doc__)

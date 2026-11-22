@@ -156,7 +156,7 @@ def mcp_serve(
     Any MCP-compatible client — Claude Desktop, Claude Code, custom agents —
     can connect and call forge tools directly.
 
-    Requires: pip install 'forge-mcp[sdk]'
+    Requires: pip install 'forge-os-mcp\\[sdk]'
 
     \b
     Examples:
@@ -167,8 +167,7 @@ def mcp_serve(
         from forge_mcp.forge_server import ForgeMCPServer
     except ImportError:
         console.print(
-            "[red]✗[/] forge-mcp[sdk] is not installed.\n"
-            "  Run: [bold]pip install 'forge-mcp[sdk]'[/]"
+            "Install the MCP SDK extra with pip install 'forge-os-mcp[sdk]'", markup=False
         )
         raise typer.Exit(1) from None
 

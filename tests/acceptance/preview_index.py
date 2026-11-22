@@ -1,4 +1,4 @@
-"""Ensayo de promoción del mismo wheel a un índice temporal de loopback en Vast."""
+"""Rehearse publishing the same wheel to a temporary loopback index."""
 
 import argparse
 import hashlib
@@ -111,7 +111,7 @@ def rehearse(wheel, directory, version, digest):
 
 if __name__ == "__main__":
     if sys.platform != "linux" or not os.environ.get("FORGE_VAST_LAB_ID"):
-        raise SystemExit("Requiere la reserva Vast")
+        raise SystemExit("Requires Linux and a nonempty FORGE_VAST_LAB_ID.")
     parser = argparse.ArgumentParser()
     parser.add_argument("--wheel", type=Path, required=True)
     parser.add_argument("--sha256", required=True)

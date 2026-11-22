@@ -1,33 +1,15 @@
-# Security Policy
+# Security policy
 
-## Supported Versions
+## Report a vulnerability
 
-| Version | Supported |
-|---------|-----------|
-| 0.x.x   | ✓ Active  |
+Email the maintainer at [nick.dicerutti@gmail.com](mailto:nick.dicerutti@gmail.com). Include the distribution and version, the affected operation, the expected and observed behavior, and enough detail to reproduce it with synthetic data. Keep credentials and customer records out of the report. Use email for the initial disclosure so the maintainer can investigate privately.
 
-## Reporting a Vulnerability
+## Scope
 
-**Please do NOT open a public GitHub issue for security vulnerabilities.**
+Forge Check (`forge-os-check`) is the maintained product. Its base CLI compares records supplied by the caller. The workflow owner chooses the eligible cases and the trusted source of observations. A `pass` applies to the evidence and rule in that comparison. [Input contract](docs/check.md)
 
-Report privately via GitHub Security Advisories:
-<https://github.com/angelnicolasc/forge/security/advisories/new>
+The optional governed runtime runs on a trusted host. Your integrating application must authenticate callers and supply their actor identity. Forge checks that identity against the configured grants. Protect the SQLite ledger, configuration, backups and provider credentials with operating system permissions. An administrator with write access to the host can change the stored evidence. Use the destination system's records to confirm an external effect. [Host configuration](docs/governed.md) · [Recovery](docs/operations.md)
 
-Or email the maintainer: **nick.dicerutti@gmail.com** (PGP key available on
-request).
+Code Mode is an opt-in executor for JavaScript on Linux x86_64. The host exposes explicitly enabled read bindings and checks the actor's grants and budget on dispatch. These controls apply to calls routed through the governed runtime. [Code Mode](docs/code-mode.md)
 
-Include:
-- Description of the vulnerability
-- Steps to reproduce
-- Potential impact
-- Suggested fix (optional)
-
-We will respond within 48 hours and aim to patch critical vulnerabilities within 7 days.
-
-## Security Design
-
-- All LLM calls are sandboxed — agents cannot execute arbitrary code without explicit tool grants
-- Memory entries are tenant-isolated — no cross-tenant data leakage
-- Evolution mutations require human approval in `mode=suggest` (default)
-- Audit logs are append-only and tamper-evident
-- No credentials are stored in the evolution journal or memory
+The earlier harness in `packages/` is historical and receives no routine maintenance. In `forge-spec`, assertion criteria evaluate Python expressions. Only run specifications from authors you trust. Include the package name when reporting an issue in the harness. [Historical packages](packages/README.md)

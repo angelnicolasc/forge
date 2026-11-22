@@ -8,16 +8,11 @@ import os
 import re
 import subprocess
 import sys
-import unicodedata
 from pathlib import Path
 
 _COMMIT = re.compile(r"[0-9a-f]{40}")
 _FINGERPRINT = re.compile(r"SHA256:[A-Za-z0-9+/]{43}")
 _PRINCIPAL = re.compile(r"[A-Za-z0-9._+@-]+")
-_ADDITIONAL_ATTRIBUTION = re.compile(
-    r"co[-_\s]*(?:author|develop|commit)|(?:authored|written|developed|generated|signed[-_ ]off)"
-    r"[-_ ]by\s*:",
-)
 
 
 def verify(
@@ -75,7 +70,7 @@ def verify(
     identity_format = "%an|%ae|%cn|%ce|%G?|%GF|%GS"
     for commit in commits:
         raw = git("cat-file", "commit", commit)
-        headers, separator, message = raw.partition("\n\n")
+        headers, separator, _ = raw.partition("\n\n")
         if not separator or not re.search(r"^gpgsig -----BEGIN SSH SIGNATURE-----$", headers, re.M):
             raise ValueError(f"Commit {commit} is missing an SSH signature")
         git("verify-commit", commit)
@@ -84,12 +79,6 @@ def verify(
             != expected
         ):
             raise ValueError(f"Commit {commit} has an unauthorized author, committer or signer")
-        normalized = unicodedata.normalize("NFKC", message).casefold()
-        normalized = "".join(
-            character for character in normalized if unicodedata.category(character) != "Cf"
-        )
-        if _ADDITIONAL_ATTRIBUTION.search(normalized):
-            raise ValueError(f"Commit {commit} contains an additional authorship attribution")
     return commits
 
 

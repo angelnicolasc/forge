@@ -1,14 +1,14 @@
-# forge-memory
+# forge-os-memory
 
-Living Collaborative Memory for Forge: a hybrid memory layer that combines semantic retrieval, graph traversal, and deterministic rules in one package.
+Part of the earlier Forge agent harness. For the standalone CI check, see [Forge Check](https://pypi.org/project/forge-os-check/).
 
-`forge-memory` is the package that gives Forge cross-run memory. It stores `MemoryEntry` objects, versions every write, preserves provenance, and retrieves relevant context through a three-layer strategy:
+`forge-os-memory` stores and retrieves entries for the harness using three components.
 
 - Vector search with ChromaDB
 - Graph retrieval with NetworkX plus SQLite WAL persistence
 - Symbolic filtering and reranking with a rule engine
 
-The result is a memory system that can ingest agent output, survive restarts, handle concurrent writers, and inject relevant context back into future runs.
+The local graph store persists entries across restarts. The memory injector can retrieve context for a subsequent run.
 
 ## What ships today
 
@@ -33,20 +33,20 @@ uv sync
 As a standalone package:
 
 ```bash
-pip install forge-memory
+pip install forge-os-memory
 ```
 
-Optional extras declared by the package:
+The optional extras install the upstream client libraries. Version 0.2.0 ships NetworkX and ChromaDB backends. Connecting other stores requires a backend implementation.
 
 ```bash
-pip install 'forge-memory[neo4j]'
-pip install 'forge-memory[qdrant]'
+pip install 'forge-os-memory[neo4j]'
+pip install 'forge-os-memory[qdrant]'
 ```
 
 Requirements:
 
 - Python 3.11+
-- `forge-core==0.1.0`
+- `forge-os-core==0.2.0`
 
 ## Quickstart
 
@@ -93,7 +93,7 @@ asyncio.run(main())
 2. Fuse their ranked results with Reciprocal Rank Fusion
 3. Apply symbolic rules for vetoes, boosts, demotions, and tag enrichment
 
-This makes the package useful in cases where semantic similarity alone is not enough. Graph hops can surface structurally related entries, and rules can enforce deterministic business constraints after retrieval.
+Graph hops can surface related entries. The rule engine filters or reweights the combined results.
 
 ## Persistence and durability
 
@@ -109,7 +109,7 @@ You can override persistence paths by constructing the backends directly and pas
 
 ## Versioning and concurrent writers
 
-Every stored `MemoryEntry` is versioned and recorded in an append-only log with provenance fields such as:
+The local version store appends JSON records for entry versions. Its history includes the following fields.
 
 - `version`
 - `supersedes`
@@ -222,8 +222,6 @@ Primary modules:
 ## Notes for backend swaps
 
 `HybridMemory` is built around structural typing rather than a hard inheritance tree. If a backend implements the expected async methods such as `store()`, `query()`, `delete()`, and `health_check()`, it can be plugged in directly.
-
-That makes it straightforward to replace the defaults with external systems such as Qdrant or Neo4j while keeping the same high-level memory API.
 
 ## Testing
 

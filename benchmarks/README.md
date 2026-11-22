@@ -6,12 +6,18 @@ The binding benchmark runs identical inventory reads with caching disabled and w
 
 On the PyPI `0.4.0` wheel, all three rounds had the same physical call counts. Each arm returned the same sequence of stock values as its control.
 
-| Sequential inventory workload | Provider calls, TTL 0 s → 300 s | Synthetic charges per arm, µUSD | Additional POSTs from 120 exact replays per arm |
-|---|---:|---:|---:|
-| 120 reads cycling over 8 SKUs | 120 → 8 | 480,000 → 32,000 | 0 |
-| 120 reads of 120 distinct SKUs | 120 → 120 | 480,000 → 480,000 | 0 |
+<!-- bindings-benchmark:start -->
 
-The fixture charges 4,000 µUSD per physical POST. The ledger was reconciled against the destination in every arm. The percentages on the project README describe provider requests. Real bills depend on provider pricing and the workload's reuse and freshness requirements. [Stable binding receipt](results/bindings-stable.json) · [Development wheel receipt](results/bindings-candidate.json)
+| Inventory workload | Cache off | Cache on | Fewer provider calls |
+|---|---:|---:|---:|
+| 120 reads, 8 recurring SKUs | 120 | 8 | 93.3% |
+| 120 reads, 120 different SKUs | 120 | 120 | 0% |
+
+<!-- bindings-benchmark:end -->
+
+In the repeated-key workload, the p50 across the 120 first invocations in each round was 24.9–25.6 ms with caching off and 8.4–8.5 ms with caching on. The latter includes eight misses and 112 hits per round. The timer covers `Host.invoke` on a loopback provider. To estimate the overhead added by Forge, the experiment would also need a direct HTTP arm under matched conditions.
+
+At the fixture tariff of 4,000 µUSD per POST, the repeated-key workload cost 480,000 µUSD with caching off and 32,000 µUSD with caching on. The distinct-key control cost 480,000 µUSD in both arms. Each arm replayed every task once, with zero additional POSTs. Every ledger reconciled with its destination. The published wheel starts the five-minute TTL when the result is settled. [Stable binding receipt](results/bindings-stable.json) · [Development receipt](results/bindings-candidate.json) · [Slow-response freshness trial](#does-cached-inventory-stay-fresh-after-an-upgrade)
 
 Run the published measurements from the root of a Forge checkout on Linux with Python 3.11 or later. Keep the same shell for the stable binding, Gate and capacity examples. Each run uses a new directory for its receipts.
 
@@ -27,7 +33,7 @@ printf '%s\n' 'forge-os-check==0.4.0 --hash=sha256:406e04674da9433ab3f392aaf089b
   --tasks 120 --keys 8 --rounds 3 --output "$RUN_DIR/bindings.json"
 ```
 
-Run `"$STABLE_PYTHON" -I benchmarks/readme_table.py --check` from the checkout to compare the README table with its stable receipt. The wheel and receipt digests are recorded in the [run manifest](results/environment.json).
+Run `"$STABLE_PYTHON" -I benchmarks/readme_table.py --check` from the checkout to compare the table above with its stable receipt. The wheel and receipt digests are recorded in the [run manifest](results/environment.json).
 
 The repeated-key workload cycles through eight SKUs. Its control uses a different SKU for each of the 120 tasks. The stock stays constant in both workloads. Compare physical calls and synthetic charges within the same workload and round. Both policies run through Forge, and the second invocation of a task exercises idempotent replay separately from cache reuse across tasks. [Benchmark source](bindings.py)
 
@@ -88,7 +94,7 @@ Times cover a warm SQLite query on an already-open connection. Each arm has 31 s
 
 ### Compare the v3 projection with canonical accounting
 
-On a leased Vast Linux host, run the following from the root of a checkout containing this PR and its history. Export `FORGE_VAST_LAB_ID` with the numeric ID of the lease. This builds two development wheels from the signed commits used in the ADR and installs each into its own virtual environment. The SHA-256 values printed by the command identify the artifacts used in your run.
+On a leased Vast Linux host, run the following from a checkout containing both commits listed below. Export `FORGE_VAST_LAB_ID` with the numeric ID of the lease. This builds two development wheels from the signed commits used in the ADR and installs each into its own virtual environment. The SHA-256 values printed by the command identify the artifacts used in your run.
 
 ```sh
 set -eu

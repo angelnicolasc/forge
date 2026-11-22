@@ -1,4 +1,4 @@
-site_name: Forge
+site_name: Forge Check
 site_description: "Check saved agent results in CI, govern tool calls and evaluate evidence before promoting a revision."
 repo_url: https://github.com/angelnicolasc/forge
 repo_name: angelnicolasc/forge
@@ -65,7 +65,7 @@ nav:
       - Evidence for conditional reads: decisions/0003-conditional-evidence.md
       - Canary traffic at the dispatch boundary: decisions/0004-rollout-traffic.md
       - Capacity under sustained load: decisions/0005-rollout-capacity.md
-  - Earlier Forge harness:
+  - Historical harness (no longer actively maintained):
       - Harness quickstart: quickstart.md
       - Harness architecture: architecture.md
       - Harness feature map: feature-map.md

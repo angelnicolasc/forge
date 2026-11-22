@@ -29,9 +29,7 @@ Usage (CLI)
 Dependencies
 ------------
 Requires the ``[sdk]`` extra:
-    pip install "forge-mcp[sdk]"
-    # or:
-    pip install "forge-os[mcp]"
+    pip install "forge-os-mcp[sdk]"
 """
 
 from __future__ import annotations
@@ -122,8 +120,8 @@ class ForgeMCPServer:
             from mcp.server import Server
         except ImportError as exc:
             raise ImportError(
-                "forge-mcp[sdk] is required to run the Forge MCP server. "
-                "Install with: pip install 'forge-mcp[sdk]'"
+                "forge-os-mcp[sdk] is required to run the Forge MCP server. "
+                "Install with: pip install 'forge-os-mcp[sdk]'"
             ) from exc
 
         app: Any = Server(self._server_name)
