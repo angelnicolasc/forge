@@ -8,32 +8,42 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+Forge Check development notes are recorded in the [architecture decisions](docs/decisions/index.md).
+
 ---
+
+## Forge Check 0.4.0 — 2026-11-20
+
+The standalone distribution is `forge-os-check`. Install it in a dedicated Python 3.11+ environment because the historical harness also provides the `forge` executable.
+
+- `forge check` compares two recorded revisions against a frozen set of eligible cases. The report includes per-case reasons, evidence coverage and a CI exit code.
+- The single-host runtime records governed calls in SQLite and uses independent observations to evaluate conditional inventory rules before promotion. The optional Code Mode extra supports explicitly enabled read bindings on Linux x86_64.
+- Read-cache expiry in this release starts when the host settles the result. Set the TTL to zero for operations that require a fresh lookup on every new request.
+
+[Published wheel](https://pypi.org/project/forge-os-check/0.4.0/#files) · [Release source](https://github.com/angelnicolasc/forge/commit/6fc58c30ca50d3d9bda1e14e0764e77bb123df56) · [Publication receipt](https://github.com/angelnicolasc/forge/actions/runs/44823397253)
+
+## Historical harness
 
 ## [0.2.0] — 2026-05-13
 
-Promotes the platform to a general-purpose agent governance runtime. Introduces `forge-spec`
-for specification-driven run verification, `forge-review` for policy-gated lifecycle hooks,
-and completes production hardening across the observability, cost-model, and memory stacks.
-All six core packages gain expanded event coverage and stronger type contracts.
+This release adds `forge-spec` for checking recorded runs against specifications and
+`forge-review` for policy-gated lifecycle hooks. It extends event coverage and type
+contracts across the harness packages.
 
 ### Added
 
-**`forge-spec` — Specification-Driven Development** (`pip install 'forge-os[spec]'`)
+**`forge-spec` — Run specifications** (`pip install 'forge-os[spec]'`)
 
-- `SpecVerifier` evaluates acceptance criteria across three check types — ASSERTION (sandboxed
-  Python expression evaluation), REGEX, and CONTAINS — with per-criterion weighting and a
-  weighted compliance rate
-- `SpecAttester` produces SLSA Level 2-inspired provenance attestations
-  (`predicate_type: https://slsa.dev/provenance/v1`) with a canonical SHA-256 spec hash for
-  immutable, timestamp-independent provenance tracking
+- `SpecVerifier` supports ASSERTION, REGEX and CONTAINS criteria, with per-criterion weights.
+  ASSERTION evaluates Python expressions from trusted specifications with restricted built-ins.
+- `SpecAttester` produces an unsigned verification report containing the spec's SHA-256
+  digest and counts of passed, failed and skipped criteria.
 - `SpecConstraintGuard` intercepts evolution mutations before application and raises
   `ConstraintViolationError` when a mutation violates a declared spec constraint
 - YAML-based spec authoring with round-trip serialization and deterministic `spec_hash`
   generation from canonical JSON
 - `RunEventKind.SPEC_VERIFIED` published to the EventBus after each verification pipeline
 - CLI: `forge spec init`, `forge spec show`, `forge spec verify`, `forge spec attest`
-- 90 tests; zero regressions against the existing suite
 
 **`forge-review` — Review Agents and Policy Gates** (`pip install 'forge-os[review]'`)
 
@@ -51,7 +61,6 @@ All six core packages gain expanded event coverage and stronger type contracts.
   continues; no reviewer can silence another
 - `RunEventKind.REVIEW_COMPLETE` published to the EventBus after each gate evaluation
 - CLI: `forge review run`, `forge review show`
-- 102 tests; zero regressions against the existing suite
 
 **`forge-core` — Streaming, Typing, and Concurrency**
 
@@ -76,10 +85,8 @@ All six core packages gain expanded event coverage and stronger type contracts.
 
 **`forge-memory`**
 
-- `GraphBackend` defined as a `@runtime_checkable` Protocol, enabling runtime interface checks
-  against custom graph backend implementations (NetworkX, Neo4j, and third-party adapters)
-- `HybridMemory` accepts an optional `graph_backend` parameter for dependency injection in
-  test and production environments
+- `GraphBackend` defines the interface for graph storage. NetworkX is the bundled implementation.
+- `HybridMemory` accepts a custom backend through its `graph_backend` parameter.
 
 **`forge-adapters`**
 
@@ -103,11 +110,10 @@ model with `TOOL_CALL` and `SKILL_CALL` telemetry.
 
 ### Added
 
-**`forge-mcp` — MCP Meta-Orchestrator** (`pip install 'forge-os[mcp]'`)
+**`forge-mcp` — MCP tool calls** (`pip install 'forge-os[mcp]'`)
 
-- Eight-layer per-call governance pipeline: tool routing → policy enforcement → budget
-  accounting → TTL result cache → circuit breaker → upstream dispatch → secret redaction →
-  post-processing telemetry
+- Tool calls pass through a router, caller policy, budget check, result cache and circuit
+  breaker. The server redacts recognized credential patterns and records dispatch events.
 - Deny-by-default tool policy with per-caller allowlist; `ToolDeniedError` raised on explicit
   policy violation, distinguished from upstream errors encapsulated in `ToolResult.error`
 - SHA-256 keyed TTL result cache; cache key normalized by sorted argument keys for
@@ -122,24 +128,21 @@ model with `TOOL_CALL` and `SKILL_CALL` telemetry.
 - `MCPClientProtocol` structural protocol with `FakeMCPClient` test double for deterministic
   upstream simulation in CI
 - CLI: `forge mcp list-tools`, `forge mcp call`, `forge mcp status`
-- 94 tests covering types, security, budget, cache, router, server, and loader
 
 **`forge-skills` — Skills Runtime** (`pip install 'forge-os[skills]'`)
 
 - SKILL.md frontmatter format (YAML between `---` markers) for skill authoring; compatible
   with the Claude Code skills ecosystem (fields: name, description, examples, parameters,
   tools, timeout_seconds, max_calls, tags)
-- `SkillRuntime` facade with a 7-step invocation pipeline: argument validation → call-count
-  budget check → handler resolution → `child_scope` isolation (inherits parent `run_id` for
-  trace continuity; assigns an independent `agent_id` per invocation) →
-  `asyncio.wait_for` with configurable timeout → budget recording → `SKILL_CALL` publication
+- `SkillRuntime` validates arguments and checks the call budget before invoking a handler
+  with a configurable timeout. Each invocation gets its own `agent_id` under the parent
+  `run_id`. Successful invocations record budget usage and emit `SKILL_CALL`.
 - `IntentDispatcher` backed by `IntentClassifier` with dual-threshold enforcement; both the
   classifier and the dispatcher enforce the confidence threshold independently for robustness
   against custom classifier implementations
 - Tag-based skill discovery and filtering in `SkillRegistry`; last-write-wins on name
   collision
 - CLI: `forge skills list`, `forge skills explain`, `forge skills run`
-- 100 tests covering types, loader, registry, executor, dispatcher, and runtime
 
 **`forge-core`**
 
@@ -150,9 +153,7 @@ model with `TOOL_CALL` and `SKILL_CALL` telemetry.
 
 ## [0.1.1] — 2026-04-26
 
-Establishes the cross-cutting platform foundations required by all subsequent releases: a
-shared intent classification primitive, SPIFFE-based agent identity, Agent-to-Agent (A2A)
-protocol compliance, and the first governance package, `forge-rules`.
+Adds rule packs, a shared intent classifier and an HTTP endpoint that serves an agent card.
 
 ### Added
 
@@ -171,13 +172,12 @@ protocol compliance, and the first governance package, `forge-rules`.
 - YAML round-trip serialization (`load_yaml` / `dump_yaml`) for rule packs and individual
   rules
 - CLI: `forge rules validate`, `forge rules lint`, `forge rules explain`, `forge rules diff`
-- 84 tests covering types, glob intersection, conflict resolver, selector, loader, and engine
 
-**`forge-core` — Platform Foundations**
+**`forge-core` — Agent cards and intent classification**
 
 - SPIFFE identity field (`spiffe_id`) on `AgentCard` with URI format validation
   (`spiffe://<trust-domain>/<workload>`); the operator issues SVIDs, Forge validates the URI
-- A2A compliance fields on `AgentCard`: `url`, `version`, `provider`
+- `AgentCard` gains `url`, `version` and `provider` fields.
 - `RunStatus.INPUT_REQUIRED` for human-in-the-loop workflow pauses
 - `RunEventKind.CONTEXT_INJECTED` and `RunEvent.context_tokens` for context token accounting
   across the platform
@@ -193,15 +193,14 @@ protocol compliance, and the first governance package, `forge-rules`.
 
 - `GET /.well-known/agent.json` A2A discovery endpoint integrated into the observe FastAPI
   application
-- `ObserveConfig.agent_base_url` — when set, produces a fully A2A-compliant agent card
-  including the `url` field; when absent, the field is omitted and the endpoint remains
-  available for non-strict A2A consumers
+- Set `ObserveConfig.agent_base_url` to include the `url` field in the response. Without
+  it, the endpoint serves the remaining card fields.
 
 ---
 
 ## [0.1.0] — 2026-04-18
 
-First public release. Backend + CLI only; a web UI on top of the observe REST + SSE API is planned for v0.2.0.
+First public release of the Python harness, CLI and HTTP API.
 
 ### Added
 
@@ -209,18 +208,18 @@ First public release. Backend + CLI only; a web UI on top of the observe REST + 
 - `MetaOrchestrator` with run lifecycle, EventBus, context propagation via `contextvars`
 - `LLMCallInterceptor` protocol — framework-agnostic token / cost capture
 - Self-evolution FSM: `IDLE → OBSERVING → PROPOSING → APPLYING → EVALUATING → COMMITTING | ROLLING_BACK`
-- Real mutators: `PromptRewriteMutator` (LLM structured output), `ParameterTuneMutator`
+- `PromptRewriteMutator` (LLM structured output), `ParameterTuneMutator`
   (applies diff to `RunConfig`), `AgentCullMutator` (snapshot-backed rollback)
 - `TopologySnapshot` for atomic rollback
 - `EvalSuite` with deterministic + synthetic evaluation
 - `EvolutionJournal` with append-only provenance
 - `CostBudgetGuard` + timeout enforcement via `asyncio.wait_for`
-- `CircuitBreaker` (closed → open → half-open) — ships with the class; wired in ζ.5
+- `CircuitBreaker` with closed, open and half-open states
 - `ForgeTestHarness` + `MockLLMProvider` for deterministic end-to-end tests
 
 **`forge-memory`**
 - `HybridMemory` fusing vector (ChromaDB), graph (NetworkX), and symbolic layers
-- `MemoryContextInjector` — memory actually flows into the next run's envelope
+- `MemoryContextInjector` adds recalled items to the next run's envelope
 - Vector-clock versioning with conflict detection
 - `IngestionPipeline` with regex + optional LLM-backed entity extraction
 - NetworkX backend persists via SQLite (WAL) with atomic writes
@@ -230,7 +229,7 @@ First public release. Backend + CLI only; a web UI on top of the observe REST + 
 - `CrewAIAdapter` — instruments `Agent.execute_task` / `BaseTool._run`
 - `AutoGenAdapter` — subscribes to `TRACE_LOGGER_NAME` structured records
 - `GenericCallableAdapter` — monkey-patches Anthropic / OpenAI / Gemini SDKs in-scope
-- Auto-detection via import inspection
+- Framework detection helpers inspect imports in a source file.
 
 **`forge-observe`**
 - `ForgeLLMInterceptor` publishes `RunEvent`s to the bus with real tokens + cost

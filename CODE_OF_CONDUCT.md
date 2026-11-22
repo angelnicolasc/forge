@@ -19,7 +19,7 @@ This includes, but is not limited to:
 - Personal insults or hostile behavior
 - Harassment or stalking
 - Discriminatory or demeaning comments
-- deliberate disruption of discussions or review threads
+- Deliberate disruption of discussions or review threads
 - Publishing private information without permission
 - Spam, trolling, or bad-faith engagement
 
@@ -34,14 +34,10 @@ This code of conduct applies in:
 
 ## Enforcement
 
-Project maintainers may remove, edit, or reject comments, issues, pull requests, or other contributions that do not align with this code of conduct.
+The maintainer may remove, edit, or reject comments, issues, pull requests, or other contributions that violate this code of conduct.
 
-Depending on severity, maintainers may also warn, temporarily restrict, or ban participants from future interaction with the project.
+Depending on severity, the maintainer may also warn, temporarily restrict, or ban participants from future interaction with the project.
 
 ## Reporting
 
-If you encounter behavior that violates this code of conduct, open a maintainer contact request through GitHub without including sensitive personal information in public.
-
-## Notes
-
-This is a small, maintainer-led project. The goal is not heavy process. The goal is to keep collaboration useful, respectful, and focused.
+Report incidents privately to the maintainer at [nick.dicerutti@gmail.com](mailto:nick.dicerutti@gmail.com). Include a link to the relevant discussion if you can.

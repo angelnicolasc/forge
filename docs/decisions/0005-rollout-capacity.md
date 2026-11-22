@@ -1,8 +1,10 @@
 # 0005 · Bound the cost of admitting a canary task
 
-**Status** The closed-charge projection is eligible for review. Canonical accounting is the default. Sustained capacity at 60 tasks/s is on hold. [F3/F4 measurements and receipt digests](https://github.com/angelnicolasc/forge/blob/e5989b9c2bf229ab6fc1f5fd4bb2652a3b253498/benchmarks/results/adr-0005.md)
+**Canonical accounting remains the default for canary admissions.** Precomputing the charges for closed tasks reduced the median warm capacity query from 51.66–52.19 ms to 0.067–0.102 ms across three fixture builds. In a separate end-to-end test at 60 offered tasks per second, all three candidate runs hit the queue cutoff after 90 seconds of the planned ten minutes. The optimized calculation stays opt-in. [Measurements and receipt digests](https://github.com/angelnicolasc/forge/blob/e5989b9c2bf229ab6fc1f5fd4bb2652a3b253498/benchmarks/results/adr-0005.md)
 
-## Decision to make
+<a id="decision-to-make"></a>
+
+## Why admission slowed as the rollout grew
 
 Two rollouts can have the same remaining budget but very different admission latency. In a single-host lab, moving 10,000 historical roots from a closed rollout into the rollout being evaluated raised a warm capacity query from 0.012 ms to 22.57 ms. At 60 offered tasks/s, end-to-end p95 went from 0.92 s to 7.40 s. The first two historical roots were real API transactions, the other 9,998 reproduced their table shape, and 120 new tasks in each arm went through the binding. These figures identify the cost of scanning an active rollout. [Benchmark results](https://github.com/angelnicolasc/forge/tree/main/benchmarks)
 

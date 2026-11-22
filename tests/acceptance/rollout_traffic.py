@@ -125,7 +125,7 @@ def main() -> None:
     args = parser.parse_args()
     lab = os.environ.get("FORGE_VAST_LAB_ID", "")
     if sys.platform != "linux" or not lab.isdigit():
-        parser.error("Run in the designated Vast instance")
+        parser.error("Requires Linux and a numeric FORGE_VAST_LAB_ID.")
     output = args.output.resolve()
     with TemporaryDirectory() as directory, chdir(directory), Oracle() as oracle:
         shutil.copytree(SUPPORT, "support")

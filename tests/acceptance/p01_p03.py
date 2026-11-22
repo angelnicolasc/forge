@@ -408,7 +408,7 @@ def main() -> int:
     args = parser.parse_args()
     lab_id = os.environ.get("FORGE_VAST_LAB_ID", "")
     if sys.platform != "linux" or not re.fullmatch(r"[0-9]+", lab_id):
-        parser.error("run on the verified Linux Vast instance with FORGE_VAST_LAB_ID set")
+        parser.error("Requires Linux and a numeric FORGE_VAST_LAB_ID.")
     strace = shutil.which("strace")
     if strace is None:
         parser.error("install strace in the lab for independent network observation")

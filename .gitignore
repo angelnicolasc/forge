@@ -18,12 +18,12 @@ env/
 
 # uv
 .uv/
-uv.lock  # uncomment to ignore lockfile (not recommended)
 
 # Testing
 .pytest_cache/
 .coverage
 coverage.xml
+coverage.json
 htmlcov/
 .hypothesis/
 
@@ -42,8 +42,8 @@ Thumbs.db
 # Docs
 site/
 
-# Forge runtime
-~/.forge/  # symlink guard — actual data in user home
+# Local copies of home-directory runtime data
+/~/.forge/
 
 # Distribution
 *.whl

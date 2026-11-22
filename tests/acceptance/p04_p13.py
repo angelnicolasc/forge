@@ -1,4 +1,4 @@
-"""Run the governed binding and release acceptance suite on an identified Vast VM."""
+"""Exercise governed binding and release behavior against an installed wheel."""
 
 from __future__ import annotations
 
@@ -117,7 +117,7 @@ def acceptance_main(trials: tuple[str, ...], driver: str, description: str | Non
     args = parser.parse_args()
     lab_id = os.environ.get("FORGE_VAST_LAB_ID", "")
     if sys.platform != "linux" or not re.fullmatch(r"[0-9]+", lab_id):
-        parser.error("run on the verified Linux Vast instance with FORGE_VAST_LAB_ID set")
+        parser.error("Requires Linux and a numeric FORGE_VAST_LAB_ID.")
     destination = args.output_dir.resolve()
     destination.mkdir(parents=True, exist_ok=False)
     wheel = args.wheel.resolve()

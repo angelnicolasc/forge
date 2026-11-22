@@ -1,4 +1,4 @@
-"""Exercise crash recovery, migration and storage failure on an identified Vast VM."""
+"""Exercise crash recovery, migration and storage failure against the installed wheel."""
 
 from __future__ import annotations
 
@@ -57,7 +57,7 @@ def main() -> int:
     arguments = parser.parse_args()
     instance = os.environ.get("FORGE_VAST_LAB_ID", "")
     if sys.platform != "linux" or not re.fullmatch(r"[0-9]+", instance):
-        parser.error("run only on the verified Linux Vast instance")
+        parser.error("Requires Linux and a numeric FORGE_VAST_LAB_ID.")
     output = arguments.output_dir.resolve()
     output.mkdir(parents=True, exist_ok=False)
     wheel = arguments.wheel.resolve()

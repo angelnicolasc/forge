@@ -1,4 +1,4 @@
-"""Print the provider-call table or check the table in the project README."""
+"""Print the provider-call table or check the table in the benchmark README."""
 
 from __future__ import annotations
 
@@ -59,16 +59,20 @@ def main() -> None:
     parser.add_argument(
         "--receipt", type=Path, default=DIRECTORY / "results" / "bindings-stable.json"
     )
-    parser.add_argument("--check", action="store_true", help="Verify the checked-in README table")
+    parser.add_argument(
+        "--check", action="store_true", help="Verify the table in benchmarks/README.md"
+    )
     args = parser.parse_args()
     table = render(json.loads(args.receipt.read_text(encoding="utf-8")))
     if args.check:
-        readme = (DIRECTORY.parent / "README.md").read_text(encoding="utf-8")
+        readme = (DIRECTORY / "README.md").read_text(encoding="utf-8")
         if readme.count(START) != 1 or readme.count(END) != 1:
             raise SystemExit("Missing or duplicate benchmark table markers")
         published = readme.split(START, 1)[1].split(END, 1)[0].strip()
         if table != published:
-            raise SystemExit(f"README benchmark table differs from receipt. Expected:\n{table}")
+            raise SystemExit(
+                f"Table in benchmarks/README.md differs from receipt. Expected:\n{table}"
+            )
     else:
         print(table)
 

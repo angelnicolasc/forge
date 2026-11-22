@@ -817,7 +817,7 @@ def main() -> int:
     options = parser.parse_args()
     lab = os.environ.get("FORGE_VAST_LAB_ID", "")
     if sys.platform != "linux" or (not options.demo and not lab.isdigit()):
-        parser.error("Run in the verified Vast lab")
+        parser.error("Requires Linux. Acceptance runs also require a numeric FORGE_VAST_LAB_ID.")
     options.output_dir.mkdir(parents=True, exist_ok=False)
     with options.wheel.open("rb") as stream:
         digest = hashlib.file_digest(stream, "sha256").hexdigest()

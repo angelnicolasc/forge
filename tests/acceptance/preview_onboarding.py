@@ -408,7 +408,7 @@ def main():
     opts = parser.parse_args()
     lab_id = os.getenv("FORGE_VAST_LAB_ID", "").strip()
     if not lab_id or sys.platform != "linux":
-        raise SystemExit("Requires a provisioned Vast Linux host and FORGE_VAST_LAB_ID")
+        raise SystemExit("Requires Linux and a nonempty FORGE_VAST_LAB_ID.")
     if not opts.wheel.is_absolute() or not opts.wheel.is_file() or opts.wheel.suffix != ".whl":
         raise SystemExit("Supply the exact installed candidate wheel by absolute path")
     out = opts.out.resolve()

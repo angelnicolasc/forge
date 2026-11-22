@@ -1,4 +1,4 @@
-"""Acceptance cases invoked exclusively by the clean-wheel Vast runner."""
+"""Acceptance cases for the governed binding in a clean wheel installation."""
 
 from __future__ import annotations
 

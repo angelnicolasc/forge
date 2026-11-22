@@ -1,24 +1,8 @@
-## Summary
+## Change
 
-<!-- What does this PR change? Why? -->
+<!-- What behavior or instruction changes, and who relies on it? -->
 
-## Type of Change
+## Verification
 
-- [ ] Bug fix
-- [ ] New feature
-- [ ] Breaking change
-- [ ] Documentation update
-- [ ] Performance improvement
-- [ ] Refactor
-
-## Checklist
-
-- [ ] I have run `uv run ruff check .` and `uv run ruff format .`
-- [ ] I have run `uv run mypy packages/` with no new errors
-- [ ] I have added tests for new functionality
-- [ ] I have updated documentation if necessary
-- [ ] All tests pass (`uv run pytest`)
-
-## Related Issues
-
-Closes #
+<!-- Give the command, test, or rendered example that exercises the change.
+For a CLI change, identify the wheel tested and the expected verdict or exit code. -->
