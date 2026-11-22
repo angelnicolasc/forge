@@ -1,8 +1,8 @@
-"""forge evolve — Trigger the self-evolution loop manually.
+"""forge evolve — Propose changes to a flow and inspect the recorded decisions.
 
 Subcommands:
 
-- ``forge evolve run <source>``  — execute the evolution loop against a flow.
+- ``forge evolve run <source>``  — propose changes in suggest mode or evaluate them in auto mode.
 - ``forge evolve status``         — show recent journal entries + breaker state.
 - ``forge evolve resume <source>`` — re-arm the evolution circuit breaker.
 """
@@ -26,40 +26,36 @@ from forge_observe.exporters.console import (
     print_evolution_proposal,
 )
 
-evolve_app = typer.Typer(help="Trigger, inspect, or resume the self-evolution loop.")
+evolve_app = typer.Typer(
+    help="Propose flow changes, inspect the journal or reset the circuit breaker."
+)
 console = Console()
 
 
 @evolve_app.command("run")
 def evolve_run(
     source: str = typer.Argument(..., help="Agent flow file or module.", metavar="SOURCE"),
-    runs: int = typer.Option(5, "--runs", "-r", help="Number of eval runs for fitness scoring."),
+    runs: int = typer.Option(
+        5, "--runs", "-r", help="Compatibility option. It has no effect on evaluation."
+    ),
     mode: str = typer.Option(
         "suggest",
         "--mode",
         "-m",
-        help="Evolution mode: 'suggest' (show proposals) or 'auto' (apply automatically).",
+        help="Use 'suggest' to review proposals or 'auto' to apply and evaluate changes.",
     ),
     max_mutations: int = typer.Option(3, "--max-mutations", help="Max mutations per session."),
 ) -> None:
-    """[bold]Run[/] the self-evolution loop against a flow.
+    """Use recent harness runs to propose changes to the flow."""
+    if mode not in ("suggest", "auto"):
+        raise typer.BadParameter("Use 'suggest' or 'auto'.", param_hint="--mode")
 
-    \b
-    [dim]The loop observes recent runs, proposes mutations, evaluates them,
-    and commits improvements. Your agents literally get smarter over time.[/dim]
-
-    [bold]Examples:[/bold]
-      [green]forge evolve run my_flow.py --mode suggest[/green]
-      [green]forge evolve run my_crew.py --mode auto --runs 10[/green]
-    """
-    console.print(
-        f"\n  [{FORGE_TEAL}]⚗  Starting Evolution Loop[/]  (mode={mode}, eval_runs={runs})\n"
-    )
-    exit_code = asyncio.run(_do_evolve(source, runs, mode, max_mutations))
+    console.print(f"\n  [{FORGE_TEAL}]Reviewing flow changes[/]  (mode={mode})\n")
+    exit_code = asyncio.run(_do_evolve(source, mode, max_mutations))
     raise typer.Exit(exit_code)
 
 
-async def _do_evolve(source: str, runs: int, mode: str, max_mutations: int) -> int:
+async def _do_evolve(source: str, mode: str, max_mutations: int) -> int:
     from forge_core.config import ForgeConfig
     from forge_core.evolution.loop import EvolutionLoop
     from forge_core.harness import MetaOrchestrator
@@ -75,33 +71,31 @@ async def _do_evolve(source: str, runs: int, mode: str, max_mutations: int) -> i
 
     loop = EvolutionLoop(orchestrator=orchestrator, mode=mode, max_mutations=max_mutations)
 
-    mutations_applied = 0
+    accepted = 0
     for i in range(max_mutations):
         console.print(f"  [dim]Iteration {i + 1}/{max_mutations}...[/]")
         mutation = await loop.step()
         if mutation is None:
-            console.print(f"  [{FORGE_TEAL}]✓ No further improvements found. System is optimal.[/]")
+            console.print(f"  [{FORGE_TEAL}]✓ This step returned no mutation.[/]")
             break
         print_evolution_proposal(mutation)
         if mode == "auto":
             console.print(f"  [{FORGE_TEAL}]↳ Applied automatically.[/]")
-            mutations_applied += 1
+            accepted += 1
         else:
-            apply = typer.confirm("  Apply this mutation?", default=False)
+            apply = typer.confirm("  Accept this proposal for this session?", default=False)
             if apply:
-                mutations_applied += 1
-                console.print(f"  [{FORGE_TEAL}]✓ Applied.[/]")
+                accepted += 1
+                console.print(f"  [{FORGE_TEAL}]Proposal accepted for this session.[/]")
             else:
                 console.print("  [dim]Skipped.[/]")
 
-    console.print(
-        f"\n  [{FORGE_TEAL}]⚗  Evolution complete.[/] {mutations_applied} mutation(s) applied.\n"
-    )
+    console.print(f"\n  [{FORGE_TEAL}]Finished.[/] {accepted} proposal(s) accepted.\n")
     return 0
 
 
 # ---------------------------------------------------------------------------
-# ζ.15 — read-side subcommands
+# Journal commands
 # ---------------------------------------------------------------------------
 
 
